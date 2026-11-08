@@ -1,6 +1,7 @@
 package dev.juuri.noma.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -75,6 +76,17 @@ class NomaUiTest {
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_checklist_0"))
         compose.onNodeWithTag("noma_checklist_0").performClick()
         compose.onNodeWithText("1 of 1 done").assertExists()
+    }
+
+    @Test fun markdownToolbarProducesBalancedBoldDelimiters() {
+        val entry = Note("one", "Plan", "hello", false, 1L, 1L)
+        val repo = FakeRepository(listOf(entry))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithText("Plan").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_format_bold"))
+        compose.onNodeWithTag("noma_format_bold").performClick()
+        compose.onNodeWithTag("noma_body_input").assertTextEquals("hello****")
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {

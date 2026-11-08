@@ -1145,7 +1145,9 @@ private fun NoteEditorScreen(
                         formatBody(MarkdownEdits.bold(
                             bodyField.text, bodyField.selection.start, bodyField.selection.end
                         ))
-                    }) { Text(stringResource(R.string.format_bold)) }
+                    }, modifier = Modifier.testTag("noma_format_bold")) {
+                        Text(stringResource(R.string.format_bold))
+                    }
                     TextButton(onClick = {
                         formatBody(MarkdownEdits.heading(bodyField.text, bodyField.selection.start))
                     }) { Text(stringResource(R.string.format_heading)) }
