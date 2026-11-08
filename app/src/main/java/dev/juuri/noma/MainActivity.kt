@@ -1,5 +1,9 @@
 package dev.juuri.noma
 
+import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -36,6 +40,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        registerCaptureShortcut()
         setContent {
             val preferences = remember {
                 getSharedPreferences("noma_appearance", MODE_PRIVATE)
@@ -61,5 +66,54 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        handleCaptureIntent(intent)
+    }
+
+    /** Launcher long-press shortcut uses the actual package ID (including debug suffix). */
+    private fun registerCaptureShortcut() {
+        val manager = getSystemService(ShortcutManager::class.java) ?: return
+        runCatching {
+            val captureIntent = Intent(this, MainActivity::class.java).apply {
+                action = ACTION_CREATE_FROM_WIDGET
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            manager.dynamicShortcuts = listOf(
+                ShortcutInfo.Builder(this, "noma_quick_capture")
+                    .setShortLabel(getString(R.string.widget_new_note))
+                    .setLongLabel(getString(R.string.shortcut_new_note))
+                    .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
+                    .setIntent(captureIntent)
+                    .build()
+            )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleCaptureIntent(intent)
+    }
+
+    private fun handleCaptureIntent(incoming: Intent?) {
+        when (incoming?.action) {
+            ACTION_CREATE_FROM_WIDGET -> notesViewModel.createNote()
+            ACTION_CAPTURE_SHARED_TEXT -> {
+                val title = incoming.getStringExtra(EXTRA_CAPTURE_TITLE).orEmpty()
+                val body = incoming.getStringExtra(EXTRA_CAPTURE_BODY).orEmpty()
+                notesViewModel.captureSharedText(title, body)
+            }
+        }
+        // A rotation or process recreation must not replay the same share.
+        if (incoming?.action == ACTION_CREATE_FROM_WIDGET ||
+            incoming?.action == ACTION_CAPTURE_SHARED_TEXT) {
+            setIntent(Intent(this, MainActivity::class.java).apply { action = Intent.ACTION_MAIN })
+        }
+    }
+
+    companion object {
+        const val ACTION_CREATE_FROM_WIDGET = "dev.juuri.noma.action.NEW_NOTE"
+        const val ACTION_CAPTURE_SHARED_TEXT = "dev.juuri.noma.action.SHARED_TEXT"
+        const val EXTRA_CAPTURE_TITLE = "noma_capture_title"
+        const val EXTRA_CAPTURE_BODY = "noma_capture_body"
     }
 }
