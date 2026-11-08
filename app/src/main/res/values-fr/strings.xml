@@ -43,4 +43,25 @@
     <string name="sort_notes">Trier les notes</string>
     <string name="sort_recent">Modification récente</string>
     <string name="sort_title">Titre (A–Z)</string>
+
+    <string name="appearance">Apparence</string>
+    <string name="appearance_system">Suivre le système</string>
+    <string name="appearance_light">Clair</string>
+    <string name="appearance_dark">Sombre</string>
+    <string name="close">Fermer</string>
+    <string name="share_note">Partager la note</string>
+    <string name="select_note_title">Un espace pour écrire</string>
+    <string name="select_note_detail">Ouvrez une note ou saisissez une nouvelle idée.</string>
+    <string name="editor_title">Éditeur</string>
+    <string name="saved_status">Enregistré sur cet appareil</string>
+    <string name="saving_status">Enregistrement…</string>
+    <string name="save_failed_status">Non enregistré</string>
+    <string name="unsaved_title">Modifications non enregistrées</string>
+    <string name="unsaved_body">Les dernières modifications n’ont pas pu être sauvegardées. Réessayez ou quittez en perdant ces modifications.</string>
+    <string name="leave_unsaved">Quitter quand même</string>
+    <string name="error_recovery">Vos notes sont conservées sur cet appareil. Essayez de les rouvrir.</string>
+    <plurals name="note_total">
+        <item quantity="one">%d note</item>
+        <item quantity="other">%d notes</item>
+    </plurals>
 </resources>
