@@ -40,8 +40,9 @@ class NotesService(
         sort: NoteSort = NoteSort.RECENT,
         tag: String? = null
     ): List<Note> {
-        val term = query.trim().lowercase(Locale.ROOT)
-        val pinnedFirst = compareByDescending<Note> { !archivedOnly && it.isPinned }
+        val parsed = NoteSearch.parse(query)
+        val effectiveScope = parsed.scope ?: if (archivedOnly) SearchScope.ARCHIVED else SearchScope.ACTIVE
+        val pinnedFirst = compareByDescending<Note> { !it.isArchived && it.isPinned }
         val comparator = when (sort) {
             NoteSort.RECENT -> pinnedFirst.thenByDescending { it.updatedAt }.thenBy { it.id }
             NoteSort.TITLE -> pinnedFirst
@@ -50,15 +51,16 @@ class NotesService(
                 .thenBy { it.id }
         }
         return notes.asSequence()
-            .filter { it.isArchived == archivedOnly }
-            .filter { !pinnedOnly || it.isPinned }
-            .filter { tag == null || it.tags.any { value -> value.equals(tag, true) } }
-            .filter {
-                term.isEmpty() ||
-                    it.title.lowercase(Locale.ROOT).contains(term) ||
-                    it.body.lowercase(Locale.ROOT).contains(term) ||
-                    it.tags.any { value -> value.lowercase(Locale.ROOT).contains(term) }
+            .filter { note ->
+                when (effectiveScope) {
+                    SearchScope.ACTIVE -> !note.isArchived
+                    SearchScope.ARCHIVED -> note.isArchived
+                    SearchScope.ALL -> true
+                }
             }
+            .filter { !pinnedOnly || (it.isPinned && !it.isArchived) }
+            .filter { tag == null || it.tags.any { value -> value.equals(tag, true) } }
+            .filter(parsed::matches)
             .sortedWith(comparator)
             .toList()
     }

@@ -140,6 +140,36 @@ class NotesServiceTest {
         assertEquals(saved, repo.list().single())
     }
 
+    @Test fun structuredSearchFiltersPinnedAndTitleAndDate() {
+        val service = NotesService(MemoryRepository())
+        val pinned = note("p", title = "Agenda", pinned = true, time = 1_770_000_000_000L)
+        val other = note("u", title = "Agenda", pinned = false, time = 1_770_000_000_000L)
+        assertEquals(listOf("p"),
+            service.visible(listOf(pinned, other), "title:agenda is:pinned", false).map { it.id })
+    }
+
+    @Test fun explicitArchiveScopeCanOverrideCurrentTab() {
+        val service = NotesService(MemoryRepository())
+        val active = note("active", "Note")
+        val archived = note("archive", "Note").copy(isArchived = true)
+        val notes = listOf(active, archived)
+        assertEquals(listOf("archive"),
+            service.visible(notes, "in:archive", false, archivedOnly = false).map { it.id })
+        assertEquals(listOf("active", "archive").sorted(),
+            service.visible(notes, "in:all", false, archivedOnly = true)
+                .map { it.id }.sorted())
+    }
+
+    @Test fun emptySearchStillRespectsArchivedFilterAndPinnedOrder() {
+        val service = NotesService(MemoryRepository())
+        val active = note("active", title = "A", pinned = true)
+        val archived = note("archive", "B").copy(isArchived = true)
+        assertEquals(listOf("active"),
+            service.visible(listOf(archived, active), "", false).map { it.id })
+        assertEquals(listOf("archive"),
+            service.visible(listOf(archived, active), "", false, true).map { it.id })
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)

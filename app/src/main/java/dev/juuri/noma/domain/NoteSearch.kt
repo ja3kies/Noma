@@ -46,20 +46,18 @@ object NoteSearch {
                 lower == "has:checklist" -> { note -> ChecklistSyntax.items(note.body).isNotEmpty() }
                 lower == "has:tags" -> { note -> note.tags.isNotEmpty() }
                 lower.startsWith("#") && word.length > 1 -> {
-                    val wanted = word.drop(1)
-                    { note: Note -> note.tags.any { it.equals(wanted, true) } }
+                    note: Note -> note.tags.any { it.equals(word.drop(1), true) }
                 }
                 lower.startsWith("tag:") && word.length > 4 -> {
-                    val wanted = word.drop(4)
-                    { note: Note -> note.tags.any { it.equals(wanted, true) } }
+                    note: Note -> note.tags.any { it.equals(word.drop(4), true) }
                 }
                 lower.startsWith("title:") && word.length > 6 -> {
-                    val wanted = word.drop(6).lowercase(Locale.ROOT)
-                    { note: Note -> note.title.lowercase(Locale.ROOT).contains(wanted) }
+                    note: Note -> note.title.lowercase(Locale.ROOT)
+                        .contains(word.drop(6).lowercase(Locale.ROOT))
                 }
                 lower.startsWith("body:") && word.length > 5 -> {
-                    val wanted = word.drop(5).lowercase(Locale.ROOT)
-                    { note: Note -> note.body.lowercase(Locale.ROOT).contains(wanted) }
+                    note: Note -> note.body.lowercase(Locale.ROOT)
+                        .contains(word.drop(5).lowercase(Locale.ROOT))
                 }
                 lower.startsWith("before:") || lower.startsWith("after:") -> {
                     val before = lower.startsWith("before:")
