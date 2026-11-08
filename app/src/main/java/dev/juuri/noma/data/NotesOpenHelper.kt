@@ -78,6 +78,34 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
         ) { "Could not save note" }
     }
 
+    /**
+     * All-or-nothing restore: one failed row must not leave a partial backup.
+     * Callers resolve existing IDs before the transaction.
+     */
+    fun insertBatch(entries: List<Note>) {
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            for (note in entries) {
+                val values = ContentValues().apply {
+                    put("id", note.id)
+                    put("title", note.title)
+                    put("body", note.body)
+                    put("pinned", if (note.isPinned) 1 else 0)
+                    put("archived", if (note.isArchived) 1 else 0)
+                    put("created_at", note.createdAt)
+                    put("updated_at", note.updatedAt)
+                }
+                check(database.insertWithOnConflict(
+                    "notes", null, values, SQLiteDatabase.CONFLICT_ABORT
+                ) != -1L) { "Import failed" }
+            }
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
+        }
+    }
+
     fun remove(id: String) {
         writableDatabase.delete("notes", "id = ?", arrayOf(id))
     }

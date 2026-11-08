@@ -64,4 +64,14 @@
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>
     </plurals>
+    <string name="notebook_actions">Notebook actions</string>
+    <string name="export_backup">Export complete JSON backup</string>
+    <string name="import_notes">Import notes or restore backup</string>
+    <string name="export_markdown">Save as Markdown (.md)</string>
+    <string name="export_text">Save as text (.txt)</string>
+    <string name="import_success">Notes imported</string>
+    <string name="export_success">Document exported</string>
+    <string name="transfer_error">Transfer failed: </string>
+    <string name="backup_warning_title">Export an unencrypted backup?</string>
+    <string name="backup_warning_body">JSON backups contain all your notes as readable text, including archived notes. Choose a private location and protect the file.</string>
 </resources>

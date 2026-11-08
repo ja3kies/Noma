@@ -13,4 +13,12 @@ interface NotesRepository {
     suspend fun save(note: Note)
     suspend fun delete(id: String)
     suspend fun refresh()
+
+    /** Import without overwriting existing notes. Implementations should commit atomically. */
+    suspend fun importNotes(entries: List<Note>): Int {
+        entries.forEach { note ->
+            save(note.copy(id = java.util.UUID.randomUUID().toString()))
+        }
+        return entries.size
+    }
 }

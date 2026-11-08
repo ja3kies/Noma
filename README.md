@@ -17,6 +17,12 @@ A calm, offline-first Android notes app. Its visual rhythm is inspired by famili
 - Adaptive two-pane layout on wide windows and one-pane navigation on phones.
 - Editor save status reflects SQLite commits, with retry and a warning before leaving after a failed save.
 - User-initiated native Android text sharing.
+- Manual offline JSON backups preserving notes, pin/archive flags and timestamps, with versioned schema.
+- Non-destructive full-backup restore (ID collisions are remapped), atomic SQLite import and failure feedback.
+- UTF-8 TXT / Markdown single-note import and export through Android's system document picker.
+- File size/count/field validation protects against accidental oversized or corrupt imports.
+- Full backups are unencrypted plain text: an explicit warning precedes export; users choose where to store the file.
+- Selecting an existing JSON backup adds its notes without replacing current notes; repeated restores create separate notes rather than deleting or merging originals.
 
 ## Build and run
 
