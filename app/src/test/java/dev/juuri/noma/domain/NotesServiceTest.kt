@@ -132,6 +132,14 @@ class NotesServiceTest {
         assertEquals(listOf("b"), service.visible(notes, "WORK", false).map { it.id })
     }
 
+    @Test fun newlyCreatedNoteRetainsSelectedTag() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo, { 10L }, { "new" })
+        val saved = service.create(tags = listOf("Work"))
+        assertEquals(listOf("Work"), saved.tags)
+        assertEquals(saved, repo.list().single())
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
+import dev.juuri.noma.domain.NoteTags
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import kotlinx.coroutines.CompletableDeferred
@@ -53,6 +54,9 @@ class NotesViewModel(
 
     private val _sort = MutableStateFlow(NoteSort.RECENT)
     val sort: StateFlow<NoteSort> = _sort.asStateFlow()
+
+    private val _tagFilter = MutableStateFlow<String?>(null)
+    val tagFilter: StateFlow<String?> = _tagFilter.asStateFlow()
 
     private val _active = MutableStateFlow<Note?>(null)
     val active: StateFlow<Note?> = _active.asStateFlow()
@@ -125,13 +129,17 @@ class NotesViewModel(
     fun toggleArchiveView() {
         _archivedOnly.value = !_archivedOnly.value
         _pinnedOnly.value = false
+        _tagFilter.value = null
     }
+    fun selectTag(value: String?) { _tagFilter.value = value }
+    fun tagsFor(notes: List<Note>, archived: Boolean): List<String> =
+        NoteTags.all(notes, archived)
     fun selectSort(value: NoteSort) { _sort.value = value }
 
     fun visible(
         notes: List<Note>, query: String, pinnedOnly: Boolean,
-        archivedOnly: Boolean, sort: NoteSort
-    ): List<Note> = service.visible(notes, query, pinnedOnly, archivedOnly, sort)
+        archivedOnly: Boolean, sort: NoteSort, tag: String?
+    ): List<Note> = service.visible(notes, query, pinnedOnly, archivedOnly, sort, tag)
 
     fun createNote() {
         if (_creating.value) return
@@ -140,7 +148,7 @@ class NotesViewModel(
         _creating.value = true
         viewModelScope.launch {
             try {
-                val created = service.create()
+                val created = service.create(tags = _tagFilter.value?.let(::listOf).orEmpty())
                 editorRevision++
                 _active.value = created
                 _saveState.value = EditorSaveState.Saved
@@ -157,6 +165,7 @@ class NotesViewModel(
     /** A share is committed to SQLite before the editor reports "Saved". */
     fun captureSharedText(title: String, body: String) {
         val payload = dev.juuri.noma.domain.NoteCaptureParser.parse(title, body) ?: return
+        _tagFilter.value = null
         viewModelScope.launch {
             try {
                 val created = service.create(payload.title, payload.body)
@@ -189,6 +198,25 @@ class NotesViewModel(
 
     fun changeBody(value: String) {
         _active.value?.let { if (it.body != value) updateActive(it.copy(body = value)) }
+    }
+
+    fun addTag(value: String) {
+        _active.value?.let { current ->
+            val changed = try {
+                NoteTags.add(current, value)
+            } catch (failure: IllegalArgumentException) {
+                eventChannel.trySend(NoteUiEvent.Failure(failure.message ?: "Invalid tag"))
+                return
+            }
+            if (changed != current) updateActive(changed)
+        }
+    }
+
+    fun removeTag(tag: String) {
+        _active.value?.let { current ->
+            val changed = NoteTags.remove(current, tag)
+            if (changed != current) updateActive(changed)
+        }
     }
 
     fun togglePin(note: Note) {
