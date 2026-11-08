@@ -7,12 +7,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BasicTooltipBox
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -175,6 +175,7 @@ private fun NotesListScreen(
     onRetry: () -> Unit,
     snackbar: SnackbarHostState
 ) {
+    val newNoteLabel = stringResource(R.string.new_note)
     var deleting by remember { mutableStateOf<Note?>(null) }
     if (deleting != null) {
         DeleteConfirmation(
@@ -200,7 +201,7 @@ private fun NotesListScreen(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp),
                 modifier = Modifier.semantics {
-                    contentDescription = "Create note"
+                    contentDescription = newNoteLabel
                 }
             )
         }
