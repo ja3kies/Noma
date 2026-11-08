@@ -2,6 +2,8 @@ package dev.juuri.noma.ui
 
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -38,6 +40,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.SaveAlt
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Close
@@ -85,6 +90,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -107,10 +113,12 @@ import dev.juuri.noma.R
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesSnapshot
+import dev.juuri.noma.transfer.NoteDocumentTransfer
 import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaMotion
 import dev.juuri.noma.ui.theme.NomaSpacing
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -224,6 +232,50 @@ private fun NotesListScreen(
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
+    var transferMenuExpanded by remember { mutableStateOf(false) }
+    var transferBusy by remember { mutableStateOf(false) }
+    val transferScope = rememberCoroutineScope()
+    val exportSuccess = stringResource(R.string.export_success)
+    val importSuccess = stringResource(R.string.import_success)
+    val transferError = stringResource(R.string.transfer_error)
+
+    val backupPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null && !transferBusy) {
+            transferScope.launch {
+                transferBusy = true
+                val result = runCatching {
+                    val notes = viewModel.exportSnapshot()
+                    NoteDocumentTransfer.writeBackup(context, uri, notes)
+                }
+                transferBusy = false
+                snackbar.showSnackbar(
+                    result.fold({ exportSuccess }, { transferError + (it.localizedMessage ?: "") })
+                )
+            }
+        }
+    }
+    val importPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null && !transferBusy) {
+            transferScope.launch {
+                transferBusy = true
+                val result = runCatching {
+                    val notes = NoteDocumentTransfer.readNotes(context, uri)
+                    viewModel.importNotes(notes)
+                }
+                transferBusy = false
+                snackbar.showSnackbar(
+                    result.fold(
+                        { count -> "$importSuccess ($count)" },
+                        { transferError + (it.localizedMessage ?: "") }
+                    )
+                )
+            }
+        }
+    }
 
     deleting?.let { note ->
         DeleteConfirmation(
@@ -282,6 +334,47 @@ private fun NotesListScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    Box {
+                        IconButton(
+                            onClick = { transferMenuExpanded = true },
+                            enabled = !transferBusy
+                        ) {
+                            Icon(
+                                Icons.Outlined.MoreHoriz,
+                                contentDescription = stringResource(R.string.notebook_actions)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = transferMenuExpanded,
+                            onDismissRequest = { transferMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.export_backup)) },
+                                onClick = {
+                                    transferMenuExpanded = false
+                                    backupPicker.launch("Noma-backup.json")
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.FileDownload, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.import_notes)) },
+                                onClick = {
+                                    transferMenuExpanded = false
+                                    importPicker.launch(
+                                        arrayOf("application/json", "text/plain", "text/markdown")
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.FileUpload, contentDescription = null)
+                                }
+                            )
+                        }
+                    }
+                    if (transferBusy) {
+                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                     IconButton(onClick = { showAppearance = true }) {
                         Icon(Icons.Outlined.Palette, contentDescription = stringResource(R.string.appearance))
@@ -612,7 +705,9 @@ private fun NoteActionsMenu(
     onPin: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onExportMarkdown: (() -> Unit)? = null,
+    onExportText: (() -> Unit)? = null
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
@@ -635,6 +730,20 @@ private fun NoteActionsMenu(
             onClick = { onDismiss(); onShare() },
             leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
         )
+        if (onExportMarkdown != null) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.export_markdown)) },
+                onClick = { onDismiss(); onExportMarkdown() },
+                leadingIcon = { Icon(Icons.Outlined.SaveAlt, contentDescription = null) }
+            )
+        }
+        if (onExportText != null) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.export_text)) },
+                onClick = { onDismiss(); onExportText() },
+                leadingIcon = { Icon(Icons.Outlined.SaveAlt, contentDescription = null) }
+            )
+        }
         DropdownMenuItem(
             text = { Text(stringResource(R.string.delete_note)) },
             onClick = { onDismiss(); onDelete() },
@@ -656,7 +765,45 @@ private fun NoteEditorScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
+    var exportInProgress by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val exportScope = rememberCoroutineScope()
+    val exportSuccess = stringResource(R.string.export_success)
+    val transferError = stringResource(R.string.transfer_error)
+    val markdownPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri ->
+        if (uri != null && !exportInProgress) {
+            exportScope.launch {
+                exportInProgress = true
+                val result = runCatching {
+                    val current = viewModel.exportSnapshot().first { it.id == note.id }
+                    NoteDocumentTransfer.writeNote(context, uri, current, markdown = true)
+                }
+                exportInProgress = false
+                snackbar.showSnackbar(
+                    result.fold({ exportSuccess }, { transferError + (it.localizedMessage ?: "") })
+                )
+            }
+        }
+    }
+    val textPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        if (uri != null && !exportInProgress) {
+            exportScope.launch {
+                exportInProgress = true
+                val result = runCatching {
+                    val current = viewModel.exportSnapshot().first { it.id == note.id }
+                    NoteDocumentTransfer.writeNote(context, uri, current, markdown = false)
+                }
+                exportInProgress = false
+                snackbar.showSnackbar(
+                    result.fold({ exportSuccess }, { transferError + (it.localizedMessage ?: "") })
+                )
+            }
+        }
+    }
     val titleFocus = remember { FocusRequester() }
     val bodyFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -771,7 +918,13 @@ private fun NoteEditorScreen(
                             onPin = { viewModel.togglePin(note) },
                             onArchive = { viewModel.toggleArchive(note) },
                             onDelete = { confirmDelete = true },
-                            onShare = { shareNote(context, note) }
+                            onShare = { shareNote(context, note) },
+                            onExportMarkdown = {
+                                markdownPicker.launch(safeExportName(note, "md"))
+                            },
+                            onExportText = {
+                                textPicker.launch(safeExportName(note, "txt"))
+                            }
                         )
                     }
                 }
@@ -999,4 +1152,12 @@ private fun shareNote(context: Context, note: Note) {
         putExtra(Intent.EXTRA_TEXT, text)
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_note)))
+}
+
+/** Suggested names are advisory: the system document picker controls the actual file. */
+private fun safeExportName(note: Note, extension: String): String {
+    val base = note.displayTitle.take(48).map {
+        if (it.isLetterOrDigit() || it == '_' || it == '-' || it == ' ') it else '_'
+    }.joinToString("").trim().ifBlank { "Noma-note" }
+    return "$base.$extension"
 }
