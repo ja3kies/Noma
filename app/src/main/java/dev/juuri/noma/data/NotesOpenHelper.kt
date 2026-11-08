@@ -21,6 +21,7 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
                 body TEXT NOT NULL,
                 pinned INTEGER NOT NULL DEFAULT 0,
                 archived INTEGER NOT NULL DEFAULT 0,
+                tags TEXT NOT NULL DEFAULT '[]',
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             )""".trimIndent()
@@ -31,18 +32,23 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 1 && newVersion == 2) {
+        var version = oldVersion
+        if (version == 1 && newVersion >= 2) {
             db.execSQL("ALTER TABLE notes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
             db.execSQL("CREATE INDEX idx_notes_archived ON notes(archived, updated_at DESC)")
-        } else {
-            throw IllegalStateException("Missing migration from $oldVersion to $newVersion")
+            version = 2
         }
+        if (version == 2 && newVersion >= 3) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'")
+            version = 3
+        }
+        check(version == newVersion) { "Missing migration from $oldVersion to $newVersion" }
     }
 
     fun readAll(): List<Note> = buildList {
         readableDatabase.query(
             "notes",
-            arrayOf("id", "title", "body", "pinned", "created_at", "updated_at", "archived"),
+            arrayOf("id", "title", "body", "pinned", "created_at", "updated_at", "archived", "tags"),
             null, null, null, null, "pinned DESC, updated_at DESC, id ASC"
         ).use { cursor ->
             while (cursor.moveToNext()) {
@@ -54,7 +60,8 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
                         isPinned = cursor.getInt(3) != 0,
                         createdAt = cursor.getLong(4),
                         updatedAt = cursor.getLong(5),
-                        isArchived = cursor.getInt(6) != 0
+                        isArchived = cursor.getInt(6) != 0,
+                        tags = decodeTags(cursor.getString(7))
                     )
                 )
             }
@@ -68,6 +75,7 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
             put("body", note.body)
             put("pinned", if (note.isPinned) 1 else 0)
             put("archived", if (note.isArchived) 1 else 0)
+            put("tags", org.json.JSONArray(note.tags).toString())
             put("created_at", note.createdAt)
             put("updated_at", note.updatedAt)
         }
@@ -93,6 +101,7 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
                     put("body", note.body)
                     put("pinned", if (note.isPinned) 1 else 0)
                     put("archived", if (note.isArchived) 1 else 0)
+                    put("tags", org.json.JSONArray(note.tags).toString())
                     put("created_at", note.createdAt)
                     put("updated_at", note.updatedAt)
                 }
@@ -110,8 +119,13 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
         writableDatabase.delete("notes", "id = ?", arrayOf(id))
     }
 
+    private fun decodeTags(value: String): List<String> {
+        val entries = org.json.JSONArray(value)
+        return (0 until entries.length()).map(entries::getString)
+    }
+
     companion object {
         internal const val DATABASE_NAME = "noma-notes.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
     }
 }

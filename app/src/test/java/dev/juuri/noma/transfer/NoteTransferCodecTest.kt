@@ -21,6 +21,33 @@ class NoteTransferCodecTest {
         assertEquals(listOf(note), restored)
     }
 
+    @Test fun tagsRoundTripWithBackup() {
+        val withTags = note.copy(tags = listOf("Work", "Ideas"))
+        assertEquals(
+            withTags,
+            NoteTransferCodec.decode(NoteTransferCodec.encode(listOf(withTags))).single()
+        )
+    }
+
+    @Test fun oldBackupWithoutTagsStillLoads() {
+        val root = JSONObject(NoteTransferCodec.encode(listOf(note)).toString(Charsets.UTF_8))
+        root.getJSONArray("notes").getJSONObject(0).remove("tags")
+        assertEquals(
+            emptyList<String>(),
+            NoteTransferCodec.decode(root.toString().toByteArray()).single().tags
+        )
+    }
+
+    @Test fun oversizedTagListsRejected() {
+        val root = JSONObject(NoteTransferCodec.encode(listOf(note)).toString(Charsets.UTF_8))
+        val array = org.json.JSONArray()
+        repeat(21) { array.put("tag$it") }
+        root.getJSONArray("notes").getJSONObject(0).put("tags", array)
+        assertThrows(IllegalArgumentException::class.java) {
+            NoteTransferCodec.decode(root.toString().toByteArray())
+        }
+    }
+
     @Test fun emptyCollectionCanBeBackedUp() {
         assertTrue(NoteTransferCodec.decode(NoteTransferCodec.encode(emptyList())).isEmpty())
     }

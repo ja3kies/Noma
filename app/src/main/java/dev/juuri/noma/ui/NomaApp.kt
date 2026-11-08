@@ -9,6 +9,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,11 +57,13 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +74,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -104,13 +109,19 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import dev.juuri.noma.R
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.ChecklistSyntax
+import dev.juuri.noma.domain.MarkdownEdit
+import dev.juuri.noma.domain.MarkdownEdits
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.transfer.NoteDocumentTransfer
@@ -225,12 +236,14 @@ private fun NotesListScreen(
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val tagFilter by viewModel.tagFilter.collectAsState()
     val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var tagMenuExpanded by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var transferMenuExpanded by remember { mutableStateOf(false) }
     var confirmUnencryptedExport by remember { mutableStateOf(false) }
@@ -459,6 +472,40 @@ private fun NotesListScreen(
                                 }
                             )
                         }
+                        Box {
+                            FilterChip(
+                                selected = tagFilter != null,
+                                onClick = { tagMenuExpanded = true },
+                                label = { Text(tagFilter ?: stringResource(R.string.tags_filter)) },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Tag, contentDescription = null, modifier = Modifier.size(18.dp))
+                                }
+                            )
+                            DropdownMenu(
+                                expanded = tagMenuExpanded,
+                                onDismissRequest = { tagMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.all_tags)) },
+                                    onClick = {
+                                        viewModel.selectTag(null)
+                                        tagMenuExpanded = false
+                                    }
+                                )
+                                val ready = snapshot as? NotesSnapshot.Ready
+                                ready?.let { state ->
+                                    viewModel.tagsFor(state.entries, archivedOnly).forEach { tag ->
+                                        DropdownMenuItem(
+                                            text = { Text("#$tag") },
+                                            onClick = {
+                                                viewModel.selectTag(tag)
+                                                tagMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     Box {
                         IconButton(onClick = { sortMenuExpanded = true }) {
@@ -526,14 +573,16 @@ private fun NotesListScreen(
                     OutlinedButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
                 }
                 is NotesSnapshot.Ready -> {
-                    val visible = remember(state.entries, query, pinnedOnly, archivedOnly, sort) {
-                        viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
+                    val visible = remember(
+                        state.entries, query, pinnedOnly, archivedOnly, sort, tagFilter
+                    ) {
+                        viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort, tagFilter)
                     }
                     if (visible.isEmpty()) {
                         CenterMessage {
                             Icon(
                                 when {
-                                    query.isNotBlank() || pinnedOnly -> Icons.Outlined.Search
+                                    query.isNotBlank() || pinnedOnly || tagFilter != null -> Icons.Outlined.Search
                                     archivedOnly -> Icons.Outlined.Archive
                                     else -> Icons.Outlined.EditNote
                                 },
@@ -545,7 +594,7 @@ private fun NotesListScreen(
                             Text(
                                 stringResource(
                                     when {
-                                        query.isNotBlank() || pinnedOnly -> R.string.no_results
+                                        query.isNotBlank() || pinnedOnly || tagFilter != null -> R.string.no_results
                                         archivedOnly -> R.string.empty_archive
                                         else -> R.string.empty_title
                                     }
@@ -556,7 +605,7 @@ private fun NotesListScreen(
                             Text(
                                 stringResource(
                                     when {
-                                        query.isNotBlank() || pinnedOnly -> R.string.no_results_detail
+                                        query.isNotBlank() || pinnedOnly || tagFilter != null -> R.string.no_results_detail
                                         archivedOnly -> R.string.empty_archive_detail
                                         else -> R.string.empty_detail
                                     }
@@ -684,6 +733,29 @@ private fun NoteCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                if (note.tags.isNotEmpty()) {
+                    Spacer(Modifier.height(NomaSpacing.small))
+                    Text(
+                        text = note.tags.joinToString("  ·  ") { "#$it" },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                val taskItems = ChecklistSyntax.items(note.body)
+                if (taskItems.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(
+                            R.string.checklist_progress,
+                            taskItems.count { it.checked },
+                            taskItems.size
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(NomaSpacing.small))
                 Text(
                     text = formatEdited(note.updatedAt),
@@ -784,6 +856,12 @@ private fun NoteEditorScreen(
     var confirmDelete by rememberSaveable(note.id) { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
+    var draftTag by rememberSaveable(note.id) { mutableStateOf("") }
+    var bodyField by remember(note.id) {
+        mutableStateOf(
+            TextFieldValue(note.body, selection = TextRange(note.body.length))
+        )
+    }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     var exportInProgress by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -827,6 +905,21 @@ private fun NoteEditorScreen(
     val titleFocus = remember { FocusRequester() }
     val bodyFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(note.id, note.body) {
+        if (bodyField.text != note.body) {
+            bodyField = bodyField.copy(text = note.body)
+        }
+    }
+
+    fun formatBody(edit: MarkdownEdit) {
+        bodyField = TextFieldValue(
+            text = edit.text,
+            selection = TextRange(edit.start, edit.end)
+        )
+        viewModel.changeBody(edit.text)
+        bodyFocus.requestFocus()
+    }
 
     fun requestClose() {
         when (saveState) {
@@ -991,12 +1084,129 @@ private fun NoteEditorScreen(
                         }
                     }
                 )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = draftTag,
+                        onValueChange = { draftTag = it.take(64) },
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.add_tag_hint)) },
+                        modifier = Modifier.weight(1f).testTag("noma_tag_input"),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            viewModel.addTag(draftTag)
+                            draftTag = ""
+                        })
+                    )
+                    IconButton(
+                        onClick = {
+                            viewModel.addTag(draftTag)
+                            draftTag = ""
+                        },
+                        enabled = draftTag.isNotBlank(),
+                        modifier = Modifier.testTag("noma_tag_add")
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.add_tag))
+                    }
+                }
+                if (note.tags.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        note.tags.forEach { tag ->
+                            InputChip(
+                                selected = false,
+                                onClick = { viewModel.removeTag(tag) },
+                                label = { Text("#$tag") },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = stringResource(R.string.remove_tag, tag),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.bold(
+                            bodyField.text, bodyField.selection.start, bodyField.selection.end
+                        ))
+                    }, modifier = Modifier.testTag("noma_format_bold")) {
+                        Text(stringResource(R.string.format_bold))
+                    }
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.heading(bodyField.text, bodyField.selection.start))
+                    }) { Text(stringResource(R.string.format_heading)) }
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.bullet(bodyField.text, bodyField.selection.start))
+                    }) { Text(stringResource(R.string.format_bullet)) }
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.checklist(bodyField.text, bodyField.selection.start))
+                    }) { Text(stringResource(R.string.add_checklist_item)) }
+                }
+                val tasks = ChecklistSyntax.items(note.body)
+                if (tasks.isNotEmpty()) {
+                    Text(
+                        stringResource(
+                            R.string.checklist_progress,
+                            tasks.count { it.checked },
+                            tasks.size
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(8.dp)
+                    ) {
+                        tasks.forEach { task ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable(role = Role.Checkbox) {
+                                        viewModel.toggleChecklistItem(task.lineIndex)
+                                    }
+                                    .testTag("noma_checklist_${task.lineIndex}"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = task.checked,
+                                    onCheckedChange = null
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = task.text.ifEmpty { stringResource(R.string.untitled_task) },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
                 BasicTextField(
-                    value = note.body,
-                    onValueChange = viewModel::changeBody,
+                    value = bodyField,
+                    onValueChange = { input ->
+                        bodyField = input
+                        viewModel.changeBody(input.text)
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground
                     ),

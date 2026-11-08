@@ -43,6 +43,28 @@ class SqlitePersistenceTest {
         assertEquals("Keep this text", migrated.body)
         assertTrue(migrated.isPinned)
         assertFalse(migrated.isArchived)
+        assertTrue(migrated.tags.isEmpty())
+    }
+
+    @Test fun upgradingV2KeepsArchivedNotesAndIntroducesTags() {
+        context.openOrCreateDatabase(testDb, 0, null).use { db ->
+            db.execSQL(
+                "CREATE TABLE notes (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, " +
+                    "body TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0, " +
+                    "archived INTEGER NOT NULL DEFAULT 0, " +
+                    "created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO notes (id, title, body, pinned, archived, created_at, updated_at) " +
+                    "VALUES ('old', 'Keep', 'Archived body', 1, 1, 10, 20)"
+            )
+            db.version = 2
+        }
+        val upgraded = NotesOpenHelper(context, testDb).readAll().single()
+        assertTrue(upgraded.isArchived)
+        assertTrue(upgraded.isPinned)
+        assertTrue(upgraded.tags.isEmpty())
+        assertEquals("Archived body", upgraded.body)
     }
 
     @Test fun writesSurviveNewRepositoryInstancesAndDeletion() = runBlocking {
