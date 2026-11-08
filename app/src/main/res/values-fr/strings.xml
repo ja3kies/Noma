@@ -80,4 +80,9 @@
     <string name="widget_new_note">Nouvelle note</string>
     <string name="widget_accessibility">Créer une nouvelle note dans Noma</string>
     <string name="shortcut_new_note">Saisir une note rapide dans Noma</string>
+    <string name="tags_filter">Étiquettes</string>
+    <string name="all_tags">Toutes les étiquettes</string>
+    <string name="add_tag_hint">Ajouter une étiquette</string>
+    <string name="add_tag">Ajouter l’étiquette</string>
+    <string name="remove_tag">Supprimer l’étiquette %1$s</string>
 </resources>

@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -225,12 +226,14 @@ private fun NotesListScreen(
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val tagFilter by viewModel.tagFilter.collectAsState()
     val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var tagMenuExpanded by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var transferMenuExpanded by remember { mutableStateOf(false) }
     var confirmUnencryptedExport by remember { mutableStateOf(false) }
@@ -459,6 +462,40 @@ private fun NotesListScreen(
                                 }
                             )
                         }
+                        Box {
+                            FilterChip(
+                                selected = tagFilter != null,
+                                onClick = { tagMenuExpanded = true },
+                                label = { Text(tagFilter ?: stringResource(R.string.tags_filter)) },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Tag, contentDescription = null, modifier = Modifier.size(18.dp))
+                                }
+                            )
+                            DropdownMenu(
+                                expanded = tagMenuExpanded,
+                                onDismissRequest = { tagMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.all_tags)) },
+                                    onClick = {
+                                        viewModel.selectTag(null)
+                                        tagMenuExpanded = false
+                                    }
+                                )
+                                val ready = snapshot as? NotesSnapshot.Ready
+                                ready?.let { state ->
+                                    viewModel.tagsFor(state.entries, archivedOnly).forEach { tag ->
+                                        DropdownMenuItem(
+                                            text = { Text("#$tag") },
+                                            onClick = {
+                                                viewModel.selectTag(tag)
+                                                tagMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     Box {
                         IconButton(onClick = { sortMenuExpanded = true }) {
@@ -526,14 +563,16 @@ private fun NotesListScreen(
                     OutlinedButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
                 }
                 is NotesSnapshot.Ready -> {
-                    val visible = remember(state.entries, query, pinnedOnly, archivedOnly, sort) {
-                        viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
+                    val visible = remember(
+                        state.entries, query, pinnedOnly, archivedOnly, sort, tagFilter
+                    ) {
+                        viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort, tagFilter)
                     }
                     if (visible.isEmpty()) {
                         CenterMessage {
                             Icon(
                                 when {
-                                    query.isNotBlank() || pinnedOnly -> Icons.Outlined.Search
+                                    query.isNotBlank() || pinnedOnly || tagFilter != null -> Icons.Outlined.Search
                                     archivedOnly -> Icons.Outlined.Archive
                                     else -> Icons.Outlined.EditNote
                                 },
@@ -545,7 +584,7 @@ private fun NotesListScreen(
                             Text(
                                 stringResource(
                                     when {
-                                        query.isNotBlank() || pinnedOnly -> R.string.no_results
+                                        query.isNotBlank() || pinnedOnly || tagFilter != null -> R.string.no_results
                                         archivedOnly -> R.string.empty_archive
                                         else -> R.string.empty_title
                                     }
@@ -556,7 +595,7 @@ private fun NotesListScreen(
                             Text(
                                 stringResource(
                                     when {
-                                        query.isNotBlank() || pinnedOnly -> R.string.no_results_detail
+                                        query.isNotBlank() || pinnedOnly || tagFilter != null -> R.string.no_results_detail
                                         archivedOnly -> R.string.empty_archive_detail
                                         else -> R.string.empty_detail
                                     }
