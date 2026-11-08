@@ -10,8 +10,8 @@ import dev.juuri.noma.domain.Note
  * Private SQLite storage with no external permissions or network access.
  * Schema version changes must ship a migration; never drop the table on upgrade.
  */
-internal class NotesOpenHelper(context: Context) :
-    SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE_NAME) :
+    SQLiteOpenHelper(context, databaseName, null, DATABASE_VERSION) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(

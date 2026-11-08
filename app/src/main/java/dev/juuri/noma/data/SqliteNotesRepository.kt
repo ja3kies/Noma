@@ -14,8 +14,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class SqliteNotesRepository(context: Context) : NotesRepository {
-    private val helper = NotesOpenHelper(context.applicationContext)
+class SqliteNotesRepository(
+    context: Context,
+    databaseName: String = NotesOpenHelper.DATABASE_NAME
+) : NotesRepository {
+    private val helper = NotesOpenHelper(context.applicationContext, databaseName)
     private val mutex = Mutex()
     private val io = Dispatchers.IO
     private val scope = CoroutineScope(SupervisorJob() + io)

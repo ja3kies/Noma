@@ -14,17 +14,19 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SqlitePersistenceTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+    // This database is dedicated to instrumentation; never touch real user notes.
+    private val testDb = "noma-instrumentation-only.db"
 
     @Before fun reset() {
-        context.deleteDatabase(NotesOpenHelper.DATABASE_NAME)
+        context.deleteDatabase(testDb)
     }
 
     @After fun cleanup() {
-        context.deleteDatabase(NotesOpenHelper.DATABASE_NAME)
+        context.deleteDatabase(testDb)
     }
 
     @Test fun upgradingV1KeepsUserContentAndPins() {
-        context.openOrCreateDatabase(NotesOpenHelper.DATABASE_NAME, 0, null).use { db ->
+        context.openOrCreateDatabase(testDb, 0, null).use { db ->
             db.execSQL(
                 "CREATE TABLE notes (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, " +
                     "body TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0, " +
@@ -36,7 +38,7 @@ class SqlitePersistenceTest {
             )
             db.version = 1
         }
-        val migrated = NotesOpenHelper(context).readAll().single()
+        val migrated = NotesOpenHelper(context, testDb).readAll().single()
         assertEquals("Original", migrated.title)
         assertEquals("Keep this text", migrated.body)
         assertTrue(migrated.isPinned)
@@ -44,18 +46,18 @@ class SqlitePersistenceTest {
     }
 
     @Test fun writesSurviveNewRepositoryInstancesAndDeletion() = runBlocking {
-        val first = SqliteNotesRepository(context)
+        val first = SqliteNotesRepository(context, testDb)
         val original = Note("persisted", "Shopping", "Coffee and bread", true, 10L, 10L, true)
         first.save(original)
 
         // A second repository represents an app re-open with a fresh SQLite helper.
-        val second = SqliteNotesRepository(context)
+        val second = SqliteNotesRepository(context, testDb)
         second.refresh()
         val restored = (second.notes.value as NotesSnapshot.Ready).entries.single()
         assertEquals(original, restored)
 
         second.delete(original.id)
-        val third = SqliteNotesRepository(context)
+        val third = SqliteNotesRepository(context, testDb)
         third.refresh()
         assertTrue((third.notes.value as NotesSnapshot.Ready).entries.isEmpty())
     }

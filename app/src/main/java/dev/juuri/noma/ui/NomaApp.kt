@@ -324,6 +324,7 @@ private fun NotesListScreen(
                         FilterChip(
                             selected = archivedOnly,
                             onClick = viewModel::toggleArchiveView,
+                            modifier = Modifier.testTag("noma_archive_filter"),
                             label = { Text(stringResource(R.string.archive_view)) },
                             leadingIcon = {
                                 Icon(

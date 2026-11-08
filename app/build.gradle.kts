@@ -12,8 +12,8 @@ android {
         applicationId = "dev.juuri.noma"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -21,7 +21,7 @@ android {
         debug {
             // CI-generated debug keys are ephemeral. Install this preview alongside
             // the stable package rather than risking note loss on a signature mismatch.
-            applicationIdSuffix = ".preview"
+            applicationIdSuffix = ".designpreview"
             versionNameSuffix = "-preview"
         }
         release {
@@ -67,5 +67,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
