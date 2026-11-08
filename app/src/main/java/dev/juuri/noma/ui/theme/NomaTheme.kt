@@ -1,6 +1,7 @@
 package dev.juuri.noma.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -13,12 +14,35 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
 
-/**
- * Noma's M3/M3E semantic palette. Surfaces, type scale and shape roles are
- * centralized so feature composables never need literal colors.
- */
+enum class NomaAppearance {
+    SYSTEM, LIGHT, DARK;
+
+    companion object {
+        fun fromStorage(value: String?): NomaAppearance =
+            entries.firstOrNull { it.name == value } ?: SYSTEM
+    }
+}
+
+/** Consistent spacing and motion roles shared across all Noma surfaces. */
+object NomaSpacing {
+    val tiny = 4.dp
+    val small = 8.dp
+    val medium = 12.dp
+    val comfortable = 16.dp
+    val section = 24.dp
+    val page = 24.dp
+    val listPaneWidth = 400.dp
+    val editorMaxWidth = 760.dp
+}
+
+object NomaMotion {
+    const val quick = 160
+    const val standard = 230
+}
+
+// Warm paper surfaces, legible blue ink and a deliberately restrained amber accent.
+// All composables use these semantic colors instead of introducing one-off swatches.
 private val LightColors = lightColorScheme(
     primary = Color(0xFF425F80),
     onPrimary = Color(0xFFFFFFFF),
@@ -38,6 +62,9 @@ private val LightColors = lightColorScheme(
     onSurface = Color(0xFF23292E),
     surfaceVariant = Color(0xFFF0F0ED),
     onSurfaceVariant = Color(0xFF5E666A),
+    surfaceContainerLow = Color(0xFFFAF9F6),
+    surfaceContainer = Color(0xFFF1F0ED),
+    surfaceContainerHigh = Color(0xFFE9E9E6),
     outline = Color(0xFF899098),
     outlineVariant = Color(0xFFDDE0E0),
     error = Color(0xFFBA1A1A),
@@ -63,6 +90,9 @@ private val DarkColors = darkColorScheme(
     onSurface = Color(0xFFE6E9ED),
     surfaceVariant = Color(0xFF303840),
     onSurfaceVariant = Color(0xFFC0C7CE),
+    surfaceContainerLow = Color(0xFF20262C),
+    surfaceContainer = Color(0xFF252D34),
+    surfaceContainerHigh = Color(0xFF303840),
     outline = Color(0xFF929CA5),
     outlineVariant = Color(0xFF3D464E),
     error = Color(0xFFFFB4AB),
@@ -74,22 +104,22 @@ private val NomaShapes = Shapes(
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(18.dp),
     large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(30.dp)
+    extraLarge = RoundedCornerShape(32.dp)
 )
 
 private val NomaTypography = Typography(
     headlineLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 31.sp,
-        lineHeight = 39.sp,
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
         letterSpacing = (-0.7).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 25.sp,
-        lineHeight = 32.sp
+        fontSize = 26.sp,
+        lineHeight = 34.sp
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -113,14 +143,27 @@ private val NomaTypography = Typography(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 21.sp
+        lineHeight = 22.sp
     )
 )
 
 @Composable
-fun NomaTheme(content: @Composable () -> Unit) {
+fun isNomaDark(appearance: NomaAppearance): Boolean {
+    val systemIsDark = isSystemInDarkTheme()
+    return when (appearance) {
+        NomaAppearance.SYSTEM -> systemIsDark
+        NomaAppearance.LIGHT -> false
+        NomaAppearance.DARK -> true
+    }
+}
+
+@Composable
+fun NomaTheme(
+    appearance: NomaAppearance = NomaAppearance.SYSTEM,
+    content: @Composable () -> Unit
+) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (isNomaDark(appearance)) DarkColors else LightColors,
         typography = NomaTypography,
         shapes = NomaShapes,
         content = content

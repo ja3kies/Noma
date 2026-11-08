@@ -3,9 +3,9 @@ package dev.juuri.noma.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
-import dev.juuri.noma.domain.NoteSort
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,8 +19,15 @@ sealed interface NoteUiEvent {
     data class Failure(val message: String) : NoteUiEvent
 }
 
+/** Reports the result of the most recent editor revision, not just a button press. */
+sealed interface EditorSaveState {
+    data object Saved : EditorSaveState
+    data object Saving : EditorSaveState
+    data class Failed(val message: String) : EditorSaveState
+}
+
 private sealed interface WriteOperation {
-    data class Save(val note: Note) : WriteOperation
+    data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
     data class Archive(val previous: Note) : WriteOperation
@@ -50,18 +57,28 @@ class NotesViewModel(
     private val _creating = MutableStateFlow(false)
     val creating: StateFlow<Boolean> = _creating.asStateFlow()
 
+    private val _saveState = MutableStateFlow<EditorSaveState>(EditorSaveState.Saved)
+    val saveState: StateFlow<EditorSaveState> = _saveState.asStateFlow()
+
+    private var editorRevision = 0L
     private val operations = Channel<WriteOperation>(Channel.UNLIMITED)
     private val eventChannel = Channel<NoteUiEvent>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
     init {
-        // One writer preserves keystroke/delete/undo order and prevents stale saves
-        // from resurrecting a deleted note.
+        // Serialize disk writes. A delete cannot be undone by an older queued save.
+        // Only the latest editor revision can be marked as saved.
         viewModelScope.launch {
             for (operation in operations) {
                 try {
                     when (operation) {
-                        is WriteOperation.Save -> service.save(operation.note)
+                        is WriteOperation.Save -> {
+                            service.save(operation.note)
+                            if (operation.editorRevision != null &&
+                                operation.editorRevision == editorRevision) {
+                                _saveState.value = EditorSaveState.Saved
+                            }
+                        }
                         is WriteOperation.Delete -> {
                             service.delete(operation.note)
                             eventChannel.send(NoteUiEvent.Deleted(operation.note))
@@ -75,9 +92,13 @@ class NotesViewModel(
                         }
                     }
                 } catch (failure: Exception) {
-                    eventChannel.send(
-                        NoteUiEvent.Failure(failure.localizedMessage ?: "Storage unavailable")
-                    )
+                    val message = failure.localizedMessage ?: "Storage unavailable"
+                    if (operation is WriteOperation.Save &&
+                        operation.editorRevision != null &&
+                        operation.editorRevision == editorRevision) {
+                        _saveState.value = EditorSaveState.Failed(message)
+                    }
+                    eventChannel.send(NoteUiEvent.Failure(message))
                 }
             }
         }
@@ -92,11 +113,8 @@ class NotesViewModel(
     fun selectSort(value: NoteSort) { _sort.value = value }
 
     fun visible(
-        notes: List<Note>,
-        query: String,
-        pinnedOnly: Boolean,
-        archivedOnly: Boolean,
-        sort: NoteSort
+        notes: List<Note>, query: String, pinnedOnly: Boolean,
+        archivedOnly: Boolean, sort: NoteSort
     ): List<Note> = service.visible(notes, query, pinnedOnly, archivedOnly, sort)
 
     fun createNote() {
@@ -106,7 +124,10 @@ class NotesViewModel(
         _creating.value = true
         viewModelScope.launch {
             try {
-                _active.value = service.create()
+                val created = service.create()
+                editorRevision++
+                _active.value = created
+                _saveState.value = EditorSaveState.Saved
             } catch (failure: Exception) {
                 eventChannel.send(
                     NoteUiEvent.Failure(failure.localizedMessage ?: "Cannot create note")
@@ -117,30 +138,49 @@ class NotesViewModel(
         }
     }
 
-    fun openNote(note: Note) { _active.value = note }
-    fun closeNote() { _active.value = null }
+    fun openNote(note: Note) {
+        editorRevision++
+        _active.value = note
+        _saveState.value = EditorSaveState.Saved
+    }
+
+    fun closeNote() {
+        editorRevision++
+        _active.value = null
+        _saveState.value = EditorSaveState.Saved
+    }
 
     fun changeTitle(value: String) {
-        _active.value?.let { updateActive(it.copy(title = value)) }
+        _active.value?.let { if (it.title != value) updateActive(it.copy(title = value)) }
     }
 
     fun changeBody(value: String) {
-        _active.value?.let { updateActive(it.copy(body = value)) }
+        _active.value?.let { if (it.body != value) updateActive(it.copy(body = value)) }
     }
 
     fun togglePin(note: Note) {
         val changed = note.copy(isPinned = !note.isPinned)
-        if (_active.value?.id == note.id) _active.value = changed
-        operations.trySend(WriteOperation.Save(changed))
+        if (_active.value?.id == note.id) {
+            updateActive(changed)
+        } else {
+            operations.trySend(WriteOperation.Save(changed))
+        }
     }
 
     private fun updateActive(note: Note) {
-        _active.value = note
-        operations.trySend(WriteOperation.Save(note))
+        val updated = note.copy(updatedAt = System.currentTimeMillis())
+        _active.value = updated
+        editorRevision++
+        _saveState.value = EditorSaveState.Saving
+        operations.trySend(WriteOperation.Save(updated, editorRevision))
+    }
+
+    fun retrySave() {
+        _active.value?.let(::updateActive)
     }
 
     fun deleteNote(note: Note) {
-        if (_active.value?.id == note.id) _active.value = null
+        if (_active.value?.id == note.id) closeNote()
         operations.trySend(WriteOperation.Delete(note))
     }
 
@@ -149,7 +189,7 @@ class NotesViewModel(
     }
 
     fun toggleArchive(note: Note) {
-        if (_active.value?.id == note.id) _active.value = null
+        if (_active.value?.id == note.id) closeNote()
         operations.trySend(WriteOperation.Archive(note))
     }
 
