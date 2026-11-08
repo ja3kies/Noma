@@ -66,6 +66,17 @@ class NomaUiTest {
         compose.waitUntilAtLeastOneExists(hasText("#Work"))
     }
 
+    @Test fun checklistTogglesOneItemWithoutLosingOtherContent() {
+        val entry = Note("one", "Plan", "- [ ] Shop\nKeep this", false, 1L, 1L)
+        val repo = FakeRepository(listOf(entry))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithText("Plan").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_checklist_0"))
+        compose.onNodeWithTag("noma_checklist_0").performClick()
+        compose.onNodeWithText("1 of 1 done").assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))

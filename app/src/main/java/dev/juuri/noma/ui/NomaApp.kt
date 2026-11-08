@@ -9,6 +9,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +63,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -106,6 +109,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -113,6 +117,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import dev.juuri.noma.R
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.ChecklistSyntax
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.transfer.NoteDocumentTransfer
@@ -734,6 +739,19 @@ private fun NoteCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+                val taskItems = ChecklistSyntax.items(note.body)
+                if (taskItems.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(
+                            R.string.checklist_progress,
+                            taskItems.count { it.checked },
+                            taskItems.size
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(NomaSpacing.small))
                 Text(
                     text = formatEdited(note.updatedAt),
@@ -1094,6 +1112,54 @@ private fun NoteEditorScreen(
                 }
                 Spacer(Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = viewModel::appendChecklistItem) {
+                    Icon(Icons.Outlined.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.add_checklist_item))
+                }
+                val tasks = ChecklistSyntax.items(note.body)
+                if (tasks.isNotEmpty()) {
+                    Text(
+                        stringResource(
+                            R.string.checklist_progress,
+                            tasks.count { it.checked },
+                            tasks.size
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(8.dp)
+                    ) {
+                        tasks.forEach { task ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable(role = Role.Checkbox) {
+                                        viewModel.toggleChecklistItem(task.lineIndex)
+                                    }
+                                    .testTag("noma_checklist_${task.lineIndex}"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = task.checked,
+                                    onCheckedChange = null
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = task.text.ifEmpty { stringResource(R.string.untitled_task) },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
                 BasicTextField(
                     value = note.body,

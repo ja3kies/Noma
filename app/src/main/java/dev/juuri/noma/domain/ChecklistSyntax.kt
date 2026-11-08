@@ -4,7 +4,7 @@ package dev.juuri.noma.domain
 data class ChecklistItem(val lineIndex: Int, val checked: Boolean, val text: String)
 
 object ChecklistSyntax {
-    private val row = Regex("""^(\\s*[-*]\\s+\\[)([ xX])(\\]\\s*)(.*)$""")
+    private val row = Regex("""^(\s*[-*]\s+\[)([ xX])(\]\s*)(.*)$""")
 
     fun items(body: String): List<ChecklistItem> =
         body.split('\n').mapIndexedNotNull { index, line ->

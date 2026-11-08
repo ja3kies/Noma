@@ -85,4 +85,7 @@
     <string name="add_tag_hint">Add a tag</string>
     <string name="add_tag">Add tag</string>
     <string name="remove_tag">Remove tag %1$s</string>
+    <string name="add_checklist_item">Add checklist item</string>
+    <string name="untitled_task">New task</string>
+    <string name="checklist_progress">%1$d of %2$d done</string>
 </resources>
