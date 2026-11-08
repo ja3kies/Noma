@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Noma</string>
+    <string name="tagline">A quiet place for everything.</string>
+    <string name="search_hint">Search your notes</string>
+    <string name="clear_search">Clear search</string>
+    <string name="pinned_filter">Pinned only</string>
+    <string name="note_total">%1$d notes</string>
+    <string name="loading_notes">Opening your notes…</string>
+    <string name="unavailable">Your notes couldn’t be opened</string>
+    <string name="retry">Try again</string>
+    <string name="no_results">Nothing found</string>
+    <string name="no_results_detail">Try a different search or filter.</string>
+    <string name="empty_title">A little space to begin</string>
+    <string name="empty_detail">Your thoughts, lists and ideas will live here.</string>
+    <string name="pinned_section">Pinned</string>
+    <string name="recent_section">Recent</string>
+    <string name="untitled">Untitled note</string>
+    <string name="note_actions">Note actions</string>
+    <string name="pin_note">Pin note</string>
+    <string name="unpin_note">Unpin note</string>
+    <string name="new_note">New note</string>
+    <string name="delete_note">Delete</string>
+    <string name="delete_confirm_title">Delete this note?</string>
+    <string name="delete_confirm_body">You can undo this action for a moment after deleting.</string>
+    <string name="cancel">Cancel</string>
+    <string name="editor_nav_title">All notes</string>
+    <string name="back_to_notes">Back to all notes</string>
+    <string name="autosave_label">Saved automatically</string>
+    <string name="title_hint">Title</string>
+    <string name="body_hint">Start writing…</string>
+    <string name="deleted_message">Note deleted</string>
+    <string name="undo">Undo</string>
+    <string name="error_prefix">Couldn’t save your changes: </string>
+</resources>

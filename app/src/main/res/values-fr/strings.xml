@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Noma</string>
+    <string name="tagline">Un espace tranquille pour vos idées.</string>
+    <string name="search_hint">Rechercher dans les notes</string>
+    <string name="clear_search">Effacer la recherche</string>
+    <string name="pinned_filter">Épinglées seulement</string>
+    <string name="note_total">%1$d notes</string>
+    <string name="loading_notes">Ouverture de vos notes…</string>
+    <string name="unavailable">Impossible d’ouvrir vos notes</string>
+    <string name="retry">Réessayer</string>
+    <string name="no_results">Aucun résultat</string>
+    <string name="no_results_detail">Essayez une autre recherche ou un autre filtre.</string>
+    <string name="empty_title">Un espace pour commencer</string>
+    <string name="empty_detail">Vos pensées, listes et idées prendront place ici.</string>
+    <string name="pinned_section">Épinglées</string>
+    <string name="recent_section">Récentes</string>
+    <string name="untitled">Note sans titre</string>
+    <string name="note_actions">Actions sur la note</string>
+    <string name="pin_note">Épingler la note</string>
+    <string name="unpin_note">Désépingler la note</string>
+    <string name="new_note">Nouvelle note</string>
+    <string name="delete_note">Supprimer</string>
+    <string name="delete_confirm_title">Supprimer cette note ?</string>
+    <string name="delete_confirm_body">Vous pourrez annuler cette action pendant un instant.</string>
+    <string name="cancel">Annuler</string>
+    <string name="editor_nav_title">Toutes les notes</string>
+    <string name="back_to_notes">Retour aux notes</string>
+    <string name="autosave_label">Enregistrement automatique</string>
+    <string name="title_hint">Titre</string>
+    <string name="body_hint">Commencez à écrire…</string>
+    <string name="deleted_message">Note supprimée</string>
+    <string name="undo">Annuler</string>
+    <string name="error_prefix">Échec de l’enregistrement : </string>
+</resources>
