@@ -6,6 +6,7 @@ import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,8 @@ private sealed interface WriteOperation {
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
     data class Archive(val previous: Note) : WriteOperation
+    data class Import(val entries: List<Note>, val completion: CompletableDeferred<Int>) : WriteOperation
+    data class Barrier(val completion: CompletableDeferred<Unit>) : WriteOperation
 }
 
 class NotesViewModel(
@@ -90,8 +93,21 @@ class NotesViewModel(
                             ))
                             eventChannel.send(NoteUiEvent.ArchiveChanged(operation.previous))
                         }
+                        is WriteOperation.Import -> {
+                            val count = repository.importNotes(operation.entries)
+                            operation.completion.complete(count)
+                        }
+                        is WriteOperation.Barrier -> {
+                            repository.refresh()
+                            operation.completion.complete(Unit)
+                        }
                     }
                 } catch (failure: Exception) {
+                    when (operation) {
+                        is WriteOperation.Import -> operation.completion.completeExceptionally(failure)
+                        is WriteOperation.Barrier -> operation.completion.completeExceptionally(failure)
+                        else -> Unit
+                    }
                     val message = failure.localizedMessage ?: "Storage unavailable"
                     if (operation is WriteOperation.Save &&
                         operation.editorRevision != null &&
@@ -195,6 +211,29 @@ class NotesViewModel(
 
     fun undoArchive(note: Note) {
         operations.trySend(WriteOperation.Restore(note))
+    }
+
+    /**
+     * Suspend until all previously queued edits have committed before exporting.
+     * Never silently present an incomplete backup as a successful one.
+     */
+    suspend fun exportSnapshot(): List<Note> {
+        check(_saveState.value !is EditorSaveState.Failed) {
+            "Resolve unsaved changes before exporting"
+        }
+        val barrier = CompletableDeferred<Unit>()
+        operations.send(WriteOperation.Barrier(barrier))
+        barrier.await()
+        val ready = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
+            ?: error("Notes unavailable for backup")
+        return ready.entries
+    }
+
+    suspend fun importNotes(entries: List<Note>): Int {
+        check(entries.isNotEmpty()) { "No notes to import" }
+        val result = CompletableDeferred<Int>()
+        operations.send(WriteOperation.Import(entries, result))
+        return result.await()
     }
 
     fun retry() {

@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class SqliteNotesRepository(
     context: Context,
@@ -44,6 +45,25 @@ class SqliteNotesRepository(
         mutex.withLock {
             helper.upsert(note)
             state.value = NotesSnapshot.Ready(helper.readAll())
+        }
+    }
+
+    override suspend fun importNotes(entries: List<Note>): Int = withContext(io) {
+        require(entries.size <= dev.juuri.noma.transfer.NoteTransferCodec.MAX_NOTES) {
+            "Import exceeds note count limit"
+        }
+        mutex.withLock {
+            val occupied = helper.readAll().mapTo(HashSet()) { it.id }
+            val unique = entries.map { incoming ->
+                var id = incoming.id
+                if (!occupied.add(id)) {
+                    do { id = UUID.randomUUID().toString() } while (!occupied.add(id))
+                }
+                incoming.copy(id = id)
+            }
+            helper.insertBatch(unique)
+            state.value = NotesSnapshot.Ready(helper.readAll())
+            unique.size
         }
     }
 
