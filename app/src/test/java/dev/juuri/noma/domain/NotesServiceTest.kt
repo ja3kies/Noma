@@ -124,6 +124,14 @@ class NotesServiceTest {
         assertEquals("a full paragraph", saved.body)
     }
 
+    @Test fun taggedNotesCanBeFilteredAndSearched() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(note("a", "One").copy(tags = listOf("Travel")),
+            note("b", "Two").copy(tags = listOf("Work")))
+        assertEquals(listOf("a"), service.visible(notes, "", false, tag = "travel").map { it.id })
+        assertEquals(listOf("b"), service.visible(notes, "WORK", false).map { it.id })
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)

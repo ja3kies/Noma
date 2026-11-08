@@ -7,7 +7,8 @@ data class Note(
     val isPinned: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    val tags: List<String> = emptyList()
 ) {
     val displayTitle: String
         get() = title.trim().ifEmpty { body.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty() }
