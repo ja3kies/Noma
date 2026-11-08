@@ -2,6 +2,7 @@ package dev.juuri.noma.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -51,6 +52,18 @@ class NomaUiTest {
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_note_list"))
         compose.onNodeWithTag("noma_search").performTextInput("Weekend")
         compose.onNodeWithText("Weekend plan").assertExists()
+    }
+
+    @Test fun tagsCanBeAddedFromEditor() {
+        val entry = Note("one", "Plan", "Body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(entry))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithText("Plan").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_tag_input"))
+        compose.onNodeWithTag("noma_tag_input").performTextInput("Work")
+        compose.onNodeWithTag("noma_tag_add").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("#Work"))
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {

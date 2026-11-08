@@ -71,6 +71,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -723,6 +724,16 @@ private fun NoteCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                if (note.tags.isNotEmpty()) {
+                    Spacer(Modifier.height(NomaSpacing.small))
+                    Text(
+                        text = note.tags.joinToString("  ·  ") { "#$it" },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Spacer(Modifier.height(NomaSpacing.small))
                 Text(
                     text = formatEdited(note.updatedAt),
@@ -823,6 +834,7 @@ private fun NoteEditorScreen(
     var confirmDelete by rememberSaveable(note.id) { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
+    var draftTag by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     var exportInProgress by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -1030,6 +1042,56 @@ private fun NoteEditorScreen(
                         }
                     }
                 )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = draftTag,
+                        onValueChange = { draftTag = it.take(64) },
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.add_tag_hint)) },
+                        modifier = Modifier.weight(1f).testTag("noma_tag_input"),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            viewModel.addTag(draftTag)
+                            draftTag = ""
+                        })
+                    )
+                    IconButton(
+                        onClick = {
+                            viewModel.addTag(draftTag)
+                            draftTag = ""
+                        },
+                        enabled = draftTag.isNotBlank(),
+                        modifier = Modifier.testTag("noma_tag_add")
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.add_tag))
+                    }
+                }
+                if (note.tags.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        note.tags.forEach { tag ->
+                            InputChip(
+                                selected = false,
+                                onClick = { viewModel.removeTag(tag) },
+                                label = { Text("#$tag") },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = stringResource(R.string.remove_tag, tag),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(Modifier.height(20.dp))
