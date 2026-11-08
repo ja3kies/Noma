@@ -655,17 +655,38 @@ private fun NoteEditorScreen(
     var confirmDelete by rememberSaveable(note.id) { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
+    var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     val context = LocalContext.current
     val titleFocus = remember { FocusRequester() }
     val bodyFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     fun requestClose() {
-        if (saveState is EditorSaveState.Failed) confirmDiscard = true
-        else viewModel.closeNote()
+        when (saveState) {
+            EditorSaveState.Saved -> viewModel.closeNote()
+            EditorSaveState.Saving -> closeWhenSaved = true
+            is EditorSaveState.Failed -> confirmDiscard = true
+        }
     }
 
     BackHandler { requestClose() }
+    // Back while writing waits for the last disk acknowledgement.
+    // A failed write keeps the unsaved content in the editor for retry.
+    LaunchedEffect(closeWhenSaved, saveState) {
+        if (closeWhenSaved) {
+            when (saveState) {
+                EditorSaveState.Saved -> {
+                    closeWhenSaved = false
+                    viewModel.closeNote()
+                }
+                EditorSaveState.Saving -> Unit
+                is EditorSaveState.Failed -> {
+                    closeWhenSaved = false
+                    confirmDiscard = true
+                }
+            }
+        }
+    }
     LaunchedEffect(note.id) {
         if (note.title.isBlank() && note.body.isBlank()) {
             titleFocus.requestFocus()
