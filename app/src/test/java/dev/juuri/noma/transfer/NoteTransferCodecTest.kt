@@ -102,6 +102,28 @@ class NoteTransferCodecTest {
         assertEquals("first\nsecond", imported.body)
     }
 
+    @Test fun malformedUtf8CannotCorruptBackupSilently() {
+        assertThrows(java.nio.charset.MalformedInputException::class.java) {
+            NoteTransferCodec.decode(byteArrayOf(0xC3.toByte(), 0x28))
+        }
+    }
+
+    @Test fun fractionalTimestampsAreRejected() {
+        val root = JSONObject(NoteTransferCodec.encode(listOf(note)).toString(Charsets.UTF_8))
+        root.getJSONArray("notes").getJSONObject(0).put("updatedAt", 1.5)
+        assertThrows(IllegalArgumentException::class.java) {
+            NoteTransferCodec.decode(root.toString().toByteArray())
+        }
+    }
+
+    @Test fun markdownRetainsLeadingBlankLines() {
+        val original = note.copy(body = "\n\nFirst line")
+        val decoded = NoteTransferCodec.markdownToNote(
+            NoteTransferCodec.toMarkdown(original), "anything.md", 50L
+        )
+        assertEquals(original.body, decoded.body)
+    }
+
     @Test fun utf8BomIsAccepted() {
         val backup = "\uFEFF" + NoteTransferCodec.encode(listOf(note)).toString(Charsets.UTF_8)
         assertEquals(note, NoteTransferCodec.decode(backup.toByteArray()).single())

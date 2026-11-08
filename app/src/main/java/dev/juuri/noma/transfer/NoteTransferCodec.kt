@@ -3,6 +3,8 @@ package dev.juuri.noma.transfer
 import dev.juuri.noma.domain.Note
 import org.json.JSONArray
 import org.json.JSONObject
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
@@ -47,7 +49,12 @@ object NoteTransferCodec {
 
     fun decode(bytes: ByteArray): List<Note> {
         require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES) { "Unsupported backup size" }
-        val raw = bytes.toString(StandardCharsets.UTF_8).removePrefix("\uFEFF")
+        val raw = StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(bytes))
+            .toString()
+            .removePrefix("\uFEFF")
         val root = JSONObject(raw)
         require(root.getString("format") == "noma-notes") { "Not a Noma backup" }
         require(root.getInt("schemaVersion") == BACKUP_VERSION) {
@@ -78,7 +85,8 @@ object NoteTransferCodec {
     private fun strictTimestamp(item: JSONObject, key: String): Long {
         val value = item.get(key)
         require(value is Number) { "Invalid timestamp" }
-        return value.toLong()
+        return value.toString().toLongOrNull()
+            ?: throw IllegalArgumentException("Timestamp must be an integer")
     }
 
     private fun validate(note: Note) {
@@ -96,7 +104,12 @@ object NoteTransferCodec {
         val hasHeading = first.startsWith("# ") && first.drop(2).trim().isNotBlank()
         val title = if (hasHeading) first.drop(2).trim() else safeTitle(filename)
         val body = if (hasHeading) {
-            normalized.substringAfter("\n", "").trimStart('\r', '\n')
+            val remainder = normalized.substringAfter("\n", "")
+            when {
+                remainder.startsWith("\r\n") -> remainder.drop(2)
+                remainder.startsWith("\n") -> remainder.drop(1)
+                else -> remainder
+            }
         } else normalized
         return freshNote(title, body, now)
     }

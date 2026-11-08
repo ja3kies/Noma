@@ -233,6 +233,7 @@ private fun NotesListScreen(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var transferMenuExpanded by remember { mutableStateOf(false) }
+    var confirmUnencryptedExport by remember { mutableStateOf(false) }
     var transferBusy by remember { mutableStateOf(false) }
     val transferScope = rememberCoroutineScope()
     val exportSuccess = stringResource(R.string.export_success)
@@ -275,6 +276,25 @@ private fun NotesListScreen(
                 )
             }
         }
+    }
+
+    if (confirmUnencryptedExport) {
+        AlertDialog(
+            onDismissRequest = { confirmUnencryptedExport = false },
+            title = { Text(stringResource(R.string.backup_warning_title)) },
+            text = { Text(stringResource(R.string.backup_warning_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmUnencryptedExport = false
+                    backupPicker.launch("Noma-backup.json")
+                }) { Text(stringResource(R.string.export_backup)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmUnencryptedExport = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     deleting?.let { note ->
@@ -353,7 +373,7 @@ private fun NotesListScreen(
                                 text = { Text(stringResource(R.string.export_backup)) },
                                 onClick = {
                                     transferMenuExpanded = false
-                                    backupPicker.launch("Noma-backup.json")
+                                    confirmUnencryptedExport = true
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Outlined.FileDownload, contentDescription = null)

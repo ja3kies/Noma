@@ -72,4 +72,6 @@
     <string name="import_success">Notes imported</string>
     <string name="export_success">Document exported</string>
     <string name="transfer_error">Transfer failed: </string>
+    <string name="backup_warning_title">Export an unencrypted backup?</string>
+    <string name="backup_warning_body">JSON backups contain all your notes as readable text, including archived notes. Choose a private location and protect the file.</string>
 </resources>

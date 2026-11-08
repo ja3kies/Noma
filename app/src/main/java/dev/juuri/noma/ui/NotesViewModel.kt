@@ -230,7 +230,7 @@ class NotesViewModel(
     }
 
     suspend fun importNotes(entries: List<Note>): Int {
-        check(entries.isNotEmpty()) { "No notes to import" }
+        if (entries.isEmpty()) return 0
         val result = CompletableDeferred<Int>()
         operations.send(WriteOperation.Import(entries, result))
         return result.await()

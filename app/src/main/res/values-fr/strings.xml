@@ -72,4 +72,6 @@
     <string name="import_success">Notes importées</string>
     <string name="export_success">Document exporté</string>
     <string name="transfer_error">Échec du transfert : </string>
+    <string name="backup_warning_title">Exporter une sauvegarde non chiffrée ?</string>
+    <string name="backup_warning_body">Les sauvegardes JSON contiennent toutes vos notes en clair, y compris les archives. Choisissez un emplacement privé et protégez le fichier.</string>
 </resources>

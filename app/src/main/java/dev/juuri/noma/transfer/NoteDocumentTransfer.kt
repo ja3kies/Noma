@@ -58,7 +58,7 @@ object NoteDocumentTransfer {
 
     private suspend fun writeBytes(context: Context, uri: Uri, bytes: ByteArray) =
         withContext(Dispatchers.IO) {
-            context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
+            context.contentResolver.openOutputStream(uri, "w")?.use { output ->
                 output.write(bytes)
                 output.flush()
             } ?: error("Cannot write selected document")
