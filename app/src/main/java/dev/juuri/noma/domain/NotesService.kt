@@ -3,6 +3,8 @@ package dev.juuri.noma.domain
 import java.util.Locale
 import java.util.UUID
 
+enum class NoteSort { RECENT, TITLE }
+
 class NotesService(
     private val repository: NotesRepository,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -27,18 +29,31 @@ class NotesService(
         repository.save(note)
     }
 
-    fun visible(notes: List<Note>, query: String, pinnedOnly: Boolean): List<Note> {
+    fun visible(
+        notes: List<Note>,
+        query: String,
+        pinnedOnly: Boolean,
+        archivedOnly: Boolean = false,
+        sort: NoteSort = NoteSort.RECENT
+    ): List<Note> {
         val term = query.trim().lowercase(Locale.ROOT)
+        val pinnedFirst = compareByDescending<Note> { !archivedOnly && it.isPinned }
+        val comparator = when (sort) {
+            NoteSort.RECENT -> pinnedFirst.thenByDescending { it.updatedAt }.thenBy { it.id }
+            NoteSort.TITLE -> pinnedFirst
+                .thenBy { it.displayTitle.lowercase(Locale.ROOT) }
+                .thenByDescending { it.updatedAt }
+                .thenBy { it.id }
+        }
         return notes.asSequence()
+            .filter { it.isArchived == archivedOnly }
             .filter { !pinnedOnly || it.isPinned }
             .filter {
                 term.isEmpty() ||
                     it.title.lowercase(Locale.ROOT).contains(term) ||
                     it.body.lowercase(Locale.ROOT).contains(term)
             }
-            .sortedWith(compareByDescending<Note> { it.isPinned }
-                .thenByDescending { it.updatedAt }
-                .thenBy { it.id })
+            .sortedWith(comparator)
             .toList()
     }
 }

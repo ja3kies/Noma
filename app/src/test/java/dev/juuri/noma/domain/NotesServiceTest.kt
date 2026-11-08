@@ -76,6 +76,45 @@ class NotesServiceTest {
         assertTrue(service.visible(notes, "unmatched", false).isEmpty())
     }
 
+    @Test fun archiveVisibilityAndSearchAreScoped() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("active", "Shopping"),
+            note("archived", "Private thoughts").copy(isArchived = true)
+        )
+        assertEquals(listOf("active"), service.visible(notes, "", false).map { it.id })
+        assertEquals(listOf("archived"),
+            service.visible(notes, "thoughts", false, archivedOnly = true).map { it.id })
+        assertTrue(service.visible(notes, "thoughts", false).isEmpty())
+    }
+
+    @Test fun titleSortIsAlphabeticalWithinPinnedGroups() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("z", "Zebra", time = 100),
+            note("a", "apple", time = 1),
+            note("pZ", "Zoo", pinned = true, time = 80),
+            note("pA", "Atlas", pinned = true, time = 10)
+        )
+        assertEquals(listOf("pA", "pZ", "a", "z"),
+            service.visible(notes, "", false, sort = NoteSort.TITLE).map { it.id })
+        assertEquals(listOf("pZ", "pA", "z", "a"),
+            service.visible(notes, "", false).map { it.id })
+    }
+
+    @Test fun archivedNotesPersistAndRestoreWithoutLosingOtherFields() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo, { 200L })
+        val original = note("a", "A", pinned = true, time = 1L)
+        repo.save(original)
+        service.save(original.copy(isArchived = true))
+        assertTrue(repo.list().single().isArchived)
+        service.save(repo.list().single().copy(isArchived = false))
+        assertFalse(repo.list().single().isArchived)
+        assertTrue(repo.list().single().isPinned)
+        assertEquals(1L, repo.list().single().createdAt)
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)

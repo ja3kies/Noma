@@ -32,4 +32,15 @@
     <string name="deleted_message">Note supprimée</string>
     <string name="undo">Annuler</string>
     <string name="error_prefix">Échec de l’enregistrement : </string>
+    <string name="archive_view">Archives</string>
+    <string name="archived_section">Notes archivées</string>
+    <string name="archive_note">Archiver la note</string>
+    <string name="unarchive_note">Restaurer la note</string>
+    <string name="archived_message">Note archivée</string>
+    <string name="unarchived_message">Note restaurée</string>
+    <string name="empty_archive">Aucune note archivée</string>
+    <string name="empty_archive_detail">Les notes archivées apparaîtront ici, prêtes à être restaurées.</string>
+    <string name="sort_notes">Trier les notes</string>
+    <string name="sort_recent">Modification récente</string>
+    <string name="sort_title">Titre (A–Z)</string>
 </resources>

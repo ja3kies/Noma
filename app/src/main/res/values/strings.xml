@@ -32,4 +32,15 @@
     <string name="deleted_message">Note deleted</string>
     <string name="undo">Undo</string>
     <string name="error_prefix">Couldn’t save your changes: </string>
+    <string name="archive_view">Archive</string>
+    <string name="archived_section">Archived notes</string>
+    <string name="archive_note">Archive note</string>
+    <string name="unarchive_note">Restore note</string>
+    <string name="archived_message">Note archived</string>
+    <string name="unarchived_message">Note restored</string>
+    <string name="empty_archive">Your archive is empty</string>
+    <string name="empty_archive_detail">Archived notes will appear here, ready to restore.</string>
+    <string name="sort_notes">Sort notes</string>
+    <string name="sort_recent">Recently edited</string>
+    <string name="sort_title">Title (A–Z)</string>
 </resources>

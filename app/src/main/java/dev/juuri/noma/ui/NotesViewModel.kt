@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
+import dev.juuri.noma.domain.NoteSort
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 
 sealed interface NoteUiEvent {
     data class Deleted(val note: Note) : NoteUiEvent
+    data class ArchiveChanged(val previous: Note) : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
 
@@ -21,6 +23,7 @@ private sealed interface WriteOperation {
     data class Save(val note: Note) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
+    data class Archive(val previous: Note) : WriteOperation
 }
 
 class NotesViewModel(
@@ -34,6 +37,12 @@ class NotesViewModel(
 
     private val _pinnedOnly = MutableStateFlow(false)
     val pinnedOnly: StateFlow<Boolean> = _pinnedOnly.asStateFlow()
+
+    private val _archivedOnly = MutableStateFlow(false)
+    val archivedOnly: StateFlow<Boolean> = _archivedOnly.asStateFlow()
+
+    private val _sort = MutableStateFlow(NoteSort.RECENT)
+    val sort: StateFlow<NoteSort> = _sort.asStateFlow()
 
     private val _active = MutableStateFlow<Note?>(null)
     val active: StateFlow<Note?> = _active.asStateFlow()
@@ -58,6 +67,12 @@ class NotesViewModel(
                             eventChannel.send(NoteUiEvent.Deleted(operation.note))
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
+                        is WriteOperation.Archive -> {
+                            service.save(operation.previous.copy(
+                                isArchived = !operation.previous.isArchived
+                            ))
+                            eventChannel.send(NoteUiEvent.ArchiveChanged(operation.previous))
+                        }
                     }
                 } catch (failure: Exception) {
                     eventChannel.send(
@@ -70,12 +85,24 @@ class NotesViewModel(
 
     fun onQueryChange(value: String) { _query.value = value }
     fun togglePinnedOnly() { _pinnedOnly.value = !_pinnedOnly.value }
+    fun toggleArchiveView() {
+        _archivedOnly.value = !_archivedOnly.value
+        _pinnedOnly.value = false
+    }
+    fun selectSort(value: NoteSort) { _sort.value = value }
 
-    fun visible(notes: List<Note>, query: String, pinnedOnly: Boolean): List<Note> =
-        service.visible(notes, query, pinnedOnly)
+    fun visible(
+        notes: List<Note>,
+        query: String,
+        pinnedOnly: Boolean,
+        archivedOnly: Boolean,
+        sort: NoteSort
+    ): List<Note> = service.visible(notes, query, pinnedOnly, archivedOnly, sort)
 
     fun createNote() {
         if (_creating.value) return
+        _archivedOnly.value = false
+        _pinnedOnly.value = false
         _creating.value = true
         viewModelScope.launch {
             try {
@@ -118,6 +145,15 @@ class NotesViewModel(
     }
 
     fun undoDelete(note: Note) {
+        operations.trySend(WriteOperation.Restore(note))
+    }
+
+    fun toggleArchive(note: Note) {
+        if (_active.value?.id == note.id) _active.value = null
+        operations.trySend(WriteOperation.Archive(note))
+    }
+
+    fun undoArchive(note: Note) {
         operations.trySend(WriteOperation.Restore(note))
     }
 

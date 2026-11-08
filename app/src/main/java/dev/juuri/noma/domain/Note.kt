@@ -6,7 +6,8 @@ data class Note(
     val body: String = "",
     val isPinned: Boolean = false,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val isArchived: Boolean = false
 ) {
     val displayTitle: String
         get() = title.trim().ifEmpty { body.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty() }

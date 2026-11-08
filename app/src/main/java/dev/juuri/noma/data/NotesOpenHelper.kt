@@ -20,22 +20,29 @@ internal class NotesOpenHelper(context: Context) :
                 title TEXT NOT NULL,
                 body TEXT NOT NULL,
                 pinned INTEGER NOT NULL DEFAULT 0,
+                archived INTEGER NOT NULL DEFAULT 0,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             )""".trimIndent()
         )
         db.execSQL("CREATE INDEX idx_notes_updated_at ON notes(updated_at DESC)")
         db.execSQL("CREATE INDEX idx_notes_pinned ON notes(pinned DESC, updated_at DESC)")
+        db.execSQL("CREATE INDEX idx_notes_archived ON notes(archived, updated_at DESC)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        throw IllegalStateException("Missing migration from $oldVersion to $newVersion")
+        if (oldVersion == 1 && newVersion == 2) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("CREATE INDEX idx_notes_archived ON notes(archived, updated_at DESC)")
+        } else {
+            throw IllegalStateException("Missing migration from $oldVersion to $newVersion")
+        }
     }
 
     fun readAll(): List<Note> = buildList {
         readableDatabase.query(
             "notes",
-            arrayOf("id", "title", "body", "pinned", "created_at", "updated_at"),
+            arrayOf("id", "title", "body", "pinned", "created_at", "updated_at", "archived"),
             null, null, null, null, "pinned DESC, updated_at DESC, id ASC"
         ).use { cursor ->
             while (cursor.moveToNext()) {
@@ -46,7 +53,8 @@ internal class NotesOpenHelper(context: Context) :
                         body = cursor.getString(2),
                         isPinned = cursor.getInt(3) != 0,
                         createdAt = cursor.getLong(4),
-                        updatedAt = cursor.getLong(5)
+                        updatedAt = cursor.getLong(5),
+                        isArchived = cursor.getInt(6) != 0
                     )
                 )
             }
@@ -59,6 +67,7 @@ internal class NotesOpenHelper(context: Context) :
             put("title", note.title)
             put("body", note.body)
             put("pinned", if (note.isPinned) 1 else 0)
+            put("archived", if (note.isArchived) 1 else 0)
             put("created_at", note.createdAt)
             put("updated_at", note.updatedAt)
         }
@@ -75,6 +84,6 @@ internal class NotesOpenHelper(context: Context) :
 
     companion object {
         internal const val DATABASE_NAME = "noma-notes.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
     }
 }

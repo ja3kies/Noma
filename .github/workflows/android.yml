@@ -30,7 +30,7 @@ jobs:
         run: |
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Run JVM tests, lint, and compile
-        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleDebug
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4

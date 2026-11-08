@@ -6,6 +6,8 @@ A calm, offline-first Android notes app. Its visual rhythm is inspired by famili
 
 - Create, edit and delete notes with immediate write-through local persistence.
 - Search by title or body, filter pinned notes, and group pinned notes above recent notes.
+- Archive and restore notes without deleting them; search the archive and undo archive actions.
+- Sort by recent edit or alphabetical title, while preserving pinned sections.
 - Note previews and last-edited timestamps.
 - Delete confirmation with an Undo snackbar.
 - Light and dark themes following system appearance, cohesive semantic colors, typography and shapes.
@@ -51,9 +53,9 @@ The UI uses Material 3 component and design tokens from the stable Compose Mater
 ## Verification and constraints
 
 - `app/src/test` includes JVM tests for creation, updating, searching by body/title, pin ordering, deletion/restore and note previews.
-- `app/src/androidTest` covers on-device SQLite persistence and deletion across new repository instances.
+- `app/src/androidTest` includes on-device SQLite persistence and v1→v2 migration tests; a device or emulator is required to execute them.
 - A GitHub Actions workflow builds, tests, lints and publishes the debug APK as a short-lived artifact on successful validation.
-- For a major SQLite schema change, add an explicit migration; the current version refuses destructive upgrades.
+- SQLite version 2 adds archive state through a non-destructive v1→v2 migration that preserves every existing note. Future schema upgrades require explicit migrations.
 - The repository initially contained no project or Gradle wrapper binary. CI uses an installed Gradle 8.13 distribution to avoid committing an unverified binary. Android Studio and a local Gradle 8.13 installation are supported.
 
 ### Privacy
