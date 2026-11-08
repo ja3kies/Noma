@@ -28,6 +28,9 @@ gradle :app:installDebug
 
 The Android GitHub Actions job installs the required SDK and runs the same validation tasks. The APK produced by a successful job is attached to the workflow as `Noma-debug-apk`.
 
+**Safe previews:** CI debug builds have a separate package ID (`dev.juuri.noma.preview`) and launcher label **Noma Preview**. Hosted CI signs APKs with ephemeral debug keys, so successive APKs may not be directly upgradeable. Do not uninstall a prior version if it contains important notes. Use an explicit, persistent signing key for any future upgradeable builds; never commit that private key to Git.
+
+
 ## Architecture
 
 ```text

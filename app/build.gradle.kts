@@ -18,6 +18,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // CI-generated debug keys are ephemeral. Install this preview alongside
+            // the stable package rather than risking note loss on a signature mismatch.
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
