@@ -88,4 +88,7 @@
     <string name="add_checklist_item">Ajouter une tâche</string>
     <string name="untitled_task">Nouvelle tâche</string>
     <string name="checklist_progress">%1$d tâche(s) sur %2$d terminée(s)</string>
+    <string name="format_bold">Gras</string>
+    <string name="format_heading">Titre</string>
+    <string name="format_bullet">Puces</string>
 </resources>

@@ -24,7 +24,7 @@ object MarkdownEdits {
 
     private fun toggleLinePrefix(text: String, cursor: Int, marker: String): MarkdownEdit {
         val pos = cursor.coerceIn(0, text.length)
-        val start = text.lastIndexOf('\n', (pos - 1).coerceAtLeast(0)).let {
+        val start = if (pos == 0) 0 else text.lastIndexOf('\n', pos - 1).let {
             if (it < 0) 0 else it + 1
         }
         val already = text.startsWith(marker, start)

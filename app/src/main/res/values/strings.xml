@@ -88,4 +88,7 @@
     <string name="add_checklist_item">Add checklist item</string>
     <string name="untitled_task">New task</string>
     <string name="checklist_progress">%1$d of %2$d done</string>
+    <string name="format_bold">Bold</string>
+    <string name="format_heading">Heading</string>
+    <string name="format_bullet">Bullets</string>
 </resources>

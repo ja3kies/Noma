@@ -112,12 +112,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import dev.juuri.noma.R
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.ChecklistSyntax
+import dev.juuri.noma.domain.MarkdownEdit
+import dev.juuri.noma.domain.MarkdownEdits
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.transfer.NoteDocumentTransfer
@@ -853,6 +857,11 @@ private fun NoteEditorScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var draftTag by rememberSaveable(note.id) { mutableStateOf("") }
+    var bodyField by remember(note.id) {
+        mutableStateOf(
+            TextFieldValue(note.body, selection = TextRange(note.body.length))
+        )
+    }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     var exportInProgress by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -896,6 +905,21 @@ private fun NoteEditorScreen(
     val titleFocus = remember { FocusRequester() }
     val bodyFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(note.id, note.body) {
+        if (bodyField.text != note.body) {
+            bodyField = bodyField.copy(text = note.body)
+        }
+    }
+
+    fun formatBody(edit: MarkdownEdit) {
+        bodyField = TextFieldValue(
+            text = edit.text,
+            selection = TextRange(edit.start, edit.end)
+        )
+        viewModel.changeBody(edit.text)
+        bodyFocus.requestFocus()
+    }
 
     fun requestClose() {
         when (saveState) {
@@ -1113,10 +1137,24 @@ private fun NoteEditorScreen(
                 Spacer(Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(Modifier.height(12.dp))
-                TextButton(onClick = viewModel::appendChecklistItem) {
-                    Icon(Icons.Outlined.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.add_checklist_item))
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.bold(
+                            bodyField.text, bodyField.selection.start, bodyField.selection.end
+                        ))
+                    }) { Text(stringResource(R.string.format_bold)) }
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.heading(bodyField.text, bodyField.selection.start))
+                    }) { Text(stringResource(R.string.format_heading)) }
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.bullet(bodyField.text, bodyField.selection.start))
+                    }) { Text(stringResource(R.string.format_bullet)) }
+                    TextButton(onClick = {
+                        formatBody(MarkdownEdits.checklist(bodyField.text, bodyField.selection.start))
+                    }) { Text(stringResource(R.string.add_checklist_item)) }
                 }
                 val tasks = ChecklistSyntax.items(note.body)
                 if (tasks.isNotEmpty()) {
@@ -1162,8 +1200,11 @@ private fun NoteEditorScreen(
                 }
                 Spacer(Modifier.height(20.dp))
                 BasicTextField(
-                    value = note.body,
-                    onValueChange = viewModel::changeBody,
+                    value = bodyField,
+                    onValueChange = { input ->
+                        bodyField = input
+                        viewModel.changeBody(input.text)
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground
                     ),
