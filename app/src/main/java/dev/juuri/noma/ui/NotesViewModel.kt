@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NoteTags
+import dev.juuri.noma.domain.ChecklistSyntax
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import kotlinx.coroutines.CompletableDeferred
@@ -216,6 +217,17 @@ class NotesViewModel(
         _active.value?.let { current ->
             val changed = NoteTags.remove(current, tag)
             if (changed != current) updateActive(changed)
+        }
+    }
+
+    fun appendChecklistItem() {
+        _active.value?.let { changeBody(ChecklistSyntax.append(it.body)) }
+    }
+
+    fun toggleChecklistItem(lineIndex: Int) {
+        _active.value?.let { current ->
+            val updated = ChecklistSyntax.toggle(current.body, lineIndex)
+            if (updated != current.body) changeBody(updated)
         }
     }
 
