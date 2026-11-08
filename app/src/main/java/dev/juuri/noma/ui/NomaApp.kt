@@ -37,6 +37,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -92,6 +95,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.juuri.noma.R
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.flow.collect
 import java.text.DateFormat
@@ -102,14 +106,18 @@ fun NomaApp(viewModel: NotesViewModel) {
     val snapshot by viewModel.snapshot.collectAsState()
     val query by viewModel.query.collectAsState()
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
+    val archivedOnly by viewModel.archivedOnly.collectAsState()
+    val sort by viewModel.sort.collectAsState()
     val active by viewModel.active.collectAsState()
     val creating by viewModel.creating.collectAsState()
 
     val snackbar = remember { SnackbarHostState() }
     val deletedMessage = stringResource(R.string.deleted_message)
+    val archivedMessage = stringResource(R.string.archived_message)
+    val unarchivedMessage = stringResource(R.string.unarchived_message)
     val undoLabel = stringResource(R.string.undo)
     val errorPrefix = stringResource(R.string.error_prefix)
-    LaunchedEffect(viewModel, deletedMessage, undoLabel, errorPrefix) {
+    LaunchedEffect(viewModel, deletedMessage, archivedMessage, unarchivedMessage, undoLabel, errorPrefix) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -120,6 +128,16 @@ fun NomaApp(viewModel: NotesViewModel) {
                     )
                     if (outcome == SnackbarResult.ActionPerformed) {
                         viewModel.undoDelete(event.note)
+                    }
+                }
+                is NoteUiEvent.ArchiveChanged -> {
+                    val outcome = snackbar.showSnackbar(
+                        message = if (event.previous.isArchived) unarchivedMessage else archivedMessage,
+                        actionLabel = undoLabel,
+                        withDismissAction = true
+                    )
+                    if (outcome == SnackbarResult.ActionPerformed) {
+                        viewModel.undoArchive(event.previous)
                     }
                 }
                 is NoteUiEvent.Failure ->
@@ -134,13 +152,18 @@ fun NomaApp(viewModel: NotesViewModel) {
                 snapshot = snapshot,
                 query = query,
                 pinnedOnly = pinnedOnly,
+                archivedOnly = archivedOnly,
+                sort = sort,
                 creating = creating,
                 filter = viewModel::visible,
                 onQueryChange = viewModel::onQueryChange,
                 onTogglePinnedOnly = viewModel::togglePinnedOnly,
+                onToggleArchiveView = viewModel::toggleArchiveView,
+                onSortChange = viewModel::selectSort,
                 onCreate = viewModel::createNote,
                 onOpen = viewModel::openNote,
                 onTogglePin = viewModel::togglePin,
+                onToggleArchive = viewModel::toggleArchive,
                 onDelete = viewModel::deleteNote,
                 onRetry = viewModel::retry,
                 snackbar = snackbar
@@ -152,6 +175,7 @@ fun NomaApp(viewModel: NotesViewModel) {
                 onTitleChange = viewModel::changeTitle,
                 onBodyChange = viewModel::changeBody,
                 onTogglePin = { viewModel.togglePin(requireNotNull(active)) },
+                onToggleArchive = { viewModel.toggleArchive(requireNotNull(active)) },
                 onDelete = { viewModel.deleteNote(requireNotNull(active)) },
                 snackbar = snackbar
             )
@@ -164,19 +188,25 @@ private fun NotesListScreen(
     snapshot: NotesSnapshot,
     query: String,
     pinnedOnly: Boolean,
+    archivedOnly: Boolean,
+    sort: NoteSort,
     creating: Boolean,
-    filter: (List<Note>, String, Boolean) -> List<Note>,
+    filter: (List<Note>, String, Boolean, Boolean, NoteSort) -> List<Note>,
     onQueryChange: (String) -> Unit,
     onTogglePinnedOnly: () -> Unit,
+    onToggleArchiveView: () -> Unit,
+    onSortChange: (NoteSort) -> Unit,
     onCreate: () -> Unit,
     onOpen: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
+    onToggleArchive: (Note) -> Unit,
     onDelete: (Note) -> Unit,
     onRetry: () -> Unit,
     snackbar: SnackbarHostState
 ) {
     val newNoteLabel = stringResource(R.string.new_note)
     var deleting by remember { mutableStateOf<Note?>(null) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     if (deleting != null) {
         DeleteConfirmation(
             onCancel = { deleting = null },
@@ -259,21 +289,59 @@ private fun NotesListScreen(
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilterChip(
-                        selected = pinnedOnly,
-                        onClick = onTogglePinnedOnly,
-                        label = { Text(stringResource(R.string.pinned_filter)) },
+                        selected = archivedOnly,
+                        onClick = onToggleArchiveView,
+                        label = { Text(stringResource(R.string.archive_view)) },
                         leadingIcon = {
-                            Icon(Icons.Outlined.PushPin, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Outlined.Archive, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
                     )
-                    Spacer(Modifier.width(10.dp))
-                    if (snapshot is NotesSnapshot.Ready) {
-                        Text(
-                            text = stringResource(R.string.note_total, snapshot.entries.size),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    if (!archivedOnly) {
+                        Spacer(Modifier.width(8.dp))
+                        FilterChip(
+                            selected = pinnedOnly,
+                            onClick = onTogglePinnedOnly,
+                            label = { Text(stringResource(R.string.pinned_filter)) },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.PushPin, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
                         )
                     }
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { sortMenuExpanded = true }) {
+                            Icon(Icons.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
+                        }
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = sortMenuExpanded,
+                            onDismissRequest = { sortMenuExpanded = false }
+                        ) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.sort_recent)) },
+                                onClick = { onSortChange(NoteSort.RECENT); sortMenuExpanded = false },
+                                trailingIcon = if (sort == NoteSort.RECENT) {
+                                    { Icon(Icons.Outlined.CheckCircle, contentDescription = null) }
+                                } else null
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.sort_title)) },
+                                onClick = { onSortChange(NoteSort.TITLE); sortMenuExpanded = false },
+                                trailingIcon = if (sort == NoteSort.TITLE) {
+                                    { Icon(Icons.Outlined.CheckCircle, contentDescription = null) }
+                                } else null
+                            )
+                        }
+                    }
+                }
+                if (snapshot is NotesSnapshot.Ready) {
+                    Text(
+                        text = stringResource(
+                            R.string.note_total,
+                            snapshot.entries.count { it.isArchived == archivedOnly }
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -297,13 +365,14 @@ private fun NotesListScreen(
                     OutlinedButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
                 }
                 is NotesSnapshot.Ready -> {
-                    val visible = remember(snapshot.entries, query, pinnedOnly) {
-                        filter(snapshot.entries, query, pinnedOnly)
+                    val visible = remember(snapshot.entries, query, pinnedOnly, archivedOnly, sort) {
+                        filter(snapshot.entries, query, pinnedOnly, archivedOnly, sort)
                     }
                     if (visible.isEmpty()) {
                         CenterMessage {
                             Icon(
                                 if (query.isNotBlank() || pinnedOnly) Icons.Outlined.Search
+                                else if (archivedOnly) Icons.Outlined.Archive
                                 else Icons.Outlined.EditNote,
                                 contentDescription = null,
                                 modifier = Modifier.size(42.dp),
@@ -313,6 +382,7 @@ private fun NotesListScreen(
                             Text(
                                 stringResource(
                                     if (query.isNotBlank() || pinnedOnly) R.string.no_results
+                                    else if (archivedOnly) R.string.empty_archive
                                     else R.string.empty_title
                                 ),
                                 style = MaterialTheme.typography.titleLarge
@@ -321,6 +391,7 @@ private fun NotesListScreen(
                             Text(
                                 stringResource(
                                     if (query.isNotBlank() || pinnedOnly) R.string.no_results_detail
+                                    else if (archivedOnly) R.string.empty_archive_detail
                                     else R.string.empty_detail
                                 ),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -328,8 +399,8 @@ private fun NotesListScreen(
                             )
                         }
                     } else {
-                        val pinned = visible.filter { it.isPinned }
-                        val others = visible.filterNot { it.isPinned }
+                        val pinned = if (archivedOnly) emptyList() else visible.filter { it.isPinned }
+                        val others = if (archivedOnly) visible else visible.filterNot { it.isPinned }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 105.dp),
@@ -340,15 +411,15 @@ private fun NotesListScreen(
                                     SectionHeader(stringResource(R.string.pinned_section))
                                 }
                                 items(pinned, key = { it.id }) { note ->
-                                    NoteCard(note, onOpen, onTogglePin, { deleting = it })
+                                    NoteCard(note, onOpen, onTogglePin, onToggleArchive, { deleting = it })
                                 }
                             }
                             if (others.isNotEmpty()) {
                                 item(key = "recentHeader") {
-                                    SectionHeader(stringResource(R.string.recent_section))
+                                    SectionHeader(stringResource(if (archivedOnly) R.string.archived_section else R.string.recent_section))
                                 }
                                 items(others, key = { it.id }) { note ->
-                                    NoteCard(note, onOpen, onTogglePin, { deleting = it })
+                                    NoteCard(note, onOpen, onTogglePin, onToggleArchive, { deleting = it })
                                 }
                             }
                         }
@@ -374,6 +445,7 @@ private fun NoteCard(
     note: Note,
     onOpen: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
+    onToggleArchive: (Note) -> Unit,
     onDelete: (Note) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -445,6 +517,19 @@ private fun NoteCard(
                         leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
                     )
                     androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(stringResource(if (note.isArchived) R.string.unarchive_note else R.string.archive_note)) },
+                        onClick = {
+                            showMenu = false
+                            onToggleArchive(note)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
                         text = { Text(stringResource(R.string.delete_note)) },
                         onClick = {
                             showMenu = false
@@ -476,6 +561,7 @@ private fun NoteEditorScreen(
     onTitleChange: (String) -> Unit,
     onBodyChange: (String) -> Unit,
     onTogglePin: () -> Unit,
+    onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
     snackbar: SnackbarHostState
 ) {
@@ -518,6 +604,15 @@ private fun NoteEditorScreen(
                             ),
                             tint = if (note.isPinned) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onToggleArchive) {
+                        Icon(
+                            if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                            contentDescription = stringResource(
+                                if (note.isArchived) R.string.unarchive_note else R.string.archive_note
+                            ),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = { confirmDelete = true }) {
