@@ -1,6 +1,6 @@
 package dev.juuri.noma.ui
 
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -22,6 +22,7 @@ import org.junit.Test
  * Uses fake notes, not the production SQLite database.
  * Compiled by CI; execute on a device or emulator for UI validation.
  */
+@OptIn(ExperimentalTestApi::class)
 class NomaUiTest {
     @get:Rule val compose = createComposeRule()
 
