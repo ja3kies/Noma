@@ -1,6 +1,9 @@
 package dev.juuri.noma
 
 import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -37,6 +40,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        registerCaptureShortcut()
         setContent {
             val preferences = remember {
                 getSharedPreferences("noma_appearance", MODE_PRIVATE)
@@ -63,6 +67,25 @@ class MainActivity : ComponentActivity() {
             }
         }
         handleCaptureIntent(intent)
+    }
+
+    /** Launcher long-press shortcut uses the actual package ID (including debug suffix). */
+    private fun registerCaptureShortcut() {
+        val manager = getSystemService(ShortcutManager::class.java) ?: return
+        runCatching {
+            val captureIntent = Intent(this, MainActivity::class.java).apply {
+                action = ACTION_CREATE_FROM_WIDGET
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            manager.dynamicShortcuts = listOf(
+                ShortcutInfo.Builder(this, "noma_quick_capture")
+                    .setShortLabel(getString(R.string.widget_new_note))
+                    .setLongLabel(getString(R.string.shortcut_new_note))
+                    .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
+                    .setIntent(captureIntent)
+                    .build()
+            )
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

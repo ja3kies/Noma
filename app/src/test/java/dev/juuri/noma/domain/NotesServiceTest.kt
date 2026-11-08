@@ -115,6 +115,15 @@ class NotesServiceTest {
         assertEquals(1L, repo.list().single().createdAt)
     }
 
+    @Test fun createWithSharedTextIsStoredBeforeOpeningEditor() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo, { 123L }, { "shared-id" })
+        val saved = service.create("Sent from another app", "a full paragraph")
+        assertEquals(saved, repo.list().single())
+        assertEquals(123L, saved.createdAt)
+        assertEquals("a full paragraph", saved.body)
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)

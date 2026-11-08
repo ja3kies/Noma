@@ -29,6 +29,16 @@ class NoteCaptureParserTest {
         assertEquals(NoteCaptureParser.MAX_INCOMING_BODY, parsed.body.length)
     }
 
+    @Test fun bodyWhitespaceIsNotLostIfNotEntirelyBlank() {
+        val payload = NoteCaptureParser.parse("title", "   a   ")
+        assertEquals("   a   ", payload?.body)
+    }
+
+    @Test fun titleIsOptional() {
+        val payload = NoteCaptureParser.parse(null, "hello")
+        assertEquals("", payload?.title)
+    }
+
     @Test fun preservesNonLatinText() {
         val parsed = NoteCaptureParser.parse("Idées", "日本語と français")
         assertEquals("日本語と français", parsed?.body)

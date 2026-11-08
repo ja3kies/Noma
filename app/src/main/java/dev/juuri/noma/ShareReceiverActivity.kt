@@ -12,10 +12,16 @@ import dev.juuri.noma.domain.NoteCaptureParser
 class ShareReceiverActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (intent?.action == Intent.ACTION_SEND && intent?.type == "text/plain") {
+        val incoming = intent
+        if (incoming?.type == "text/plain" &&
+            (incoming.action == Intent.ACTION_SEND || incoming.action == Intent.ACTION_PROCESS_TEXT)
+        ) {
+            val selected = if (incoming.action == Intent.ACTION_PROCESS_TEXT)
+                incoming.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
+            else incoming.getCharSequenceExtra(Intent.EXTRA_TEXT)
             val payload = NoteCaptureParser.parse(
-                intent?.getCharSequenceExtra(Intent.EXTRA_SUBJECT),
-                intent?.getCharSequenceExtra(Intent.EXTRA_TEXT)
+                incoming.getCharSequenceExtra(Intent.EXTRA_SUBJECT),
+                selected
             )
             if (payload != null) {
                 val destination = Intent(this, MainActivity::class.java).apply {
