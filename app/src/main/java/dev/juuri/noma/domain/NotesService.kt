@@ -10,9 +10,12 @@ class NotesService(
     private val clock: () -> Long = System::currentTimeMillis,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() }
 ) {
-    suspend fun create(): Note {
+    suspend fun create(title: String = "", body: String = ""): Note {
         val now = clock()
-        return Note(id = idGenerator(), createdAt = now, updatedAt = now).also {
+        return Note(
+            id = idGenerator(), title = title, body = body,
+            createdAt = now, updatedAt = now
+        ).also {
             repository.save(it)
         }
     }

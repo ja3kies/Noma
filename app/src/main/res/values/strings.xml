@@ -74,4 +74,5 @@
     <string name="transfer_error">Transfer failed: </string>
     <string name="backup_warning_title">Export an unencrypted backup?</string>
     <string name="backup_warning_body">JSON backups contain all your notes as readable text, including archived notes. Choose a private location and protect the file.</string>
+    <string name="share_to_noma">Save to Noma</string>
 </resources>

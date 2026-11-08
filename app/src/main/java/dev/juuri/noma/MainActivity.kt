@@ -1,5 +1,6 @@
 package dev.juuri.noma
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -61,5 +62,35 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        handleCaptureIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleCaptureIntent(intent)
+    }
+
+    private fun handleCaptureIntent(incoming: Intent?) {
+        when (incoming?.action) {
+            ACTION_CREATE_FROM_WIDGET -> notesViewModel.createNote()
+            ACTION_CAPTURE_SHARED_TEXT -> {
+                val title = incoming.getStringExtra(EXTRA_CAPTURE_TITLE).orEmpty()
+                val body = incoming.getStringExtra(EXTRA_CAPTURE_BODY).orEmpty()
+                notesViewModel.captureSharedText(title, body)
+            }
+        }
+        // A rotation or process recreation must not replay the same share.
+        if (incoming?.action == ACTION_CREATE_FROM_WIDGET ||
+            incoming?.action == ACTION_CAPTURE_SHARED_TEXT) {
+            setIntent(Intent(this, MainActivity::class.java).apply { action = Intent.ACTION_MAIN })
+        }
+    }
+
+    companion object {
+        const val ACTION_CREATE_FROM_WIDGET = "dev.juuri.noma.action.NEW_NOTE"
+        const val ACTION_CAPTURE_SHARED_TEXT = "dev.juuri.noma.action.SHARED_TEXT"
+        const val EXTRA_CAPTURE_TITLE = "noma_capture_title"
+        const val EXTRA_CAPTURE_BODY = "noma_capture_body"
     }
 }

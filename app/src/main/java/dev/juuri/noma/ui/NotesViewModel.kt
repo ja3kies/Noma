@@ -154,6 +154,23 @@ class NotesViewModel(
         }
     }
 
+    /** A share is committed to SQLite before the editor reports "Saved". */
+    fun captureSharedText(title: String, body: String) {
+        val payload = dev.juuri.noma.domain.NoteCaptureParser.parse(title, body) ?: return
+        viewModelScope.launch {
+            try {
+                val created = service.create(payload.title, payload.body)
+                editorRevision++
+                _active.value = created
+                _saveState.value = EditorSaveState.Saved
+            } catch (failure: Exception) {
+                eventChannel.send(
+                    NoteUiEvent.Failure(failure.localizedMessage ?: "Cannot capture shared text")
+                )
+            }
+        }
+    }
+
     fun openNote(note: Note) {
         editorRevision++
         _active.value = note
