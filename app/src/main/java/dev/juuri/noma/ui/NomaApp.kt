@@ -57,6 +57,7 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
@@ -123,6 +124,8 @@ import dev.juuri.noma.domain.ChecklistSyntax
 import dev.juuri.noma.domain.MarkdownEdit
 import dev.juuri.noma.domain.MarkdownEdits
 import dev.juuri.noma.domain.NoteSort
+import dev.juuri.noma.domain.NoteSearch
+import dev.juuri.noma.domain.SearchScope
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.transfer.NoteDocumentTransfer
 import dev.juuri.noma.ui.theme.NomaAppearance
@@ -233,6 +236,7 @@ private fun NotesListScreen(
 ) {
     val snapshot by viewModel.snapshot.collectAsState()
     val query by viewModel.query.collectAsState()
+    val queryScope = remember(query) { NoteSearch.parse(query).scope }
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
@@ -244,6 +248,7 @@ private fun NotesListScreen(
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var tagMenuExpanded by remember { mutableStateOf(false) }
+    var showSearchHelp by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var transferMenuExpanded by remember { mutableStateOf(false) }
     var confirmUnencryptedExport by remember { mutableStateOf(false) }
@@ -316,6 +321,27 @@ private fun NotesListScreen(
             onConfirm = {
                 viewModel.deleteNote(note)
                 deleting = null
+            }
+        )
+    }
+    if (showSearchHelp) {
+        AlertDialog(
+            onDismissRequest = { showSearchHelp = false },
+            title = { Text(stringResource(R.string.search_help_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.search_help_intro))
+                    Text("title:trip   body:milk   #work")
+                    Text("is:pinned   has:checklist   has:tags")
+                    Text("after:2026-01-01   before:2026-12-31")
+                    Text("in:active   in:archive   in:all")
+                    Text(stringResource(R.string.search_help_phrases))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSearchHelp = false }) {
+                    Text(stringResource(R.string.close))
+                }
             }
         )
     }
@@ -404,6 +430,16 @@ private fun NotesListScreen(
                                     Icon(Icons.Outlined.FileUpload, contentDescription = null)
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.search_help_title)) },
+                                onClick = {
+                                    transferMenuExpanded = false
+                                    showSearchHelp = true
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.HelpOutline, contentDescription = null)
+                                }
+                            )
                         }
                     }
                     if (transferBusy) {
@@ -416,7 +452,7 @@ private fun NotesListScreen(
                 Spacer(Modifier.height(20.dp))
                 TextField(
                     value = query,
-                    onValueChange = viewModel::onQueryChange,
+                    onValueChange = { viewModel.onQueryChange(it.take(NoteSearch.MAX_QUERY_LENGTH)) },
                     modifier = Modifier.fillMaxWidth().testTag("noma_search"),
                     singleLine = true,
                     shape = MaterialTheme.shapes.large,
@@ -440,6 +476,13 @@ private fun NotesListScreen(
                         unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 )
+                if (queryScope != null) {
+                    Text(
+                        stringResource(R.string.search_scope_hint),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Row(
@@ -540,7 +583,12 @@ private fun NotesListScreen(
                 }
                 if (snapshot is NotesSnapshot.Ready) {
                     val count = (snapshot as NotesSnapshot.Ready).entries.count {
-                        it.isArchived == archivedOnly
+                        when (queryScope) {
+                            SearchScope.ACTIVE -> !it.isArchived
+                            SearchScope.ARCHIVED -> it.isArchived
+                            SearchScope.ALL -> true
+                            null -> it.isArchived == archivedOnly
+                        }
                     }
                     Text(
                         text = pluralStringResource(R.plurals.note_total, count, count),
@@ -623,8 +671,9 @@ private fun NotesListScreen(
                             }
                         }
                     } else {
-                        val pinned = if (archivedOnly) emptyList() else visible.filter { it.isPinned }
-                        val others = if (archivedOnly) visible else visible.filterNot { it.isPinned }
+                        val pinned = visible.filter { it.isPinned && !it.isArchived }
+                        val others = visible.filter { !it.isPinned && !it.isArchived }
+                        val archived = visible.filter { it.isArchived }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize().testTag("noma_note_list"),
                             contentPadding = PaddingValues(
@@ -652,14 +701,25 @@ private fun NotesListScreen(
                             }
                             if (others.isNotEmpty()) {
                                 item(key = "recent_section") {
-                                    SectionHeader(
-                                        stringResource(
-                                            if (archivedOnly) R.string.archived_section
-                                            else R.string.recent_section
-                                        )
-                                    )
+                                    SectionHeader(stringResource(R.string.recent_section))
                                 }
                                 items(others, key = { it.id }) { note ->
+                                    NoteCard(
+                                        note = note,
+                                        selected = note.id == selectedId,
+                                        onOpen = { viewModel.openNote(note) },
+                                        onPin = { viewModel.togglePin(note) },
+                                        onArchive = { viewModel.toggleArchive(note) },
+                                        onDelete = { deleting = note },
+                                        onShare = { shareNote(context, note) }
+                                    )
+                                }
+                            }
+                            if (archived.isNotEmpty()) {
+                                item(key = "archived_section") {
+                                    SectionHeader(stringResource(R.string.archived_section))
+                                }
+                                items(archived, key = { it.id }) { note ->
                                     NoteCard(
                                         note = note,
                                         selected = note.id == selectedId,

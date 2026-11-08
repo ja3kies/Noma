@@ -89,6 +89,15 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_body_input").assertTextEquals("hello****")
     }
 
+    @Test fun advancedSearchFindsArchivedNoteFromDefaultTab() {
+        val archived = Note("arch", "Hidden thought", "Body", false, 1L, 1L, true)
+        val repo = FakeRepository(listOf(archived))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_search").performTextInput("in:archive title:Hidden")
+        compose.onNodeWithText("Hidden thought").assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))

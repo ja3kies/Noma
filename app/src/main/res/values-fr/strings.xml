@@ -91,4 +91,8 @@
     <string name="format_bold">Gras</string>
     <string name="format_heading">Titre</string>
     <string name="format_bullet">Puces</string>
+    <string name="search_help_title">Aide à la recherche</string>
+    <string name="search_help_intro">Combinez mots et filtres pour préciser les résultats. Exemples :</string>
+    <string name="search_help_phrases">Utilisez des guillemets pour une expression et - pour exclure un mot. La recherche reste sur votre appareil.</string>
+    <string name="search_scope_hint">Le périmètre de recherche est défini par la requête</string>
 </resources>

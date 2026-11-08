@@ -26,6 +26,7 @@ A calm, offline-first Android notes app. Its visual rhythm is inspired by famili
 - Tags in the editor and note list; tag filtering/search, case-insensitive de-duplication, SQLite migrations, JSON backup.
 - Portable Markdown checklists: create tasks, check/uncheck from the editor, retain original body text and export as Markdown.
 - Selection-aware Markdown toolbar: bold, heading, bullet and checklist formatting, retaining caret selection rather than appending placeholder text.
+- Advanced offline search: quoted phrases, multiple terms, negation, title/body/tag scope, pin/task presence, edit dates and archive scope. Built-in help shows syntax and retains the original simple search experience.
 - Full backups are unencrypted plain text: an explicit warning precedes export; users choose where to store the file.
 - Selecting an existing JSON backup adds its notes without replacing current notes; repeated restores create separate notes rather than deleting or merging originals.
 

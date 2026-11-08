@@ -91,4 +91,8 @@
     <string name="format_bold">Bold</string>
     <string name="format_heading">Heading</string>
     <string name="format_bullet">Bullets</string>
+    <string name="search_help_title">Search tips</string>
+    <string name="search_help_intro">Combine words and filters to narrow results. Examples:</string>
+    <string name="search_help_phrases">Use quotes for exact phrases and a leading - to exclude words. Searches stay on your device.</string>
+    <string name="search_scope_hint">Search scope overridden by your query</string>
 </resources>
