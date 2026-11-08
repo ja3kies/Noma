@@ -1,0 +1,80 @@
+package dev.juuri.noma.data
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import dev.juuri.noma.domain.Note
+
+/**
+ * Private SQLite storage with no external permissions or network access.
+ * Schema version changes must ship a migration; never drop the table on upgrade.
+ */
+internal class NotesOpenHelper(context: Context) :
+    SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE notes (
+                id TEXT NOT NULL PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                pinned INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )""".trimIndent()
+        )
+        db.execSQL("CREATE INDEX idx_notes_updated_at ON notes(updated_at DESC)")
+        db.execSQL("CREATE INDEX idx_notes_pinned ON notes(pinned DESC, updated_at DESC)")
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        throw IllegalStateException("Missing migration from $oldVersion to $newVersion")
+    }
+
+    fun readAll(): List<Note> = buildList {
+        readableDatabase.query(
+            "notes",
+            arrayOf("id", "title", "body", "pinned", "created_at", "updated_at"),
+            null, null, null, null, "pinned DESC, updated_at DESC, id ASC"
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                add(
+                    Note(
+                        id = cursor.getString(0),
+                        title = cursor.getString(1),
+                        body = cursor.getString(2),
+                        isPinned = cursor.getInt(3) != 0,
+                        createdAt = cursor.getLong(4),
+                        updatedAt = cursor.getLong(5)
+                    )
+                )
+            }
+        }
+    }
+
+    fun upsert(note: Note) {
+        val values = ContentValues().apply {
+            put("id", note.id)
+            put("title", note.title)
+            put("body", note.body)
+            put("pinned", if (note.isPinned) 1 else 0)
+            put("created_at", note.createdAt)
+            put("updated_at", note.updatedAt)
+        }
+        check(
+            writableDatabase.insertWithOnConflict(
+                "notes", null, values, SQLiteDatabase.CONFLICT_REPLACE
+            ) != -1L
+        ) { "Could not save note" }
+    }
+
+    fun remove(id: String) {
+        writableDatabase.delete("notes", "id = ?", arrayOf(id))
+    }
+
+    companion object {
+        internal const val DATABASE_NAME = "noma-notes.db"
+        private const val DATABASE_VERSION = 1
+    }
+}
