@@ -75,4 +75,8 @@
     <string name="backup_warning_title">Exporter une sauvegarde non chiffrée ?</string>
     <string name="backup_warning_body">Les sauvegardes JSON contiennent toutes vos notes en clair, y compris les archives. Choisissez un emplacement privé et protégez le fichier.</string>
     <string name="share_to_noma">Enregistrer dans Noma</string>
+    <string name="widget_label">Note rapide Noma</string>
+    <string name="widget_hint">Une idée ? Notez-la.</string>
+    <string name="widget_new_note">Nouvelle note</string>
+    <string name="widget_accessibility">Créer une nouvelle note dans Noma</string>
 </resources>

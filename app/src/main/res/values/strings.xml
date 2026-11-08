@@ -75,4 +75,8 @@
     <string name="backup_warning_title">Export an unencrypted backup?</string>
     <string name="backup_warning_body">JSON backups contain all your notes as readable text, including archived notes. Choose a private location and protect the file.</string>
     <string name="share_to_noma">Save to Noma</string>
+    <string name="widget_label">Noma quick note</string>
+    <string name="widget_hint">Capture your next idea.</string>
+    <string name="widget_new_note">New note</string>
+    <string name="widget_accessibility">Create a new note in Noma</string>
 </resources>
