@@ -1,6 +1,7 @@
 package dev.juuri.noma.transfer
 
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NoteTags
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.ByteBuffer
@@ -35,6 +36,7 @@ object NoteTransferCodec {
                 put("isArchived", note.isArchived)
                 put("createdAt", note.createdAt)
                 put("updatedAt", note.updatedAt)
+                put("tags", JSONArray(note.tags))
             })
         }
         val data = JSONObject().apply {
@@ -73,7 +75,12 @@ object NoteTransferCodec {
                     isPinned = item.getBoolean("isPinned"),
                     isArchived = item.getBoolean("isArchived"),
                     createdAt = strictTimestamp(item, "createdAt"),
-                    updatedAt = strictTimestamp(item, "updatedAt")
+                    updatedAt = strictTimestamp(item, "updatedAt"),
+                    tags = if (item.has("tags")) {
+                        val tags = item.getJSONArray("tags")
+                        require(tags.length() <= NoteTags.MAX_COUNT) { "Too many tags" }
+                        (0 until tags.length()).map(tags::getString)
+                    } else emptyList()
                 )
                 validate(note)
                 require(ids.add(note.id)) { "Duplicate note ID in backup" }
@@ -94,6 +101,10 @@ object NoteTransferCodec {
         require(note.title.length <= MAX_TITLE_LENGTH) { "Note title too long" }
         require(note.body.length <= MAX_BODY_LENGTH) { "Note content too long" }
         require(note.createdAt >= 0 && note.updatedAt >= 0) { "Invalid note timestamp" }
+        require(note.tags.size <= NoteTags.MAX_COUNT) { "Too many tags" }
+        require(note.tags.all { it.isNotBlank() && it.length <= NoteTags.MAX_LENGTH }) {
+            "Invalid tag"
+        }
     }
 
     /** One markdown file is a single note, with optional first-line H1. */
