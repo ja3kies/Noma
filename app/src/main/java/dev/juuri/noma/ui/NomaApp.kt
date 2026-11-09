@@ -107,6 +107,7 @@ import androidx.compose.ui.platform.testTag
 import dev.juuri.noma.R
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
+import dev.juuri.noma.domain.NoteSearch
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaMotion
@@ -492,6 +493,7 @@ private fun NotesListScreen(
                                 items(pinned, key = { it.id }) { note ->
                                     NoteCard(
                                         note = note,
+                                        query = query,
                                         selected = note.id == selectedId,
                                         onOpen = { viewModel.openNote(note) },
                                         onPin = { viewModel.togglePin(note) },
@@ -513,6 +515,7 @@ private fun NotesListScreen(
                                 items(others, key = { it.id }) { note ->
                                     NoteCard(
                                         note = note,
+                                        query = query,
                                         selected = note.id == selectedId,
                                         onOpen = { viewModel.openNote(note) },
                                         onPin = { viewModel.togglePin(note) },
@@ -543,6 +546,7 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun NoteCard(
     note: Note,
+    query: String,
     selected: Boolean,
     onOpen: () -> Unit,
     onPin: () -> Unit,
@@ -552,6 +556,7 @@ private fun NoteCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
+    val relevantPreview = remember(note.body, query) { NoteSearch.matchingPreview(note, query) }
     val cardColor = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surface
     Card(
@@ -574,10 +579,10 @@ private fun NoteCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (note.preview.isNotEmpty() && note.title.isNotBlank()) {
+                if (relevantPreview.isNotEmpty() && note.title.isNotBlank()) {
                     Spacer(Modifier.height(NomaSpacing.tiny))
                     Text(
-                        text = note.preview,
+                        text = relevantPreview,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodyMedium,
