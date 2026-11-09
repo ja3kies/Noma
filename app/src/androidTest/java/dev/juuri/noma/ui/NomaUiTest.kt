@@ -17,6 +17,7 @@ import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
@@ -38,7 +39,9 @@ class NomaUiTest {
     ) : NotesRepository {
         private val state = MutableStateFlow<NotesSnapshot>(initialState)
         override val notes: StateFlow<NotesSnapshot> = state
+        var saveGate: CompletableDeferred<Unit>? = null
         override suspend fun save(note: Note) {
+            saveGate?.await()
             val old = (state.value as NotesSnapshot.Ready).entries
             state.value = NotesSnapshot.Ready(old.filterNot { it.id == note.id } + note)
         }
@@ -141,6 +144,22 @@ class NomaUiTest {
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_note_list"))
         compose.onNodeWithTag("noma_search").performTextInput("Weekend")
         compose.onNodeWithText("Weekend plan").assertExists()
+    }
+
+    @Test fun slowNoteCreationShowsProgressAndBlocksRepeatedTaps() {
+        val repo = FakeRepository()
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("New note").performClick()
+        compose.onNodeWithText("Creating note…").assertExists().assertIsNotEnabled()
+        compose.runOnIdle { assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty()) }
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
+        compose.runOnIdle {
+            assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
     }
 
     @Test fun populatedNotebookRetainsTheFastCreationFab() {
