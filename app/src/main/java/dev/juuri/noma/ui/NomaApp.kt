@@ -368,10 +368,9 @@ private fun NotesListScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            // Do not offer creation while the repository is loading or unavailable.
-            // Recovery and backup inspection remain discoverable in the header.
-            if (snapshot is NotesSnapshot.Ready &&
-                (snapshot as NotesSnapshot.Ready).entries.isNotEmpty()) {
+            // Offer the same creation action in empty, filtered and populated libraries.
+            // Keep it hidden while storage is loading or unavailable.
+            if (snapshot is NotesSnapshot.Ready) {
                 ExtendedFloatingActionButton(
                     onClick = { if (!creating) viewModel.createNote() },
                     expanded = true,
@@ -609,27 +608,6 @@ private fun NotesListScreen(
                                     onClick = viewModel::clearDiscoveryFilters,
                                     modifier = Modifier.testTag("noma_clear_filters")
                                 ) { Text(stringResource(R.string.clear_all_filters)) }
-                            }
-                            if (state.entries.isEmpty()) {
-                                Spacer(Modifier.height(NomaSpacing.section))
-                                Button(
-                                    onClick = viewModel::createNote,
-                                    enabled = !creating
-                                ) {
-                                    if (creating) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    } else {
-                                        Icon(Icons.Outlined.Add, contentDescription = null)
-                                    }
-                                    Spacer(Modifier.width(NomaSpacing.small))
-                                    Text(stringResource(
-                                        if (creating) R.string.creating_note else R.string.new_note
-                                    ))
-                                }
                             }
                         }
                     } else {
