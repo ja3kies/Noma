@@ -59,6 +59,8 @@
     <string name="save_failed_status">Non enregistré</string>
     <string name="unsaved_title">Modifications non enregistrées</string>
     <string name="unsaved_body">Les dernières modifications n’ont pas pu être sauvegardées. Réessayez ou quittez en perdant ces modifications.</string>
+    <string name="keep_editing">Continuer à modifier</string>
+    <string name="wait_for_save_before_exit">Enregistrement des modifications avant de quitter…</string>
     <string name="leave_unsaved">Quitter quand même</string>
     <string name="error_recovery">Vos notes sont conservées sur cet appareil. Essayez de les rouvrir.</string>
     <plurals name="note_total">
