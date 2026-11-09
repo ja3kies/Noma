@@ -372,7 +372,11 @@ private fun NotesListScreen(
             // Keep it hidden while storage is loading or unavailable.
             if (snapshot is NotesSnapshot.Ready) {
                 ExtendedFloatingActionButton(
-                    onClick = { if (!creating) viewModel.createNote() },
+                    onClick = {
+                        focusManager.clearFocus()
+                        searchKeyboard?.hide()
+                        if (!creating) viewModel.createNote()
+                    },
                     expanded = true,
                     icon = {
                         if (creating) {
@@ -449,7 +453,10 @@ private fun NotesListScreen(
                         }
                     } else null,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        focusManager.clearFocus()
+                        searchKeyboard?.hide()
+                    }),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -505,6 +512,7 @@ private fun NotesListScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.sort_recent)) },
+                                modifier = Modifier.semantics { selected = sort == NoteSort.RECENT },
                                 onClick = {
                                     viewModel.selectSort(NoteSort.RECENT)
                                     sortMenuExpanded = false
@@ -515,6 +523,7 @@ private fun NotesListScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.sort_title)) },
+                                modifier = Modifier.semantics { selected = sort == NoteSort.TITLE },
                                 onClick = {
                                     viewModel.selectSort(NoteSort.TITLE)
                                     sortMenuExpanded = false
@@ -605,7 +614,11 @@ private fun NotesListScreen(
                                 (query.isNotBlank() || pinnedOnly || archivedOnly)) {
                                 Spacer(Modifier.height(NomaSpacing.section))
                                 OutlinedButton(
-                                    onClick = viewModel::clearDiscoveryFilters,
+                                    onClick = {
+                                        viewModel.clearDiscoveryFilters()
+                                        focusManager.clearFocus()
+                                        searchKeyboard?.hide()
+                                    },
                                     modifier = Modifier.testTag("noma_clear_filters")
                                 ) { Text(stringResource(R.string.clear_all_filters)) }
                             }
