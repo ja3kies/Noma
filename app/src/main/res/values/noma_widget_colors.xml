@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="noma_widget_background">#E8F0E5</color>
+    <color name="noma_widget_outline">#AEC2B1</color>
+    <color name="noma_widget_text">#20352F</color>
+</resources>
