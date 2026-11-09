@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -346,7 +347,7 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_search").performTextInput("nothing matches")
         compose.onNodeWithTag("noma_new_note").assertExists()
-        compose.onNodeWithTag("noma_clear_filters").assertExists().performClick()
+        compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
         compose.waitUntil(5_000) { model.query.value.isEmpty() }
         compose.onNodeWithTag("noma_clear_filters").assertDoesNotExist()
         compose.onNodeWithTag("noma_new_note").assertExists()
@@ -420,6 +421,29 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithContentDescription("Pinned note").assertExists()
+    }
+
+
+    @Test fun clearSearchControlReallyRemovesQueryWithKeyboardFocused() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("draft query")
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithContentDescription("Clear search").assertDoesNotExist()
+        compose.onNodeWithTag("noma_new_note").assertExists()
+    }
+
+    @Test fun emptyArchiveOffersVisibleResetWithoutHidingCreate() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithText("Your archive is empty").assertExists()
+        compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
+        compose.waitUntil(5_000) { !model.archivedOnly.value }
+        compose.onNodeWithTag("noma_new_note").assertExists()
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
