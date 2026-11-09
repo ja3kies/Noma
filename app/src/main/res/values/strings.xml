@@ -104,4 +104,5 @@
     <string name="widget_style_frosted_green">Frosted green</string>
     <string name="widget_style_liquid_glass">Liquid Glass</string>
     <string name="widget_style_glass_note">Translucent glass styles depend on the launcher and do not blur the live wallpaper.</string>
+    <string name="quick_capture_deferred">Your new note will open after the current draft is saved.</string>
 </resources>
