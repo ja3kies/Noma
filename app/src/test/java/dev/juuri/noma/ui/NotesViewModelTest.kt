@@ -364,13 +364,17 @@ class NotesViewModelTest {
         val repo = FakeRepository(old)
         val model = NotesViewModel(repo, NotesService(repo))
         repo.failImports = true
+        val failed = async { model.importNotesAwait(listOf(incoming)) }
+        advanceUntilIdle()
         try {
-            model.importNotesAwait(listOf(incoming))
+            failed.await()
             org.junit.Assert.fail("Failed import incorrectly acknowledged")
         } catch (_: IllegalStateException) { }
         assertEquals(listOf(old), (repo.notes.value as NotesSnapshot.Ready).entries)
         repo.failImports = false
-        assertEquals(1, model.importNotesAwait(listOf(incoming)))
+        val retry = async { model.importNotesAwait(listOf(incoming)) }
+        advanceUntilIdle()
+        assertEquals(1, retry.await())
         assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
