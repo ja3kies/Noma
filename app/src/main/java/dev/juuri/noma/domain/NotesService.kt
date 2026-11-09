@@ -16,6 +16,23 @@ class NotesService(
         }
     }
 
+    /** Save a received snippet exactly once, with no transient blank note. */
+    suspend fun captureText(title: String, body: String): Note {
+        require(body.isNotBlank()) { "Shared text is empty" }
+        require(body.length <= 100_000) { "Shared text exceeds limit" }
+        require(title.length <= 200) { "Shared title exceeds limit" }
+        val now = clock()
+        val note = Note(
+            id = idGenerator(),
+            title = title,
+            body = body,
+            createdAt = now,
+            updatedAt = now
+        )
+        repository.save(note)
+        return note
+    }
+
     suspend fun save(note: Note) {
         repository.save(note.copy(updatedAt = clock()))
     }
