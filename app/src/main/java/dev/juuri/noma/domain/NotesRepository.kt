@@ -12,15 +12,7 @@ interface NotesRepository {
     val notes: StateFlow<NotesSnapshot>
     suspend fun save(note: Note)
     suspend fun delete(id: String)
-    /** Returns imported count. Implementations must not replace existing IDs. */
-    suspend fun importMissing(notes: List<Note>): Int {
-        val existing = (this.notes.value as? NotesSnapshot.Ready)?.entries?.mapTo(HashSet()) { it.id }
-            ?: error("Notes are not loaded")
-        var count = 0
-        for (note in notes) {
-            if (existing.add(note.id)) { save(note); count++ }
-        }
-        return count
-    }
+    /** Atomically inserts missing IDs; all-or-nothing on storage failure. */
+    suspend fun importMissing(notes: List<Note>): Int
     suspend fun refresh()
 }

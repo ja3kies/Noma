@@ -10,6 +10,13 @@ class NotesServiceTest {
     private class MemoryRepository : NotesRepository {
         private val state = MutableStateFlow<NotesSnapshot>(NotesSnapshot.Ready(emptyList()))
         override val notes: StateFlow<NotesSnapshot> = state
+        override suspend fun importMissing(notes: List<Note>): Int {
+            val old = (state.value as NotesSnapshot.Ready).entries
+            val ids = old.mapTo(HashSet<String>()) { it.id }
+            val missing = notes.filter { ids.add(it.id) }
+            state.value = NotesSnapshot.Ready(old + missing)
+            return missing.size
+        }
         override suspend fun refresh() = Unit
         override suspend fun save(note: Note) {
             val old = (state.value as NotesSnapshot.Ready).entries
