@@ -120,4 +120,5 @@
     <string name="alphabetical_section">A–Z</string>
     <string name="delete_confirm_body_named">Delete “%1$s”? You can undo this action briefly.</string>
     <string name="share_unavailable">No compatible sharing app is available.</string>
+    <string name="creating_note">Creating note…</string>
 </resources>
