@@ -630,8 +630,12 @@ private fun NotesListScreen(
                                 item(key = "recent_section") {
                                     SectionHeader(
                                         stringResource(
-                                            if (archivedOnly) R.string.archived_section
-                                            else R.string.recent_section
+                                            when {
+                                                archivedOnly -> R.string.archived_section
+                                                query.isNotBlank() -> R.string.search_section
+                                                sort == NoteSort.TITLE -> R.string.alphabetical_section
+                                                else -> R.string.recent_section
+                                            }
                                         )
                                     )
                                 }
