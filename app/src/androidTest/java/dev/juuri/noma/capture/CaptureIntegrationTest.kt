@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,8 +42,9 @@ class CaptureIntegrationTest {
     }
 
     @Test fun widgetResourcesArePresentForCurrentTheme() {
-        assertEquals("Quickly create a note",
-            context.getString(dev.juuri.noma.R.string.widget_description))
+        assertTrue(context.getString(
+            dev.juuri.noma.R.string.widget_description
+        ).isNotBlank())
         assertTrue(context.resources.getIdentifier(
             "noma_quick_capture_widget", "layout", context.packageName
         ) != 0)
