@@ -81,4 +81,6 @@
     <string name="portable_export_txt">Exporter en TXT</string>
     <string name="portable_export_md">Exporter en Markdown</string>
     <string name="portable_note_export_done">Note exportée</string>
+    <string name="portable_export_warning_title">Export non chiffré</string>
+    <string name="portable_export_warning_detail">Cette archive contient toutes les notes en texte lisible. Enregistrez-la uniquement dans un emplacement fiable et supprimez les copies non souhaitées.</string>
 </resources>
