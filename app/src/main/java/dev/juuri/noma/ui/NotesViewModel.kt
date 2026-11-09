@@ -19,6 +19,7 @@ sealed interface NoteUiEvent {
     data class ArchiveChanged(val previous: Note) : NoteUiEvent
     data class Imported(val added: Int, val skipped: Int) : NoteUiEvent
     data object SaveBeforeNavigation : NoteUiEvent
+    data object QuickCaptureDeferred : NoteUiEvent
     data object SharedCaptureSaved : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
@@ -203,7 +204,7 @@ class NotesViewModel(
     fun requestQuickNote() {
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             quickNoteRequestedAfterSave = true
-            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            eventChannel.trySend(NoteUiEvent.QuickCaptureDeferred)
         } else {
             createNote()
         }
