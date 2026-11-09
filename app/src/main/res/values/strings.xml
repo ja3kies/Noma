@@ -88,4 +88,5 @@
         <item quantity="one">%d result</item>
         <item quantity="other">%d results</item>
     </plurals>
+    <string name="portable_actions">Import and export notes</string>
 </resources>
