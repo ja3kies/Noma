@@ -25,6 +25,7 @@ import dev.juuri.noma.R
 import dev.juuri.noma.data.NotesPortableFormat
 import dev.juuri.noma.data.NotesBackupVerification
 import dev.juuri.noma.data.NotesArchiveSummary
+import dev.juuri.noma.data.NotesDocumentIo
 import dev.juuri.noma.data.NotesPlainTextFormat
 import android.provider.OpenableColumns
 import dev.juuri.noma.domain.Note
@@ -97,17 +98,7 @@ internal fun PortableDocuments(
                             if (cursor.moveToFirst()) cursor.getString(0) else null
                         }
                         val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
-                            val output = java.io.ByteArrayOutputStream()
-                            val buffer = ByteArray(8192)
-                            while (true) {
-                                val size = stream.read(buffer)
-                                if (size < 0) break
-                                output.write(buffer, 0, size)
-                                require(output.size() <= NotesPortableFormat.MAX_IMPORT_BYTES) {
-                                    "File exceeds size limit"
-                                }
-                            }
-                            output.toByteArray()
+                            NotesDocumentIo.readBounded(stream)
                         } ?: error(readFailed)
                         NotesPlainTextFormat.decode(bytes, filename)
                     }
@@ -127,17 +118,7 @@ internal fun PortableDocuments(
                 try {
                     inspectedArchive = withContext(Dispatchers.IO) {
                         val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
-                            val output = java.io.ByteArrayOutputStream()
-                            val chunk = ByteArray(8192)
-                            while (true) {
-                                val count = stream.read(chunk)
-                                if (count < 0) break
-                                output.write(chunk, 0, count)
-                                require(output.size() <= NotesPortableFormat.MAX_IMPORT_BYTES) {
-                                    "Archive exceeds maximum size"
-                                }
-                            }
-                            output.toByteArray()
+                            NotesDocumentIo.readBounded(stream)
                         } ?: error(readFailed)
                         NotesArchiveSummary.inspect(bytes)
                     }
@@ -158,17 +139,7 @@ internal fun PortableDocuments(
                 try {
                     pending = withContext(Dispatchers.IO) {
                         val bytes = context.contentResolver.openInputStream(uri)?.use {
-                            val out = java.io.ByteArrayOutputStream()
-                            val chunk = ByteArray(8192)
-                            while (true) {
-                                val count = it.read(chunk)
-                                if (count < 0) break
-                                out.write(chunk, 0, count)
-                                require(out.size() <= NotesPortableFormat.MAX_IMPORT_BYTES) {
-                                    "Archive exceeds size limit"
-                                }
-                            }
-                            out.toByteArray()
+                            NotesDocumentIo.readBounded(it)
                         } ?: error(readFailed)
                         NotesPortableFormat.decode(bytes)
                     }
