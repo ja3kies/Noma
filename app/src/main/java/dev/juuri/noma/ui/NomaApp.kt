@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -109,6 +112,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -1117,7 +1121,7 @@ private fun AppearanceDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.appearance)) },
         text = {
-            Column {
+            Column(Modifier.selectableGroup().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                 val options = listOf(
                     NomaAppearance.SYSTEM to R.string.appearance_system,
                     NomaAppearance.LIGHT to R.string.appearance_light,
@@ -1127,7 +1131,11 @@ private fun AppearanceDialog(
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .defaultMinSize(minHeight = 56.dp)
-                            .clickable { onSelect(mode) },
+                            .selectable(
+                                selected = mode == selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(mode) }
+                            ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = mode == selected, onClick = null)
