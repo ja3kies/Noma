@@ -447,7 +447,11 @@ private fun NotesListScreen(
                     },
                     trailingIcon = if (query.isNotEmpty()) {
                         {
-                            IconButton(onClick = { viewModel.onQueryChange("") }) {
+                            IconButton(onClick = {
+                                viewModel.onQueryChange("")
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                            }) {
                                 Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.clear_search))
                             }
                         }
@@ -473,7 +477,11 @@ private fun NotesListScreen(
                     ) {
                         FilterChip(
                             selected = archivedOnly,
-                            onClick = viewModel::toggleArchiveView,
+                            onClick = {
+                                viewModel.toggleArchiveView()
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                            },
                             enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier.testTag("noma_archive_filter"),
                             label = { Text(stringResource(R.string.archive_view)) },
@@ -487,7 +495,11 @@ private fun NotesListScreen(
                         if (!archivedOnly) {
                             FilterChip(
                                 selected = pinnedOnly,
-                                onClick = viewModel::togglePinnedOnly,
+                                onClick = {
+                                    viewModel.togglePinnedOnly()
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
+                                },
                                 enabled = snapshot is NotesSnapshot.Ready,
                                 label = { Text(stringResource(R.string.pinned_filter)) },
                                 leadingIcon = {
@@ -516,6 +528,8 @@ private fun NotesListScreen(
                                 onClick = {
                                     viewModel.selectSort(NoteSort.RECENT)
                                     sortMenuExpanded = false
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
                                 },
                                 trailingIcon = if (sort == NoteSort.RECENT) {
                                     { Icon(Icons.Outlined.CheckCircleOutline, contentDescription = null) }
@@ -527,6 +541,8 @@ private fun NotesListScreen(
                                 onClick = {
                                     viewModel.selectSort(NoteSort.TITLE)
                                     sortMenuExpanded = false
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
                                 },
                                 trailingIcon = if (sort == NoteSort.TITLE) {
                                     { Icon(Icons.Outlined.CheckCircleOutline, contentDescription = null) }
@@ -610,8 +626,7 @@ private fun NotesListScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (state.entries.isNotEmpty() &&
-                                (query.isNotBlank() || pinnedOnly || archivedOnly)) {
+                            if (query.isNotBlank() || pinnedOnly || archivedOnly) {
                                 Spacer(Modifier.height(NomaSpacing.section))
                                 OutlinedButton(
                                     onClick = {
@@ -732,7 +747,7 @@ private fun NoteCard(
     onDelete: () -> Unit,
     onShare: () -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember(note.id) { mutableStateOf(false) }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
@@ -756,7 +771,7 @@ private fun NoteCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = highlightMatches(title, query),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
@@ -782,7 +797,7 @@ private fun NoteCard(
             if (note.isPinned && !note.isArchived) {
                 Icon(
                     Icons.Outlined.PushPin,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.pinned_section),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 3.dp).size(18.dp)
                 )
