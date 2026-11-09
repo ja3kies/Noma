@@ -152,7 +152,7 @@ internal fun PortableDocuments(
     Box {
         IconButton(
             onClick = { actionsExpanded = true },
-            enabled = !busy && snapshot is NotesSnapshot.Ready
+            enabled = !busy
         ) {
             Icon(
                 Icons.Outlined.ImportExport,
@@ -172,6 +172,7 @@ internal fun PortableDocuments(
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.portable_import_json)) },
+                enabled = snapshot is NotesSnapshot.Ready && !busy,
                 onClick = {
                     actionsExpanded = false
                     importer.launch(arrayOf("application/json"))
@@ -179,6 +180,7 @@ internal fun PortableDocuments(
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.portable_import_text)) },
+                enabled = snapshot is NotesSnapshot.Ready && !busy,
                 onClick = {
                     actionsExpanded = false
                     textImporter.launch(arrayOf("text/plain", "text/markdown", "text/x-markdown"))
@@ -186,6 +188,7 @@ internal fun PortableDocuments(
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.portable_export_json)) },
+                enabled = snapshot is NotesSnapshot.Ready && !busy,
                 onClick = {
                     actionsExpanded = false
                     confirmPlaintextExport = true
