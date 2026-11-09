@@ -23,5 +23,16 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <receiver
+            android:name=".capture.NomaQuickCaptureWidget"
+            android:exported="true"
+            android:label="@string/widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/noma_quick_widget" />
+        </receiver>
     </application>
 </manifest>
