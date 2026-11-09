@@ -166,6 +166,33 @@ class NotesServiceTest {
         assertEquals(listOf("archived"), service.visible(entries, "ete", false, archivedOnly = true).map { it.id })
     }
 
+    @Test fun precomposedAndCombiningAccentsMatchEqually() {
+        val service = NotesService(MemoryRepository())
+        val entries = listOf(note("accent", "Cafe\u0301 matinal", "Texte"))
+        assertEquals(listOf("accent"), service.visible(entries, "CAFÉ", false).map { it.id })
+        assertEquals(listOf("accent"), service.visible(entries, "cafe", false).map { it.id })
+    }
+
+    @Test fun searchDoesNotAlterNoteBodiesOrTimestamps() {
+        val service = NotesService(MemoryRepository())
+        val original = note("id", "Réunion", "Note complète", pinned = true, time = 1234L)
+        val before = original.copy()
+        service.visible(listOf(original), "note reunion", false)
+        assertEquals(before, original)
+    }
+
+    @Test fun leadingTrailingNewlinesAndWhitespaceAreIgnoredInQuery() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(note("id", "A weekend", "Go to the market"))
+        assertEquals(listOf("id"), service.visible(notes, "\n  MARKET\tweekend  ", false).map { it.id })
+    }
+
+    @Test fun searchResultsStableForEqualTimestamps() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(note("z", "Found", "match"), note("a", "Found", "match"))
+        assertEquals(listOf("a", "z"), service.visible(notes, "match", false).map { it.id })
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
