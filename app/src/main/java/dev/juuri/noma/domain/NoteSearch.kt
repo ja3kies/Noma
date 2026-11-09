@@ -36,6 +36,25 @@ object NoteSearch {
         return terms.all { title.contains(it) || body.contains(it) }
     }
 
+    /**
+     * Smaller rank means a result is more obviously relevant to the typed
+     * query. This only affects nonempty searches; the selected notebook sort
+     * still provides a stable tie-breaker.
+     */
+    fun relevance(note: Note, query: String): Int {
+        val phrase = normalize(query).trim().replace(Regex("\\s+"), " ")
+        if (phrase.isEmpty()) return 0
+        val title = normalize(note.title)
+        val words = terms(query)
+        return when {
+            title == phrase -> 0
+            title.startsWith(phrase) -> 1
+            words.all(title::contains) -> 2
+            words.any(title::contains) -> 3
+            else -> 4
+        }
+    }
+
     private const val PREVIEW_LIMIT = 160
     private const val PREVIEW_LEADING_CONTEXT = 48
 
