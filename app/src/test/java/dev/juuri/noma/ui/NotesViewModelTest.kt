@@ -245,6 +245,47 @@ class NotesViewModelTest {
         assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
+    @Test fun multipleIncomingSharesArePresentedInOrderWithoutOverwriting() = runTest {
+        val existing = Note("old", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(existing)
+        val model = NotesViewModel(repo, NotesService(repo))
+        val first = CaptureRequest.SharedText("First", "Content one")
+        val second = CaptureRequest.SharedText("Second", "Content two")
+        val third = CaptureRequest.SharedText("Third", "Content three")
+        model.receiveSharedText(first)
+        model.receiveSharedText(second)
+        model.receiveSharedText(third)
+        assertEquals(first, model.pendingShare.value)
+        model.dismissSharedText()
+        assertEquals(second, model.pendingShare.value)
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals(third, model.pendingShare.value)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals(null, model.pendingShare.value)
+        assertEquals(3, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun sharesStayQueuedWhileAWriteIsUnconfirmed() = runTest {
+        val existing = Note("old", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(existing)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("", "First pending"))
+        model.confirmSharedText()
+        runCurrent()
+        model.receiveSharedText(CaptureRequest.SharedText("", "Second pending"))
+        model.dismissSharedText()
+        assertEquals("First pending", model.pendingShare.value?.body)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("Second pending", model.pendingShare.value?.body)
+        model.dismissSharedText()
+        assertEquals(null, model.pendingShare.value)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
