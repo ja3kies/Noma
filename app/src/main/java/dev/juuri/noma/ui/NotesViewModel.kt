@@ -19,6 +19,7 @@ sealed interface NoteUiEvent {
     data class ArchiveChanged(val previous: Note) : NoteUiEvent
     data class Imported(val added: Int, val skipped: Int) : NoteUiEvent
     data object SaveBeforeNavigation : NoteUiEvent
+    data object SharedCaptureSaved : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
 
@@ -43,6 +44,12 @@ class NotesViewModel(
     private val service: NotesService
 ) : ViewModel() {
     val snapshot = repository.notes
+
+    private val _pendingShare = MutableStateFlow<dev.juuri.noma.capture.CaptureRequest.SharedText?>(null)
+    val pendingShare: StateFlow<dev.juuri.noma.capture.CaptureRequest.SharedText?> =
+        _pendingShare.asStateFlow()
+    private val _capturingShare = MutableStateFlow(false)
+    val capturingShare: StateFlow<Boolean> = _capturingShare.asStateFlow()
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -117,6 +124,41 @@ class NotesViewModel(
                     }
                     eventChannel.send(NoteUiEvent.Failure(message))
                 }
+            }
+        }
+    }
+
+    fun receiveSharedText(request: dev.juuri.noma.capture.CaptureRequest.SharedText) {
+        // Never overwrite an unconfirmed incoming share.
+        if (_pendingShare.value == null) _pendingShare.value = request
+    }
+
+    fun dismissSharedText() {
+        if (!_capturingShare.value) _pendingShare.value = null
+    }
+
+    fun confirmSharedText() {
+        val pending = _pendingShare.value ?: return
+        if (_capturingShare.value) return
+        if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
+        _capturingShare.value = true
+        viewModelScope.launch {
+            try {
+                val created = service.captureText(pending.title, pending.body)
+                _pendingShare.value = null
+                clearDiscoveryFilters()
+                editorRevision++
+                _active.value = created
+                _saveState.value = EditorSaveState.Saved
+                eventChannel.send(NoteUiEvent.SharedCaptureSaved)
+            } catch (failure: Exception) {
+                eventChannel.send(NoteUiEvent.Failure(failure.localizedMessage ?: "Capture failed"))
+                // Keep the pending text so the user can retry without asking the sender again.
+            } finally {
+                _capturingShare.value = false
             }
         }
     }
