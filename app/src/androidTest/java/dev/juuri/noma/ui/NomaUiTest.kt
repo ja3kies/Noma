@@ -168,6 +168,33 @@ class NomaUiTest {
         compose.onNodeWithText("Café").assertExists()
     }
 
+    @Test fun deleteDialogNamesTheExactNoteAndCancelPreservesIt() {
+        val original = Note("one", "Work item", "Keep this", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Actions for Work item").performClick()
+        compose.onNodeWithText("Delete").performClick()
+        compose.onNodeWithText("Delete “Work item”? You can undo this action briefly.").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Work item").assertExists()
+        compose.runOnIdle {
+            assertEquals(listOf(original), (repo.notes.value as NotesSnapshot.Ready).entries)
+        }
+    }
+
+    @Test fun editorMenuDoesNotRepeatThePrimaryPinAction() {
+        val repo = FakeRepository(listOf(
+            Note("one", "Open note", "Body", false, 1L, 1L)
+        ))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Open note").performClick()
+        compose.onNodeWithContentDescription("Note actions").performClick()
+        compose.onNodeWithText("Pin note").assertDoesNotExist()
+        compose.onNodeWithText("Archive note").assertExists()
+    }
+
     @Test fun clearingSearchFiltersRestoresAllNotes() {
         val original = Note("one", "Réunion", "Important content", false, 1L, 1L)
         val repo = FakeRepository(listOf(original))
