@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -99,6 +100,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -843,7 +845,11 @@ private fun NoteEditorScreen(
         }
     }
 
-    BackHandler { requestClose() }
+    // Let Android consume Back to dismiss the IME first. A second Back
+    // navigates away only after the keyboard is no longer visible.
+    val density = LocalDensity.current
+    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    BackHandler(enabled = !keyboardVisible) { requestClose() }
     // Back while writing waits for the last disk acknowledgement.
     // A failed write keeps the unsaved content in the editor for retry.
     LaunchedEffect(closeWhenSaved, saveState) {
