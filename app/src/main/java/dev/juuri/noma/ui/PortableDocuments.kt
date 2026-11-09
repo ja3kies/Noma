@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import dev.juuri.noma.R
 import dev.juuri.noma.data.NotesPortableFormat
 import dev.juuri.noma.data.NotesBackupVerification
+import dev.juuri.noma.data.NotesArchiveSummary
 import dev.juuri.noma.data.NotesPlainTextFormat
 import android.provider.OpenableColumns
 import dev.juuri.noma.domain.Note
@@ -50,6 +51,7 @@ internal fun PortableDocuments(
     val importFailure = stringResource(R.string.portable_import_failed)
     val exportFailure = stringResource(R.string.portable_export_failed)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
+    var inspectedArchive by remember { mutableStateOf<NotesArchiveSummary?>(null) }
     var busy by remember { mutableStateOf(false) }
     var actionsExpanded by remember { mutableStateOf(false) }
     var confirmPlaintextExport by remember { mutableStateOf(false) }
@@ -116,6 +118,37 @@ internal fun PortableDocuments(
             }
         }
     }
+    val verifier = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null && !busy) {
+            busy = true
+            scope.launch {
+                try {
+                    inspectedArchive = withContext(Dispatchers.IO) {
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val output = java.io.ByteArrayOutputStream()
+                            val chunk = ByteArray(8192)
+                            while (true) {
+                                val count = stream.read(chunk)
+                                if (count < 0) break
+                                output.write(chunk, 0, count)
+                                require(output.size() <= NotesPortableFormat.MAX_IMPORT_BYTES) {
+                                    "Archive exceeds maximum size"
+                                }
+                            }
+                            output.toByteArray()
+                        } ?: error(readFailed)
+                        NotesArchiveSummary.inspect(bytes)
+                    }
+                } catch (failure: Exception) {
+                    onMessage(importFailure.format(failure.localizedMessage ?: readFailed))
+                } finally {
+                    busy = false
+                }
+            }
+        }
+    }
     val importer = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -160,6 +193,13 @@ internal fun PortableDocuments(
             onDismissRequest = { actionsExpanded = false }
         ) {
             DropdownMenuItem(
+                text = { Text(stringResource(R.string.portable_verify_action)) },
+                onClick = {
+                    actionsExpanded = false
+                    verifier.launch(arrayOf("application/json"))
+                }
+            )
+            DropdownMenuItem(
                 text = { Text(stringResource(R.string.portable_import_json)) },
                 onClick = {
                     actionsExpanded = false
@@ -181,6 +221,25 @@ internal fun PortableDocuments(
                 }
             )
         }
+    }
+    inspectedArchive?.let { summary ->
+        AlertDialog(
+            onDismissRequest = { inspectedArchive = null },
+            title = { Text(stringResource(R.string.portable_verify_success_title)) },
+            text = {
+                Text(stringResource(
+                    R.string.portable_verify_summary,
+                    summary.total,
+                    summary.pinned,
+                    summary.archived
+                ) + "\n" + stringResource(R.string.portable_verify_no_import))
+            },
+            confirmButton = {
+                TextButton(onClick = { inspectedArchive = null }) {
+                    Text(stringResource(R.string.close))
+                }
+            }
+        )
     }
     if (confirmPlaintextExport) {
         AlertDialog(
