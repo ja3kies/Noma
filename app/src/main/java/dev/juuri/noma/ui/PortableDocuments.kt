@@ -64,7 +64,17 @@ internal fun PortableDocuments(
                 try {
                     pending = withContext(Dispatchers.IO) {
                         val bytes = context.contentResolver.openInputStream(uri)?.use {
-                            it.readNBytes(NotesPortableFormat.MAX_IMPORT_BYTES + 1)
+                            val out = java.io.ByteArrayOutputStream()
+                            val chunk = ByteArray(8192)
+                            while (true) {
+                                val count = it.read(chunk)
+                                if (count < 0) break
+                                out.write(chunk, 0, count)
+                                require(out.size() <= NotesPortableFormat.MAX_IMPORT_BYTES) {
+                                    "Archive exceeds size limit"
+                                }
+                            }
+                            out.toByteArray()
                         } ?: error("Cannot read selected file")
                         NotesPortableFormat.decode(bytes)
                     }
