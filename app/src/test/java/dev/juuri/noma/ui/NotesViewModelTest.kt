@@ -906,6 +906,162 @@ class NotesViewModelTest {
         assertTrue(repo.saveCallCount <= 2)
     }
 
+
+    @Test fun unchangedTitleAndBodyNeverTriggerDiskWrites() = runTest {
+        val note = Note("id", "Keep title", "Keep body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeTitle("Keep title")
+        model.changeBody("Keep body")
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals(0, repo.saveCallCount)
+        assertEquals(note, (repo.notes.value as NotesSnapshot.Ready).entries.single())
+    }
+
+    @Test fun pinCannotOverrideUnconfirmedEditorText() = runTest {
+        val note = Note("id", "Original", "Before", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("Unsaved draft")
+        model.togglePin(note)
+        assertEquals("Unsaved draft", model.active.value?.body)
+        assertEquals(false, model.active.value?.isPinned)
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+        assertEquals("Unsaved draft", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+    @Test fun pinCannotSilentlyResetAFailedAutosave() = runTest {
+        val note = Note("id", "Title", "Saved body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("Not yet stored")
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        model.togglePin(note)
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        assertEquals(false, model.active.value?.isPinned)
+        assertEquals("Not yet stored", model.active.value?.body)
+        assertEquals("Saved body", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+        repo.failWrites = false
+        model.retrySave()
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals("Not yet stored", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+    @Test fun pinSecondTimeDuringFirstWriteCannotInvertLatestState() = runTest {
+        val note = Note("id", "Title", "", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.togglePin(note)
+        model.togglePin(note)
+        assertEquals(true, model.active.value?.isPinned)
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+        assertEquals(1, repo.saveCallCount)
+    }
+
+    @Test fun deletingNoteWhileNewCapturePendingCannotDiscardIt() = runTest {
+        val old = Note("id", "Old note", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        runCurrent()
+        model.deleteNote(old)
+        assertEquals("Saved", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun archivingNoteWhileNewCapturePendingDoesNotChangeIt() = runTest {
+        val old = Note("id", "Old note", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        runCurrent()
+        model.toggleArchive(old)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.first { it.id == "id" }.isArchived)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun pinWhileNewCapturePendingDoesNotChangeStoredNote() = runTest {
+        val old = Note("id", "Old note", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        runCurrent()
+        model.togglePin(old)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.first { it.id == "id" }.isPinned)
+        assertEquals(1, repo.saveCallCount)
+    }
+
+    @Test fun deleteDuringSharedCaptureLeavesExistingNoteAlone() = runTest {
+        val old = Note("id", "Old note", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("New", "Shared"))
+        model.confirmSharedText()
+        runCurrent()
+        model.deleteNote(old)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("Saved", (repo.notes.value as NotesSnapshot.Ready).entries.first { it.id == "id" }.body)
+    }
+
+    @Test fun archiveDuringSharedCaptureLeavesExistingNoteUnchanged() = runTest {
+        val old = Note("id", "Old note", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("New", "Shared"))
+        model.confirmSharedText()
+        runCurrent()
+        model.toggleArchive(old)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.first { it.id == "id" }.isArchived)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun pinDuringSharedCaptureLeavesExistingNoteUnchanged() = runTest {
+        val old = Note("id", "Old note", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("New", "Shared"))
+        model.confirmSharedText()
+        runCurrent()
+        model.togglePin(old)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.first { it.id == "id" }.isPinned)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)

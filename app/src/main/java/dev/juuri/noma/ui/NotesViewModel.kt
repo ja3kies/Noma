@@ -316,6 +316,13 @@ class NotesViewModel(
     }
 
     fun togglePin(note: Note) {
+        // A stale card or external caller must not bypass the UI's disabled actions.
+        if (_creating.value || _capturingShare.value) return
+        if (_active.value?.id == note.id &&
+            _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
         // List cards can lag behind unsaved editor changes on wide screens.
         // Never replace the editor text with a stale list snapshot.
         val current = _active.value?.takeIf { it.id == note.id } ?: note
@@ -342,6 +349,7 @@ class NotesViewModel(
     }
 
     fun deleteNote(note: Note) {
+        if (_creating.value || _capturingShare.value) return
         val current = _active.value?.takeIf { it.id == note.id } ?: note
         if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
@@ -356,6 +364,7 @@ class NotesViewModel(
     }
 
     fun toggleArchive(note: Note) {
+        if (_creating.value || _capturingShare.value) return
         val current = _active.value?.takeIf { it.id == note.id } ?: note
         if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)

@@ -598,7 +598,7 @@ class NomaUiTest {
         compose.setContent {
             NomaTheme {
                 PortableDocuments(
-                    snapshot = repo.notes.value,
+                    snapshot = NotesSnapshot.Ready(emptyList()),
                     onImport = { 0 },
                     snapshotForExport = { emptyList() },
                     onMessage = {},
@@ -618,7 +618,7 @@ class NomaUiTest {
         compose.setContent {
             NomaTheme {
                 PortableDocuments(
-                    snapshot = repo.notes.value,
+                    snapshot = NotesSnapshot.Ready(emptyList()),
                     onImport = { 0 },
                     snapshotForExport = { emptyList() },
                     onMessage = {},
