@@ -90,6 +90,45 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_search").assertIsNotEnabled()
     }
 
+    @Test fun noteActionsIdentifyTheirNoteForTalkBack() {
+        val repo = FakeRepository(listOf(Note(
+            "one", "Réunion", "Agenda", false, 1L, 2L
+        )))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Actions for Réunion").assertExists()
+    }
+
+    @Test fun archivedActionsDoNotShowPinThatCannotAffectTheArchive() {
+        val repo = FakeRepository(listOf(Note(
+            "archived", "Finished task", "Done", false, 1L, 2L, true
+        )))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithContentDescription("Actions for Finished task").performClick()
+        compose.onNodeWithText("Pin note").assertDoesNotExist()
+        compose.onNodeWithText("Unarchive note").assertExists()
+    }
+
+    @Test fun sharedTextPreviewDisclosesTruncationWithoutTruncatingSavedContents() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val fullText = "A".repeat(750)
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("Long", fullText))
+        }
+        compose.onNodeWithText("Preview shows the first 500 of 750 characters. The full text will be saved.")
+            .assertExists()
+        compose.onNodeWithText("Save note").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
+        compose.runOnIdle {
+            val entries = (repo.notes.value as NotesSnapshot.Ready).entries
+            assertEquals(fullText, entries.single().body)
+        }
+    }
+
     @Test fun quickCaptureAndSearchKeepNoteDiscoverable() {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))
