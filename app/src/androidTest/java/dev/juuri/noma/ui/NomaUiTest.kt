@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.capture.CaptureRequest
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
@@ -105,6 +106,45 @@ class NomaUiTest {
         val viewModel = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(viewModel) } }
         compose.onNodeWithContentDescription("Search your notes").assertExists()
+    }
+
+    @Test fun shareSheetCaptureShowsPreviewAndDoesNotSaveUntilConfirmed() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle {
+            model.receiveSharedText(
+                CaptureRequest.SharedText("Article title", "https://example.org/idea")
+            )
+        }
+        compose.onNodeWithText("Save shared text?").assertExists()
+        compose.onNodeWithText("Article title").assertExists()
+        compose.onNodeWithText("https://example.org/idea").assertExists()
+        compose.runOnIdle {
+            assert((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
+        }
+        compose.onNodeWithText("Save note").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
+        compose.runOnIdle {
+            val stored = (repo.notes.value as NotesSnapshot.Ready).entries
+            assert(stored.size == 1)
+            assert(stored.single().body == "https://example.org/idea")
+            assert(stored.single().title == "Article title")
+        }
+    }
+
+    @Test fun dismissedShareNeverWritesToRepository() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("", "Private data"))
+        }
+        compose.onNodeWithText("Discard").performClick()
+        compose.runOnIdle {
+            assert((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
+            assert(model.pendingShare.value == null)
+        }
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
