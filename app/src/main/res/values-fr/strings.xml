@@ -13,6 +13,7 @@
     <string name="no_results_detail">Essayez une autre recherche ou un autre filtre.</string>
     <string name="empty_title">Un espace pour commencer</string>
     <string name="empty_detail">Vos pensées, listes et idées prendront place ici.</string>
+    <string name="pinned_note_indicator">Note épinglée</string>
     <string name="pinned_section">Épinglées</string>
     <string name="recent_section">Récentes</string>
     <string name="untitled">Note sans titre</string>
