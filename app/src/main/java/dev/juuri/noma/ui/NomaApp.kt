@@ -326,6 +326,7 @@ private fun NotesListScreen(
 
     deleting?.let { note ->
         DeleteConfirmation(
+            noteTitle = note.displayTitle.ifBlank { stringResource(R.string.untitled) },
             onCancel = { deleting = null },
             onConfirm = {
                 viewModel.deleteNote(note)
@@ -888,6 +889,7 @@ private fun NoteEditorScreen(
     }
     if (confirmDelete) {
         DeleteConfirmation(
+            noteTitle = note.displayTitle.ifBlank { stringResource(R.string.untitled) },
             onCancel = { confirmDelete = false },
             onConfirm = {
                 confirmDelete = false
@@ -1230,11 +1232,11 @@ private fun WidgetStyleDialog(
 }
 
 @Composable
-private fun DeleteConfirmation(onCancel: () -> Unit, onConfirm: () -> Unit) {
+private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(R.string.delete_confirm_title)) },
-        text = { Text(stringResource(R.string.delete_confirm_body)) },
+        text = { Text(stringResource(R.string.delete_confirm_body_named, noteTitle.take(80))) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(
