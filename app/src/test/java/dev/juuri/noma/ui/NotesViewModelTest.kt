@@ -286,6 +286,58 @@ class NotesViewModelTest {
         assertEquals(null, model.pendingShare.value)
     }
 
+    @Test fun widgetQuickNoteWaitsForUnsavedEditorAndPreservesTheDraft() = runTest {
+        val original = Note("id", "Existing", "Original", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Latest unsaved edit")
+        model.requestQuickNote()
+        runCurrent()
+        assertEquals("id", model.active.value?.id)
+        assertEquals("Latest unsaved edit", model.active.value?.body)
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        val entries = (repo.notes.value as NotesSnapshot.Ready).entries
+        assertEquals(2, entries.size)
+        assertEquals("Latest unsaved edit", entries.first { it.id == "id" }.body)
+        assertTrue(model.active.value?.id != "id")
+    }
+
+    @Test fun repeatedWidgetTapDuringPendingSaveCreatesJustOneNewNote() = runTest {
+        val original = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeTitle("New title")
+        model.requestQuickNote()
+        model.requestQuickNote()
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun failedSaveDoesNotLaunchDeferredWidgetCapture() = runTest {
+        val original = Note("id", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Unsaved text")
+        model.requestQuickNote()
+        advanceUntilIdle()
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("Unsaved text", model.active.value?.body)
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        repo.failWrites = false
+        model.retrySave()
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
