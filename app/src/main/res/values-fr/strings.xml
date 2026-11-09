@@ -112,4 +112,5 @@
     <string name="portable_verify_summary">%1$d notes · %2$d épinglées · %3$d archivées</string>
     <string name="portable_verify_no_import">Le fichier a été vérifié sans importer ni modifier de notes.</string>
     <string name="portable_verify_failed">Vérification de la sauvegarde impossible : %1$s</string>
+    <string name="portable_import_details">%1$d nouvelles notes · %2$d déjà présentes · %3$d épinglées · %4$d archivées</string>
 </resources>
