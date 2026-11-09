@@ -230,6 +230,7 @@ private fun NotesListScreen(
     val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val portableScope = rememberCoroutineScope()
 
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -296,6 +297,14 @@ private fun NotesListScreen(
                     IconButton(onClick = { showAppearance = true }) {
                         Icon(Icons.Outlined.Palette, contentDescription = stringResource(R.string.appearance))
                     }
+                    PortableDocuments(
+                        snapshot = snapshot,
+                        onImport = viewModel::importNotes,
+                        snapshotForExport = viewModel::snapshotForExport,
+                        onMessage = { message ->
+                            portableScope.launch { snackbar.showSnackbar(message) }
+                        }
+                    )
                 }
                 Spacer(Modifier.height(20.dp))
                 TextField(
@@ -388,15 +397,6 @@ private fun NotesListScreen(
                         }
                     }
                 }
-                val portableScope = rememberCoroutineScope()
-                PortableDocuments(
-                    snapshot = snapshot,
-                    onImport = viewModel::importNotes,
-                    snapshotForExport = viewModel::snapshotForExport,
-                    onMessage = { message ->
-                        portableScope.launch { snackbar.showSnackbar(message) }
-                    }
-                )
                 if (snapshot is NotesSnapshot.Ready) {
                     val count = (snapshot as NotesSnapshot.Ready).entries.count {
                         it.isArchived == archivedOnly
