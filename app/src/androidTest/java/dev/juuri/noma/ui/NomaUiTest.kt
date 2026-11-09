@@ -78,7 +78,7 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(viewModel) } }
         compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
         compose.onNodeWithTag("noma_search").assertIsNotEnabled()
-        compose.onNodeWithText("Retry").assertExists()
+        compose.onNodeWithText("Try again").assertExists()
         compose.onNodeWithContentDescription("Import and export notes").assertExists()
     }
 
@@ -108,7 +108,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_archive_filter").performClick()
         compose.onNodeWithContentDescription("Actions for Finished task").performClick()
         compose.onNodeWithText("Pin note").assertDoesNotExist()
-        compose.onNodeWithText("Unarchive note").assertExists()
+        compose.onNodeWithText("Restore note").assertExists()
     }
 
     @Test fun sharedTextPreviewDisclosesTruncationWithoutTruncatingSavedContents() {
