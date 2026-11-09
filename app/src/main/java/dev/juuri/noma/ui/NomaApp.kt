@@ -2,6 +2,8 @@ package dev.juuri.noma.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -1279,5 +1281,11 @@ private fun shareNote(context: Context, note: Note) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)
     }
-    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_note)))
+    try {
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_note)))
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, R.string.share_unavailable, Toast.LENGTH_SHORT).show()
+    } catch (_: SecurityException) {
+        Toast.makeText(context, R.string.share_unavailable, Toast.LENGTH_SHORT).show()
+    }
 }
