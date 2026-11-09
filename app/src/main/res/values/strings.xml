@@ -59,6 +59,8 @@
     <string name="save_failed_status">Not saved</string>
     <string name="unsaved_title">Changes not saved</string>
     <string name="unsaved_body">The latest changes could not be stored. Retry saving or leave without those changes.</string>
+    <string name="keep_editing">Keep editing</string>
+    <string name="wait_for_save_before_exit">Saving your changes before leaving…</string>
     <string name="leave_unsaved">Leave anyway</string>
     <string name="error_recovery">Your notes are still on this device. Try reopening them.</string>
     <plurals name="note_total">
