@@ -118,4 +118,5 @@
     <string name="portable_import_in_progress">Importing…</string>
     <string name="search_section">Search results</string>
     <string name="alphabetical_section">A–Z</string>
+    <string name="delete_confirm_body_named">Delete “%1$s”? You can undo this action briefly.</string>
 </resources>
