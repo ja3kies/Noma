@@ -759,6 +759,10 @@ private fun NoteEditorScreen(
                     }
                 },
                 actions = {
+                    val portableScope = rememberCoroutineScope()
+                    PortableNoteExport(note, onMessage = { message ->
+                        portableScope.launch { snackbar.showSnackbar(message) }
+                    })
                     IconButton(onClick = { viewModel.togglePin(note) }) {
                         Icon(
                             Icons.Outlined.PushPin,
