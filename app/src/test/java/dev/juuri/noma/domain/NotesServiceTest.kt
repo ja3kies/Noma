@@ -193,6 +193,35 @@ class NotesServiceTest {
         assertEquals(listOf("a", "z"), service.visible(notes, "match", false).map { it.id })
     }
 
+    @Test fun contextualPreviewIncludesMatchAtEndOfLongLine() {
+        val line = "Ordinary background. ".repeat(20) + "Important café rendezvous"
+        val result = NoteSearch.matchingPreview(note("long", body = line), "CAFE")
+        assertTrue(result.contains("café"))
+        assertTrue(result.startsWith("…"))
+        assertTrue(result.length <= 162)
+    }
+
+    @Test fun contextualPreviewPreservesAccentsAndSupplementaryCharacters() {
+        val line = "🦊 ".repeat(100) + "Cafe\u0301 et réunion"
+        val result = NoteSearch.matchingPreview(note("unicode", body = line), "reunion")
+        assertTrue(result.contains("réunion"))
+        assertTrue(result.length <= 162)
+    }
+
+    @Test fun matchingShortPreviewKeepsEntireLineWithoutEllipsis() {
+        val body = "Préparer le café avant midi"
+        assertEquals(body, NoteSearch.matchingPreview(note("short", body = body), "cafe"))
+    }
+
+    @Test fun titleMatchWithoutBodyTextReturnsEmptyPreview() {
+        assertEquals("", NoteSearch.matchingPreview(note("title", title = "Réunion"), "REUNION"))
+    }
+
+    @Test fun veryLongTitleMatchDoesNotRequireMatchingBodyText() {
+        val candidate = note("long", title = "Noma", body = "unrelated ".repeat(1000))
+        assertTrue(NoteSearch.matches(candidate, "noma"))
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
