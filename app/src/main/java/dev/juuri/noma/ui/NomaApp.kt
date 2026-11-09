@@ -798,12 +798,14 @@ private fun NoteActionsMenu(
     onPin: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    showPinAction: Boolean = true,
+    destructiveEnabled: Boolean = true
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         // An archived note is not shown in the pinned section. Do not offer
         // a pin action that appears to have no visible effect.
-        if (!note.isArchived) {
+        if (showPinAction && !note.isArchived) {
             DropdownMenuItem(
                 text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
                 onClick = { onDismiss(); onPin() },
@@ -812,6 +814,7 @@ private fun NoteActionsMenu(
         }
         DropdownMenuItem(
             text = { Text(stringResource(if (note.isArchived) R.string.unarchive_note else R.string.archive_note)) },
+            enabled = destructiveEnabled,
             onClick = { onDismiss(); onArchive() },
             leadingIcon = {
                 Icon(
@@ -827,6 +830,7 @@ private fun NoteActionsMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.delete_note)) },
+            enabled = destructiveEnabled,
             onClick = { onDismiss(); onDelete() },
             leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null) }
         )
@@ -970,7 +974,9 @@ private fun NoteEditorScreen(
                             onPin = { viewModel.togglePin(note) },
                             onArchive = { viewModel.toggleArchive(note) },
                             onDelete = { confirmDelete = true },
-                            onShare = { shareNote(context, note) }
+                            onShare = { shareNote(context, note) },
+                            showPinAction = false,
+                            destructiveEnabled = saveState == EditorSaveState.Saved
                         )
                     }
                 }
