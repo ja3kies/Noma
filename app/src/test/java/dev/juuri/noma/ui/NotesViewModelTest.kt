@@ -364,12 +364,13 @@ class NotesViewModelTest {
         val repo = FakeRepository(old)
         val model = NotesViewModel(repo, NotesService(repo))
         repo.failImports = true
-        val failed = async { model.importNotesAwait(listOf(incoming)) }
+        // Capture the expected failure *inside* the child task, otherwise
+        // runTest also reports the async child as an uncaught failure.
+        val failed = async { runCatching { model.importNotesAwait(listOf(incoming)) } }
         advanceUntilIdle()
-        try {
-            failed.await()
-            org.junit.Assert.fail("Failed import incorrectly acknowledged")
-        } catch (_: IllegalStateException) { }
+        val outcome = failed.await()
+        assertTrue(outcome.isFailure)
+        assertTrue(outcome.exceptionOrNull() is IllegalStateException)
         assertEquals(listOf(old), (repo.notes.value as NotesSnapshot.Ready).entries)
         repo.failImports = false
         val retry = async { model.importNotesAwait(listOf(incoming)) }
