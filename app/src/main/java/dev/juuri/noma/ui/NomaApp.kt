@@ -347,7 +347,7 @@ private fun NotesListScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { if (!creating) viewModel.createNote() },
+                onClick = { if (!creating && snapshot is NotesSnapshot.Ready) viewModel.createNote() },
                 expanded = true,
                 icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
                 text = { Text(newNoteLabel) },
