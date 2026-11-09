@@ -263,6 +263,20 @@ class NotesServiceTest {
         assertEquals(listOf("city"), service.visible(entries, "lodz", false).map { it.id })
     }
 
+    @Test fun alphabeticalSortIgnoresAccentsAndLigatures() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("z", title = "Zèbre"),
+            note("e", title = "Éclair"),
+            note("c", title = "Cœur"),
+            note("b", title = "Banane")
+        )
+        assertEquals(
+            listOf("b", "c", "e", "z"),
+            service.visible(notes, "", false, sort = NoteSort.TITLE).map { it.id }
+        )
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
