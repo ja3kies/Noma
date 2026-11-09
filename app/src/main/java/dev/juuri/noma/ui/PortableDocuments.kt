@@ -5,6 +5,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +44,7 @@ internal fun PortableDocuments(
     val exportFailure = stringResource(R.string.portable_export_failed)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var importMenu by remember { mutableStateOf(false) }
     val exporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -130,11 +134,27 @@ internal fun PortableDocuments(
         }
     }
     Row {
-        TextButton(onClick = { textImporter.launch(arrayOf("text/plain", "text/markdown", "text/x-markdown")) }, enabled = !busy) {
-            Text(stringResource(R.string.portable_import_text))
-        }
-        TextButton(onClick = { importer.launch(arrayOf("application/json")) }, enabled = !busy) {
-            Text(stringResource(R.string.portable_import_json))
+        Box {
+            TextButton(
+                onClick = { importMenu = true },
+                enabled = !busy && snapshot is NotesSnapshot.Ready
+            ) { Text(stringResource(R.string.portable_import_action)) }
+            DropdownMenu(expanded = importMenu, onDismissRequest = { importMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.portable_import_json)) },
+                    onClick = {
+                        importMenu = false
+                        importer.launch(arrayOf("application/json"))
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.portable_import_text)) },
+                    onClick = {
+                        importMenu = false
+                        textImporter.launch(arrayOf("text/plain", "text/markdown", "text/x-markdown"))
+                    }
+                )
+            }
         }
         TextButton(
             onClick = { exporter.launch("noma-notes.json") },
