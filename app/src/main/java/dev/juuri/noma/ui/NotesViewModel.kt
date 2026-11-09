@@ -169,6 +169,9 @@ class NotesViewModel(
     }
 
     fun openNote(note: Note) {
+        // Selecting the same card on a tablet must not mark an in-flight save
+        // as completed or replace its unsaved editor buffer.
+        if (_active.value?.id == note.id) return
         if (_active.value?.id != null && _active.value?.id != note.id &&
             _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
