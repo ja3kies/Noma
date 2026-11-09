@@ -64,4 +64,16 @@
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>
     </plurals>
+    <string name="portable_import_json">Import JSON</string>
+    <string name="portable_export_json">Export JSON</string>
+    <string name="portable_import_confirm">Import %1$d notes?</string>
+    <string name="portable_import_warning">Existing notes will be preserved. %1$d duplicate IDs will be skipped. The import is atomic and cannot be undone automatically.</string>
+    <string name="portable_import_action">Import</string>
+    <string name="portable_export_result">Exported %1$d notes</string>
+    <string name="portable_import_result">Imported %1$d notes; skipped %2$d existing</string>
+    <string name="portable_export_failed">Export failed: %1$s</string>
+    <string name="portable_import_failed">Import failed: %1$s</string>
+    <string name="portable_not_ready">Notes are still loading</string>
+    <string name="portable_read_failed">Unable to read this file</string>
+    <string name="portable_write_failed">Unable to write this file</string>
 </resources>

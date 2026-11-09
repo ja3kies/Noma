@@ -14,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import dev.juuri.noma.R
 import dev.juuri.noma.data.NotesPortableFormat
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NotesSnapshot
@@ -29,6 +31,12 @@ internal fun PortableDocuments(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val notReady = stringResource(R.string.portable_not_ready)
+    val writeFailed = stringResource(R.string.portable_write_failed)
+    val readFailed = stringResource(R.string.portable_read_failed)
+    val exportResult = stringResource(R.string.portable_export_result)
+    val importFailure = stringResource(R.string.portable_import_failed)
+    val exportFailure = stringResource(R.string.portable_export_failed)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var busy by remember { mutableStateOf(false) }
     val exporter = rememberLauncherForActivityResult(
@@ -36,7 +44,7 @@ internal fun PortableDocuments(
     ) { uri: Uri? ->
         if (uri != null && !busy) {
             val notes = (snapshot as? NotesSnapshot.Ready)?.entries
-            if (notes == null) onMessage("Notes not ready")
+            if (notes == null) onMessage(notReady)
             else {
                 busy = true
                 scope.launch {
@@ -45,11 +53,11 @@ internal fun PortableDocuments(
                             context.contentResolver.openOutputStream(uri, "wt")?.use {
                                 it.write(NotesPortableFormat.encode(notes))
                                 it.flush()
-                            } ?: error("Cannot write selected file")
+                            } ?: error(writeFailed)
                         }
-                        onMessage("Exported ${notes.size} notes")
+                        onMessage(exportResult.format(notes.size))
                     } catch (e: Exception) {
-                        onMessage("Export failed: ${e.localizedMessage}")
+                        onMessage(exportFailure.format(e.localizedMessage ?: writeFailed))
                     } finally { busy = false }
                 }
             }
@@ -75,34 +83,34 @@ internal fun PortableDocuments(
                                 }
                             }
                             out.toByteArray()
-                        } ?: error("Cannot read selected file")
+                        } ?: error(readFailed)
                         NotesPortableFormat.decode(bytes)
                     }
                 } catch (e: Exception) {
-                    onMessage("Import failed: ${e.localizedMessage}")
+                    onMessage(importFailure.format(e.localizedMessage ?: readFailed))
                 } finally { busy = false }
             }
         }
     }
     Row {
         TextButton(onClick = { importer.launch(arrayOf("application/json")) }, enabled = !busy) {
-            Text("Import JSON")
+            Text(stringResource(R.string.portable_import_json))
         }
         TextButton(
             onClick = { exporter.launch("noma-notes.json") },
             enabled = !busy && snapshot is NotesSnapshot.Ready
-        ) { Text("Export JSON") }
+        ) { Text(stringResource(R.string.portable_export_json)) }
     }
     pending?.let { notes ->
         AlertDialog(
             onDismissRequest = { pending = null },
-            title = { Text("Import ${notes.size} notes?") },
-            text = { Text("Existing note IDs will be skipped; nothing will be overwritten.") },
+            title = { Text(stringResource(R.string.portable_import_confirm, notes.size)) },
+            text = { Text(stringResource(R.string.portable_import_warning, notes.count { note -> (snapshot as? NotesSnapshot.Ready)?.entries?.any { it.id == note.id } == true })) },
             confirmButton = {
-                TextButton(onClick = { onImport(notes); pending = null }) { Text("Import") }
+                TextButton(onClick = { onImport(notes); pending = null }) { Text(stringResource(R.string.portable_import_action)) }
             },
             dismissButton = {
-                TextButton(onClick = { pending = null }) { Text("Cancel") }
+                TextButton(onClick = { pending = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
