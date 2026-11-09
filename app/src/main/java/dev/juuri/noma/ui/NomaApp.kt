@@ -85,6 +85,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -111,6 +112,7 @@ import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaMotion
 import dev.juuri.noma.ui.theme.NomaSpacing
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -145,6 +147,7 @@ fun NomaApp(
                     val result = snackbar.showSnackbar(message, actionLabel = undo, withDismissAction = true)
                     if (result == SnackbarResult.ActionPerformed) viewModel.undoArchive(event.previous)
                 }
+                is NoteUiEvent.Imported -> snackbar.showSnackbar("Imported ${event.added} notes; skipped ${event.skipped} existing")
                 is NoteUiEvent.Failure ->
                     snackbar.showSnackbar(failurePrefix + event.message, withDismissAction = true)
             }
@@ -378,6 +381,14 @@ private fun NotesListScreen(
                         }
                     }
                 }
+                val portableScope = rememberCoroutineScope()
+                PortableDocuments(
+                    snapshot = snapshot,
+                    onImport = viewModel::importNotes,
+                    onMessage = { message ->
+                        portableScope.launch { snackbar.showSnackbar(message) }
+                    }
+                )
                 if (snapshot is NotesSnapshot.Ready) {
                     val count = (snapshot as NotesSnapshot.Ready).entries.count {
                         it.isArchived == archivedOnly
