@@ -10,9 +10,9 @@
     android:importantForAccessibility="yes"
     android:contentDescription="@string/shortcut_new_note_detail">
     <ImageView
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:src="@drawable/ic_noma_launcher"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/noma_launcher_foreground"
         android:contentDescription="@null" />
     <TextView
         android:layout_width="wrap_content"
