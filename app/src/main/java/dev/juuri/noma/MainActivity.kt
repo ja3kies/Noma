@@ -129,10 +129,22 @@ class MainActivity : ComponentActivity() {
                     appearance = appearance,
                     widgetStyle = widgetStyle,
                     onWidgetStyleChange = { selected ->
-                        // Write first, then notify the widget host. The choice survives restarts.
-                        NomaWidgetPreferences.save(applicationContext, selected)
-                        widgetStyle = selected
-                        NomaQuickCaptureWidget.refreshAll(applicationContext)
+                        try {
+                            // Write first: never show a selection that cannot survive restart.
+                            NomaWidgetPreferences.save(applicationContext, selected)
+                            widgetStyle = selected
+                        } catch (failure: RuntimeException) {
+                            android.util.Log.e("NomaWidget", "Cannot save widget style", failure)
+                            android.widget.Toast.makeText(
+                                this, R.string.widget_style_save_error,
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        try {
+                            NomaQuickCaptureWidget.refreshAll(applicationContext)
+                        } catch (failure: RuntimeException) {
+                            android.util.Log.w("NomaWidget", "Widget host refused refresh", failure)
+                        }
                     },
                     onAppearanceChange = { selected ->
                         appearance = selected
