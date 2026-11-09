@@ -68,14 +68,15 @@ class MainActivity : ComponentActivity() {
             action = AndroidCaptureIntents.ACTION_NEW_NOTE
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
-        val entry = ShortcutInfo.Builder(this, "noma-new-note")
-            .setShortLabel(getString(R.string.shortcut_new_note))
-            .setLongLabel(getString(R.string.shortcut_new_note_detail))
-            .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
-            .setIntent(target)
-            .build()
         try {
-            // Some OEM launchers deny dynamic-shortcut updates. The app must still open.
+            // Some OEM launchers deny the entire shortcut API, including construction.
+            // Quick capture is optional and must not prevent opening the notebook.
+            val entry = ShortcutInfo.Builder(this, "noma-new-note")
+                .setShortLabel(getString(R.string.shortcut_new_note))
+                .setLongLabel(getString(R.string.shortcut_new_note_detail))
+                .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
+                .setIntent(target)
+                .build()
             shortcuts.addDynamicShortcuts(listOf(entry))
         } catch (failure: RuntimeException) {
             android.util.Log.w("NomaCapture", "Launcher shortcut unavailable", failure)
