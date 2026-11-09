@@ -908,11 +908,12 @@ private fun NoteEditorScreen(
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     val context = LocalContext.current
-    val titleFocus = remember { FocusRequester() }
-    val bodyFocus = remember { FocusRequester() }
+    val titleFocus = remember(note.id) { FocusRequester() }
+    val bodyFocus = remember(note.id) { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     fun requestClose() {
+        menuExpanded = false
         when (saveState) {
             EditorSaveState.Saved -> viewModel.closeNote()
             EditorSaveState.Saving -> closeWhenSaved = true
@@ -967,13 +968,29 @@ private fun NoteEditorScreen(
                 TextButton(onClick = {
                     confirmDiscard = false
                     viewModel.retrySave()
-                }) { Text(stringResource(R.string.retry)) }
+                }, modifier = Modifier.testTag("noma_dialog_retry_save")) {
+                    Text(stringResource(R.string.retry))
+                }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    confirmDiscard = false
-                    viewModel.closeNote()
-                }) { Text(stringResource(R.string.leave_unsaved)) }
+                Row {
+                    TextButton(
+                        onClick = { confirmDiscard = false },
+                        modifier = Modifier.testTag("noma_keep_editing")
+                    ) { Text(stringResource(R.string.keep_editing)) }
+                    TextButton(
+                        onClick = {
+                            confirmDiscard = false
+                            viewModel.closeNote()
+                        },
+                        modifier = Modifier.testTag("noma_discard_unsaved")
+                    ) {
+                        Text(
+                            stringResource(R.string.leave_unsaved),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         )
     }
@@ -1009,7 +1026,7 @@ private fun NoteEditorScreen(
                     })
                     IconButton(
                         onClick = { viewModel.togglePin(note) },
-                        enabled = saveState == EditorSaveState.Saved,
+                        enabled = saveState == EditorSaveState.Saved && !note.isArchived,
                         modifier = Modifier.testTag("noma_editor_pin")
                     ) {
                         Icon(
@@ -1061,10 +1078,21 @@ private fun NoteEditorScreen(
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 16.dp, bottom = 64.dp)
             ) {
                 EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
+                if (closeWhenSaved && saveState == EditorSaveState.Saving) {
+                    Text(
+                        stringResource(R.string.wait_for_save_before_exit),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("noma_pending_exit")
+                    )
+                }
                 Spacer(Modifier.height(24.dp))
                 BasicTextField(
                     value = note.title,
-                    onValueChange = viewModel::changeTitle,
+                    onValueChange = {
+                        closeWhenSaved = false
+                        viewModel.changeTitle(it)
+                    },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.headlineLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground
@@ -1092,7 +1120,10 @@ private fun NoteEditorScreen(
                 Spacer(Modifier.height(20.dp))
                 BasicTextField(
                     value = note.body,
-                    onValueChange = viewModel::changeBody,
+                    onValueChange = {
+                        closeWhenSaved = false
+                        viewModel.changeBody(it)
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground
                     ),
