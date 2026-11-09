@@ -5,6 +5,7 @@ import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +68,35 @@ class NotesViewModelTest {
         advanceUntilIdle()
         assertEquals(EditorSaveState.Saved, model.saveState.value)
         assertEquals("Updated", (repo.notes.value as NotesSnapshot.Ready).entries.single().title)
+    }
+
+    @Test fun exportSnapshotWaitsForLatestCommittedEditorWrite() = runTest {
+        val note = Note("id", "Before", "", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeTitle("After")
+        val result = async { model.snapshotForExport() }
+        runCurrent()
+        assertTrue(!result.isCompleted)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("After", result.await().single().title)
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+    }
+
+    @Test fun importsNeverReplaceExistingIds() = runTest {
+        val note = Note("id", "Existing", "", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.importNotes(listOf(note.copy(title = "Injected"),
+            Note("new", "Imported", "Body", false, 2L, 3L)))
+        advanceUntilIdle()
+        val entries = (repo.notes.value as NotesSnapshot.Ready).entries.associateBy { it.id }
+        assertEquals(2, entries.size)
+        assertEquals("Existing", entries["id"]?.title)
+        assertEquals("Imported", entries["new"]?.title)
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {
