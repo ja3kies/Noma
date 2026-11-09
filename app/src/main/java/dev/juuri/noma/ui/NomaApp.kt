@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -313,6 +314,10 @@ private fun NotesListScreen(
         (snapshot as? NotesSnapshot.Ready)?.let { state ->
             viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
         }
+    }
+    val listState = rememberLazyListState()
+    LaunchedEffect(query, pinnedOnly, archivedOnly, sort) {
+        if (!filteredNotes.isNullOrEmpty()) listState.scrollToItem(0)
     }
     val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
@@ -643,6 +648,7 @@ private fun NotesListScreen(
                         val others = if (archivedOnly) visible else visible.filterNot { it.isPinned }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize().testTag("noma_note_list"),
+                            state = listState,
                             contentPadding = PaddingValues(
                                 start = NomaSpacing.comfortable,
                                 end = NomaSpacing.comfortable,
@@ -667,7 +673,11 @@ private fun NotesListScreen(
                                         onPin = { viewModel.togglePin(note) },
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
-                                        onShare = { shareNote(context, note) }
+                                        onShare = { shareNote(context, note) },
+                                        onMenuOpen = {
+                                            focusManager.clearFocus()
+                                            searchKeyboard?.hide()
+                                        }
                                     )
                                 }
                             }
@@ -697,7 +707,11 @@ private fun NotesListScreen(
                                         onPin = { viewModel.togglePin(note) },
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
-                                        onShare = { shareNote(context, note) }
+                                        onShare = { shareNote(context, note) },
+                                        onMenuOpen = {
+                                            focusManager.clearFocus()
+                                            searchKeyboard?.hide()
+                                        }
                                     )
                                 }
                             }
@@ -745,9 +759,13 @@ private fun NoteCard(
     onPin: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onMenuOpen: () -> Unit
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
+    LaunchedEffect(note.id, selected) {
+        if (!selected) menuExpanded = false
+    }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
@@ -757,6 +775,7 @@ private fun NoteCard(
     Card(
         onClick = onOpen,
         modifier = Modifier.fillMaxWidth()
+            .testTag("noma_note_${note.id}")
             .semantics { this.selected = selected }
             .animateContentSize(tween(NomaMotion.quick)),
         shape = MaterialTheme.shapes.large,
@@ -797,13 +816,16 @@ private fun NoteCard(
             if (note.isPinned && !note.isArchived) {
                 Icon(
                     Icons.Outlined.PushPin,
-                    contentDescription = stringResource(R.string.pinned_section),
-                    tint = MaterialTheme.colorScheme.primary,
+                    contentDescription = stringResource(R.string.pinned_note_indicator),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 3.dp).size(18.dp)
                 )
             }
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(onClick = {
+                    onMenuOpen()
+                    menuExpanded = true
+                }) {
                     Icon(
                         Icons.Outlined.MoreHoriz,
                         contentDescription = stringResource(R.string.note_actions_for, title)
@@ -858,6 +880,7 @@ private fun NoteActionsMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.share_note)) },
+            enabled = note.title.isNotBlank() || note.body.isNotBlank(),
             onClick = { onDismiss(); onShare() },
             leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
         )
