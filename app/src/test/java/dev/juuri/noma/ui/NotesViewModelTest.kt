@@ -1,6 +1,7 @@
 package dev.juuri.noma.ui
 
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.capture.CaptureRequest
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
@@ -175,6 +176,73 @@ class NotesViewModelTest {
         assertEquals("current", model.active.value?.id)
         assertEquals("Draft still in memory", model.active.value?.body)
         assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun receivingSharedTextDoesNotWriteUntilExplicitConfirmation() = runTest {
+        val original = Note("saved", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("From browser", "https://example.org"))
+        advanceUntilIdle()
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("https://example.org", model.pendingShare.value?.body)
+        model.dismissSharedText()
+        assertEquals(null, model.pendingShare.value)
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun confirmingSharedTextPersistsAndOpensExactlyOneNote() = runTest {
+        val original = Note("saved", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        val pending = CaptureRequest.SharedText("Shared thought", "An idea from another app")
+        model.receiveSharedText(pending)
+        model.confirmSharedText()
+        model.confirmSharedText() // Duplicate tap cannot create a second note.
+        advanceUntilIdle()
+        assertEquals(null, model.pendingShare.value)
+        assertEquals(false, model.capturingShare.value)
+        val notes = (repo.notes.value as NotesSnapshot.Ready).entries
+        assertEquals(2, notes.size)
+        assertEquals(1, notes.count { it.body == pending.body })
+        assertEquals("Shared thought", model.active.value?.title)
+    }
+
+    @Test fun failedSharedCaptureRetainsContentsForRetry() = runTest {
+        val original = Note("saved", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("", "Do not lose this"))
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals("Do not lose this", model.pendingShare.value?.body)
+        assertEquals(false, model.capturingShare.value)
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        repo.failWrites = false
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals(null, model.pendingShare.value)
+    }
+
+    @Test fun pendingEditorSavePreventsSharedCaptureFromReplacingDraft() = runTest {
+        val original = Note("saved", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Uncommitted")
+        model.receiveSharedText(CaptureRequest.SharedText("", "Incoming message"))
+        model.confirmSharedText()
+        assertEquals("Uncommitted", model.active.value?.body)
+        assertEquals("Incoming message", model.pendingShare.value?.body)
+        assertEquals(false, model.capturingShare.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {
