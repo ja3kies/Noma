@@ -315,6 +315,7 @@ private fun NotesListScreen(
     val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val searchKeyboard = LocalSoftwareKeyboardController.current
     val portableScope = rememberCoroutineScope()
     val searchAccessibilityLabel = stringResource(R.string.search_hint)
 
@@ -624,7 +625,11 @@ private fun NotesListScreen(
                                         note = note,
                                         query = query,
                                         selected = note.id == selectedId,
-                                        onOpen = { viewModel.openNote(note) },
+                                        onOpen = {
+                                            focusManager.clearFocus()
+                                            searchKeyboard?.hide()
+                                            viewModel.openNote(note)
+                                        },
                                         onPin = { viewModel.togglePin(note) },
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
@@ -650,7 +655,11 @@ private fun NotesListScreen(
                                         note = note,
                                         query = query,
                                         selected = note.id == selectedId,
-                                        onOpen = { viewModel.openNote(note) },
+                                        onOpen = {
+                                            focusManager.clearFocus()
+                                            searchKeyboard?.hide()
+                                            viewModel.openNote(note)
+                                        },
                                         onPin = { viewModel.togglePin(note) },
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
