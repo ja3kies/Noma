@@ -6,6 +6,7 @@ import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,7 @@ private sealed interface WriteOperation {
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
     data class Import(val notes: List<Note>) : WriteOperation
+    data class ExportSnapshot(val result: CompletableDeferred<List<Note>>) : WriteOperation
     data class Archive(val previous: Note) : WriteOperation
 }
 
@@ -86,6 +88,11 @@ class NotesViewModel(
                             eventChannel.send(NoteUiEvent.Deleted(operation.note))
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
+                        is WriteOperation.ExportSnapshot -> {
+                            val current = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
+                                ?: error("Notes not ready")
+                            operation.result.complete(current.entries.toList())
+                        }
                         is WriteOperation.Import -> {
                             val added = repository.importMissing(operation.notes)
                             eventChannel.send(NoteUiEvent.Imported(added, operation.notes.size - added))
@@ -98,6 +105,9 @@ class NotesViewModel(
                         }
                     }
                 } catch (failure: Exception) {
+                    if (operation is WriteOperation.ExportSnapshot) {
+                        operation.result.completeExceptionally(failure)
+                    }
                     val message = failure.localizedMessage ?: "Storage unavailable"
                     if (operation is WriteOperation.Save &&
                         operation.editorRevision != null &&
@@ -204,6 +214,13 @@ class NotesViewModel(
     }
 
     fun importNotes(notes: List<Note>) { operations.trySend(WriteOperation.Import(notes)) }
+
+    /** Ordered after all queued saves, archive operations and imports. */
+    suspend fun snapshotForExport(): List<Note> {
+        val deferred = CompletableDeferred<List<Note>>()
+        operations.send(WriteOperation.ExportSnapshot(deferred))
+        return deferred.await()
+    }
 
     fun retry() {
         viewModelScope.launch { repository.refresh() }
