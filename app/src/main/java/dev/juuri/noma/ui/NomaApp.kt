@@ -110,6 +110,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import dev.juuri.noma.R
+import dev.juuri.noma.capture.NomaWidgetStyle
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NoteSearch
@@ -130,7 +131,9 @@ import java.util.Date
 fun NomaApp(
     viewModel: NotesViewModel,
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
-    onAppearanceChange: (NomaAppearance) -> Unit = {}
+    onAppearanceChange: (NomaAppearance) -> Unit = {},
+    widgetStyle: NomaWidgetStyle = NomaWidgetStyle.MATERIAL_YOU,
+    onWidgetStyleChange: (NomaWidgetStyle) -> Unit = {}
 ) {
     val active by viewModel.active.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
@@ -219,6 +222,8 @@ fun NomaApp(
                         selectedId = active?.id,
                         appearance = appearance,
                         onAppearanceChange = onAppearanceChange,
+                        widgetStyle = widgetStyle,
+                        onWidgetStyleChange = onWidgetStyleChange,
                         modifier = Modifier.width(NomaSpacing.listPaneWidth).fillMaxHeight()
                     )
                     VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -244,6 +249,8 @@ fun NomaApp(
                         selectedId = null,
                         appearance = appearance,
                         onAppearanceChange = onAppearanceChange,
+                        widgetStyle = widgetStyle,
+                        onWidgetStyleChange = onWidgetStyleChange,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -267,6 +274,8 @@ private fun NotesListScreen(
     selectedId: String?,
     appearance: NomaAppearance,
     onAppearanceChange: (NomaAppearance) -> Unit,
+    widgetStyle: NomaWidgetStyle,
+    onWidgetStyleChange: (NomaWidgetStyle) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val snapshot by viewModel.snapshot.collectAsState()
@@ -288,6 +297,7 @@ private fun NotesListScreen(
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
+    var showWidgetStyles by remember { mutableStateOf(false) }
 
     deleting?.let { note ->
         DeleteConfirmation(
@@ -305,7 +315,21 @@ private fun NotesListScreen(
                 onAppearanceChange(it)
                 showAppearance = false
             },
-            onDismiss = { showAppearance = false }
+            onDismiss = { showAppearance = false },
+            onWidgetStyles = {
+                showAppearance = false
+                showWidgetStyles = true
+            }
+        )
+    }
+    if (showWidgetStyles) {
+        WidgetStyleDialog(
+            selected = widgetStyle,
+            onSelect = {
+                onWidgetStyleChange(it)
+                showWidgetStyles = false
+            },
+            onDismiss = { showWidgetStyles = false }
         )
     }
 
@@ -1034,7 +1058,8 @@ private fun EmptyEditorPane() {
 private fun AppearanceDialog(
     selected: NomaAppearance,
     onSelect: (NomaAppearance) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onWidgetStyles: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1058,6 +1083,53 @@ private fun AppearanceDialog(
                         Text(stringResource(label), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onWidgetStyles) {
+                Text(stringResource(R.string.widget_style_settings))
+            }
+        }
+    )
+}
+
+@Composable
+private fun WidgetStyleDialog(
+    selected: NomaWidgetStyle,
+    onSelect: (NomaWidgetStyle) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val styles = listOf(
+        NomaWidgetStyle.MATERIAL_YOU to R.string.widget_style_material_you,
+        NomaWidgetStyle.FROSTED_GREEN to R.string.widget_style_frosted_green,
+        NomaWidgetStyle.LIQUID_GLASS to R.string.widget_style_liquid_glass
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.widget_style_settings)) },
+        text = {
+            Column {
+                styles.forEach { (style, label) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .defaultMinSize(minHeight = 56.dp)
+                            .clickable { onSelect(style) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selected == style, onClick = null)
+                        Spacer(Modifier.width(NomaSpacing.comfortable))
+                        Text(stringResource(label), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                Spacer(Modifier.height(NomaSpacing.small))
+                Text(
+                    stringResource(R.string.widget_style_glass_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         },
         confirmButton = {
