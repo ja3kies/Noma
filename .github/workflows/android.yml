@@ -2,7 +2,7 @@ name: Android validation
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "feature/**", "fix/**"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -46,7 +46,7 @@ jobs:
 
   instrumentation:
     needs: build-and-test
-    if: startsWith(github.ref, 'refs/heads/feature/') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/fix/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
