@@ -763,9 +763,6 @@ private fun NoteCard(
     onMenuOpen: () -> Unit
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
-    LaunchedEffect(note.id, selected) {
-        if (!selected) menuExpanded = false
-    }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
@@ -822,10 +819,13 @@ private fun NoteCard(
                 )
             }
             Box {
-                IconButton(onClick = {
-                    onMenuOpen()
-                    menuExpanded = true
-                }) {
+                IconButton(
+                    onClick = {
+                        onMenuOpen()
+                        menuExpanded = true
+                    },
+                    modifier = Modifier.testTag("noma_note_actions_${note.id}")
+                ) {
                     Icon(
                         Icons.Outlined.MoreHoriz,
                         contentDescription = stringResource(R.string.note_actions_for, title)
@@ -863,6 +863,7 @@ private fun NoteActionsMenu(
         if (showPinAction && !note.isArchived) {
             DropdownMenuItem(
                 text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
+                enabled = destructiveEnabled,
                 onClick = { onDismiss(); onPin() },
                 leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
             )
@@ -880,7 +881,7 @@ private fun NoteActionsMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.share_note)) },
-            enabled = note.title.isNotBlank() || note.body.isNotBlank(),
+            enabled = destructiveEnabled && (note.title.isNotBlank() || note.body.isNotBlank()),
             onClick = { onDismiss(); onShare() },
             leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
         )
@@ -903,7 +904,7 @@ private fun NoteEditorScreen(
     expanded: Boolean
 ) {
     var confirmDelete by rememberSaveable(note.id) { mutableStateOf(false) }
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember(note.id) { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     val context = LocalContext.current
@@ -1006,7 +1007,11 @@ private fun NoteEditorScreen(
                     PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
                         portableScope.launch { snackbar.showSnackbar(message) }
                     })
-                    IconButton(onClick = { viewModel.togglePin(note) }) {
+                    IconButton(
+                        onClick = { viewModel.togglePin(note) },
+                        enabled = saveState == EditorSaveState.Saved,
+                        modifier = Modifier.testTag("noma_editor_pin")
+                    ) {
                         Icon(
                             Icons.Outlined.PushPin,
                             contentDescription = stringResource(
@@ -1017,7 +1022,10 @@ private fun NoteEditorScreen(
                         )
                     }
                     Box {
-                        IconButton(onClick = { menuExpanded = true }) {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.testTag("noma_editor_actions")
+                        ) {
                             Icon(
                                 Icons.Outlined.MoreHoriz,
                                 contentDescription = stringResource(R.string.note_actions)
@@ -1154,7 +1162,9 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                TextButton(onClick = onRetry, modifier = Modifier.testTag("noma_retry_save")) {
+                    Text(stringResource(R.string.retry))
+                }
             }
         }
     }
