@@ -115,4 +115,5 @@
     <string name="portable_import_details">%1$d new notes · %2$d already present · %3$d pinned · %4$d archived</string>
     <string name="incoming_share_preview_truncated">Preview shows the first %1$d of %2$d characters. The full text will be saved.</string>
     <string name="note_actions_for">Actions for %1$s</string>
+    <string name="portable_import_in_progress">Importing…</string>
 </resources>
