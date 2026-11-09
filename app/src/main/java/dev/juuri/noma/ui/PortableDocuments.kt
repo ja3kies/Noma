@@ -3,11 +3,14 @@ package dev.juuri.noma.ui
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ImportExport
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +48,7 @@ internal fun PortableDocuments(
     val exportFailure = stringResource(R.string.portable_export_failed)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var importMenu by remember { mutableStateOf(false) }
+    var actionsExpanded by remember { mutableStateOf(false) }
     var confirmPlaintextExport by remember { mutableStateOf(false) }
     val exporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -134,33 +137,42 @@ internal fun PortableDocuments(
             }
         }
     }
-    Row {
-        Box {
-            TextButton(
-                onClick = { importMenu = true },
-                enabled = !busy && snapshot is NotesSnapshot.Ready
-            ) { Text(stringResource(R.string.portable_import_action)) }
-            DropdownMenu(expanded = importMenu, onDismissRequest = { importMenu = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.portable_import_json)) },
-                    onClick = {
-                        importMenu = false
-                        importer.launch(arrayOf("application/json"))
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.portable_import_text)) },
-                    onClick = {
-                        importMenu = false
-                        textImporter.launch(arrayOf("text/plain", "text/markdown", "text/x-markdown"))
-                    }
-                )
-            }
-        }
-        TextButton(
-            onClick = { confirmPlaintextExport = true },
+    Box {
+        IconButton(
+            onClick = { actionsExpanded = true },
             enabled = !busy && snapshot is NotesSnapshot.Ready
-        ) { Text(stringResource(R.string.portable_export_json)) }
+        ) {
+            Icon(
+                Icons.Outlined.ImportExport,
+                contentDescription = stringResource(R.string.portable_actions)
+            )
+        }
+        DropdownMenu(
+            expanded = actionsExpanded,
+            onDismissRequest = { actionsExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.portable_import_json)) },
+                onClick = {
+                    actionsExpanded = false
+                    importer.launch(arrayOf("application/json"))
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.portable_import_text)) },
+                onClick = {
+                    actionsExpanded = false
+                    textImporter.launch(arrayOf("text/plain", "text/markdown", "text/x-markdown"))
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.portable_export_json)) },
+                onClick = {
+                    actionsExpanded = false
+                    confirmPlaintextExport = true
+                }
+            )
+        }
     }
     if (confirmPlaintextExport) {
         AlertDialog(
