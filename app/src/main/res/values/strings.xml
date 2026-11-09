@@ -89,4 +89,5 @@
         <item quantity="other">%d results</item>
     </plurals>
     <string name="portable_actions">Import and export notes</string>
+    <string name="save_before_navigation">Save the current note before switching or deleting it.</string>
 </resources>
