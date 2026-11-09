@@ -212,8 +212,10 @@ class NotesViewModel(
     /** Launcher/widget capture never discards the active unsaved editor. */
     fun requestQuickNote() {
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
-            quickNoteRequestedAfterSave = true
-            eventChannel.trySend(NoteUiEvent.QuickCaptureDeferred)
+            if (!quickNoteRequestedAfterSave) {
+                quickNoteRequestedAfterSave = true
+                eventChannel.trySend(NoteUiEvent.QuickCaptureDeferred)
+            }
         } else {
             createNote()
         }
@@ -261,6 +263,10 @@ class NotesViewModel(
         _saveState.value = EditorSaveState.Saved
     }
 
+    fun cancelDeferredQuickNote() {
+        quickNoteRequestedAfterSave = false
+    }
+
     fun closeNote() {
         // If the user explicitly discards an unsaved draft, do not leave a
         // queued widget action that could unexpectedly open a note much later.
@@ -279,7 +285,11 @@ class NotesViewModel(
     }
 
     fun togglePin(note: Note) {
-        val changed = note.copy(isPinned = !note.isPinned)
+        // List cards can lag behind unsaved editor changes on wide screens.
+        // Never replace the editor text with a stale list snapshot.
+        val current = _active.value?.takeIf { it.id == note.id } ?: note
+        if (current.isArchived) return
+        val changed = current.copy(isPinned = !current.isPinned)
         if (_active.value?.id == note.id) {
             updateActive(changed)
         } else {
@@ -296,16 +306,18 @@ class NotesViewModel(
     }
 
     fun retrySave() {
+        if (_saveState.value !is EditorSaveState.Failed) return
         _active.value?.let(::updateActive)
     }
 
     fun deleteNote(note: Note) {
+        val current = _active.value?.takeIf { it.id == note.id } ?: note
         if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
         if (_active.value?.id == note.id) closeNote()
-        operations.trySend(WriteOperation.Delete(note))
+        operations.trySend(WriteOperation.Delete(current))
     }
 
     fun undoDelete(note: Note) {
@@ -313,12 +325,13 @@ class NotesViewModel(
     }
 
     fun toggleArchive(note: Note) {
+        val current = _active.value?.takeIf { it.id == note.id } ?: note
         if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
         if (_active.value?.id == note.id) closeNote()
-        operations.trySend(WriteOperation.Archive(note))
+        operations.trySend(WriteOperation.Archive(current))
     }
 
     fun undoArchive(note: Note) {
