@@ -262,6 +262,9 @@ class NotesViewModel(
     }
 
     fun closeNote() {
+        // If the user explicitly discards an unsaved draft, do not leave a
+        // queued widget action that could unexpectedly open a note much later.
+        quickNoteRequestedAfterSave = false
         editorRevision++
         _active.value = null
         _saveState.value = EditorSaveState.Saved
