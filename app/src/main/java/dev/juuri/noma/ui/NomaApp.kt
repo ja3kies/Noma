@@ -1171,12 +1171,16 @@ private fun WidgetStyleDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.widget_style_settings)) },
         text = {
-            Column {
+            Column(Modifier.selectableGroup().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                 styles.forEach { (style, label) ->
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .defaultMinSize(minHeight = 56.dp)
-                            .clickable { onSelect(style) },
+                            .selectable(
+                                selected = selected == style,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(style) }
+                            ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selected == style, onClick = null)
