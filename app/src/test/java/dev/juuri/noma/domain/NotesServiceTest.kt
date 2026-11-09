@@ -293,6 +293,56 @@ class NotesServiceTest {
         }
     }
 
+    @Test fun searchRanksExactTitleAheadOfMoreRecentBodyMatches() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("body", title = "Another item", body = "Project", time = 5000L),
+            note("prefix", title = "Project planning", time = 300L),
+            note("exact", title = "Project", time = 100L)
+        )
+        assertEquals(
+            listOf("exact", "prefix", "body"),
+            service.visible(notes, "project", false).map { it.id }
+        )
+    }
+
+    @Test fun searchRelevancePrioritizesCrossFieldTitleMatches() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("body", title = "Other", body = "cafe reunion", time = 900L),
+            note("cross", title = "Réunion", body = "café", time = 50L),
+            note("title", title = "Réunion café", time = 10L)
+        )
+        assertEquals(
+            listOf("title", "cross", "body"),
+            service.visible(notes, "reunion cafe", false).map { it.id }
+        )
+    }
+
+    @Test fun emptySearchPreservesPinnedAndRecentOrdering() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("recent", "Alpha", time = 200L),
+            note("pinned", "Zulu", pinned = true, time = 1L)
+        )
+        assertEquals(
+            listOf("pinned", "recent"),
+            service.visible(notes, "", false).map { it.id }
+        )
+    }
+
+    @Test fun searchTiesHonorSelectedTitleSort() {
+        val service = NotesService(MemoryRepository())
+        val notes = listOf(
+            note("z", "Project Zoo", time = 200L),
+            note("a", "Project Apple", time = 50L)
+        )
+        assertEquals(
+            listOf("a", "z"),
+            service.visible(notes, "project", false, sort = NoteSort.TITLE).map { it.id }
+        )
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
