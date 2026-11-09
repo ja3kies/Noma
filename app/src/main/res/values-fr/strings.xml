@@ -120,4 +120,5 @@
     <string name="alphabetical_section">A–Z</string>
     <string name="delete_confirm_body_named">Supprimer « %1$s » ? Vous pourrez annuler cette action pendant un instant.</string>
     <string name="share_unavailable">Aucune application compatible n’est disponible pour le partage.</string>
+    <string name="creating_note">Création de la note…</string>
 </resources>
