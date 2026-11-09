@@ -36,7 +36,7 @@ class NotesService(
         archivedOnly: Boolean = false,
         sort: NoteSort = NoteSort.RECENT
     ): List<Note> {
-        val term = query.trim().lowercase(Locale.ROOT)
+        val words = NoteSearch.terms(query)
         val pinnedFirst = compareByDescending<Note> { !archivedOnly && it.isPinned }
         val comparator = when (sort) {
             NoteSort.RECENT -> pinnedFirst.thenByDescending { it.updatedAt }.thenBy { it.id }
@@ -48,11 +48,7 @@ class NotesService(
         return notes.asSequence()
             .filter { it.isArchived == archivedOnly }
             .filter { !pinnedOnly || it.isPinned }
-            .filter {
-                term.isEmpty() ||
-                    it.title.lowercase(Locale.ROOT).contains(term) ||
-                    it.body.lowercase(Locale.ROOT).contains(term)
-            }
+            .filter { NoteSearch.matches(it, words) }
             .sortedWith(comparator)
             .toList()
     }
