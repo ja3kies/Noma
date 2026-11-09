@@ -222,6 +222,33 @@ class NotesServiceTest {
         assertTrue(NoteSearch.matches(candidate, "noma"))
     }
 
+    @Test fun contextualExcerptPrioritizesWordsMissingFromTitle() {
+        val candidate = note(
+            "cross", title = "Réunion d'équipe",
+            body = "Réunion avec le groupe\nDocuments à préparer et café à acheter"
+        )
+        assertEquals(
+            "Documents à préparer et café à acheter",
+            NoteSearch.matchingPreview(candidate, "reunion cafe")
+        )
+    }
+
+    @Test fun contextualExcerptPrefersLineCoveringMostSearchTerms() {
+        val candidate = note(
+            "score", title = "Courses",
+            body = "Acheter le café\nAcheter le café et le lait\nPrendre le lait"
+        )
+        assertEquals(
+            "Acheter le café et le lait",
+            NoteSearch.matchingPreview(candidate, "cafe lait")
+        )
+    }
+
+    @Test fun titleOnlyMatchFallsBackToFirstNonemptyBodyLine() {
+        val candidate = note("first", title = "Essai", body = "\n Premier paragraphe\nSuite")
+        assertEquals("Premier paragraphe", NoteSearch.matchingPreview(candidate, "essai"))
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
