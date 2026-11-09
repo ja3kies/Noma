@@ -76,6 +76,7 @@
     <string name="portable_export_result">Exported %1$d notes</string>
     <string name="portable_import_result">Imported %1$d notes; skipped %2$d existing</string>
     <string name="portable_export_failed">Export failed: %1$s</string>
+    <string name="portable_export_unsaved_edits">A note has unsaved changes. Retry saving or explicitly discard them before exporting.</string>
     <string name="portable_import_failed">Import failed: %1$s</string>
     <string name="portable_not_ready">Notes are still loading</string>
     <string name="portable_read_failed">Unable to read this file</string>

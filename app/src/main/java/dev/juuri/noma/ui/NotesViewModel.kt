@@ -31,6 +31,9 @@ sealed interface EditorSaveState {
     data class Failed(val message: String) : EditorSaveState
 }
 
+/** Prevents a stale export from appearing complete while the editor has unsaved changes. */
+class UnsavedEditorChangesException : IllegalStateException("The current note has unsaved changes")
+
 private sealed interface WriteOperation {
     data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
@@ -107,6 +110,11 @@ class NotesViewModel(
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
                         is WriteOperation.ExportSnapshot -> {
+                            // Export is ordered behind queued saves. Refuse a stale backup
+                            // if the final editor write still has no disk acknowledgement.
+                            if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
+                                throw UnsavedEditorChangesException()
+                            }
                             val current = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
                                 ?: error("Notes not ready")
                             operation.result.complete(current.entries.toList())
@@ -141,7 +149,7 @@ class NotesViewModel(
                     // Only the newest editor failure should interrupt the user.
                     val relevantFailure = operation !is WriteOperation.Save ||
                         operation.editorRevision == null || currentEditorWrite
-                    if (relevantFailure &&
+                    if (relevantFailure && operation !is WriteOperation.ExportSnapshot &&
                         (operation !is WriteOperation.Import || operation.result == null)) {
                         eventChannel.send(NoteUiEvent.Failure(message))
                     }

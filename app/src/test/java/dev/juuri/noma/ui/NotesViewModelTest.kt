@@ -38,6 +38,7 @@ class NotesViewModelTest {
         override val notes: StateFlow<NotesSnapshot> = state
         var gate: CompletableDeferred<Unit>? = null
         var failWrites = false
+        var failNextWrites = 0
         var saveCallCount = 0
         var failImports = false
         var importGate: CompletableDeferred<Unit>? = null
@@ -45,6 +46,10 @@ class NotesViewModelTest {
         override suspend fun save(note: Note) {
             saveCallCount++
             gate?.await()
+            if (failNextWrites > 0) {
+                failNextWrites--
+                throw IllegalStateException("Simulated one-time disk failure")
+            }
             if (failWrites) throw IllegalStateException("Simulated disk failure")
             val old = (state.value as NotesSnapshot.Ready).entries
             state.value = NotesSnapshot.Ready(old.filterNot { it.id == note.id } + note)
@@ -625,7 +630,7 @@ class NotesViewModelTest {
         repo.failWrites = true
         val model = NotesViewModel(repo, NotesService(repo))
         val events = mutableListOf<NoteUiEvent>()
-        backgroundScope.launch { model.events.collect { events.add(it) } }
+        val observer = launch { model.events.collect { events.add(it) } }
         runCurrent()
         model.openNote(original)
         model.changeTitle("Draft title")
@@ -634,6 +639,131 @@ class NotesViewModelTest {
         assertEquals(1, events.filterIsInstance<NoteUiEvent.Failure>().size)
         assertTrue(model.saveState.value is EditorSaveState.Failed)
         assertEquals("Draft body", model.active.value?.body)
+        observer.cancel()
+    }
+
+
+    @Test fun failedDraftCannotBeSilentlyExportedAsCurrentBackup() = runTest {
+        val original = Note("id", "Document", "On disk", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Unsaved private work")
+        val task = async { runCatching { model.snapshotForExport() } }
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        assertTrue(task.await().exceptionOrNull() is UnsavedEditorChangesException)
+        assertEquals("On disk", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+        assertEquals("Unsaved private work", model.active.value?.body)
+    }
+
+    @Test fun queuedBackupRefusesExportWhenPendingWriteFails() = runTest {
+        val original = Note("id", "Document", "Old", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeTitle("Uncommitted title")
+        val task = async { runCatching { model.snapshotForExport() } }
+        runCurrent()
+        assertTrue(!task.isCompleted)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(task.await().exceptionOrNull() is UnsavedEditorChangesException)
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+    }
+
+    @Test fun retryAfterFailedSaveAllowsFreshCompleteBackup() = runTest {
+        val original = Note("id", "Document", "Old", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Recovered latest text")
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        repo.failWrites = false
+        model.retrySave()
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        val export = async { model.snapshotForExport() }
+        advanceUntilIdle()
+        assertEquals("Recovered latest text", export.await().single().body)
+    }
+
+    @Test fun deliberateDiscardOfFailedDraftExportsOnlyCommittedText() = runTest {
+        val original = Note("id", "Document", "Last committed", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Discarded draft")
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        model.closeNote()
+        val export = async { model.snapshotForExport() }
+        advanceUntilIdle()
+        assertEquals("Last committed", export.await().single().body)
+        assertEquals(null, model.active.value)
+    }
+
+    @Test fun latestSuccessfulWriteCanBeExportedDespiteOlderFailure() = runTest {
+        val original = Note("id", "Document", "Old", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failNextWrites = 1
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeTitle("New title")
+        model.changeBody("New body")
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        val exported = async { model.snapshotForExport() }
+        advanceUntilIdle()
+        assertEquals("New title", exported.await().single().title)
+        assertEquals("New body", exported.await().single().body)
+        assertEquals(2, repo.saveCallCount)
+    }
+
+    @Test fun discoveryFiltersCannotBypassUncommittedExportProtection() = runTest {
+        val original = Note("id", "Document", "Saved", true, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Failed edit")
+        model.onQueryChange("different")
+        model.togglePinnedOnly()
+        model.toggleArchiveView()
+        model.selectSort(NoteSort.TITLE)
+        val result = async { runCatching { model.snapshotForExport() } }
+        advanceUntilIdle()
+        assertTrue(result.await().exceptionOrNull() is UnsavedEditorChangesException)
+        assertEquals("Saved", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+    @Test fun blockedExportDoesNotEmitDuplicateGlobalFailure() = runTest {
+        val original = Note("id", "Document", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Failed edit")
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        // Consume the editor write error so only the export's own UI handles its failure.
+        val existing = async { model.events.first() }
+        runCurrent()
+        assertTrue(existing.await() is NoteUiEvent.Failure)
+        val extraEvents = mutableListOf<NoteUiEvent>()
+        val observer = launch { model.events.collect { extraEvents.add(it) } }
+        runCurrent()
+        val blocked = async { runCatching { model.snapshotForExport() } }
+        advanceUntilIdle()
+        assertTrue(blocked.await().exceptionOrNull() is UnsavedEditorChangesException)
+        assertTrue(extraEvents.none { it is NoteUiEvent.Failure })
+        observer.cancel()
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {

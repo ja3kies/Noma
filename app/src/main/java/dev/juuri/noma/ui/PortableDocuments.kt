@@ -52,6 +52,7 @@ internal fun PortableDocuments(
     val importFailure = stringResource(R.string.portable_import_failed)
     val verificationFailure = stringResource(R.string.portable_verify_failed)
     val exportFailure = stringResource(R.string.portable_export_failed)
+    val unsavedExport = stringResource(R.string.portable_export_unsaved_edits)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var inspectedArchive by remember { mutableStateOf<NotesArchiveSummary?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -80,7 +81,9 @@ internal fun PortableDocuments(
                         else unverifiedExport
                     )
                 } catch (e: Exception) {
-                    onMessage(exportFailure.format(e.localizedMessage ?: writeFailed))
+                    val reason = if (e is UnsavedEditorChangesException) unsavedExport
+                        else e.localizedMessage ?: writeFailed
+                    onMessage(exportFailure.format(reason))
                 } finally { busy = false }
             }
         }
