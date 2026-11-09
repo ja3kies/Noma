@@ -28,7 +28,7 @@ import kotlinx.coroutines.withContext
 
 /** Export a snapshot of the current note to the user-selected document destination. */
 @Composable
-internal fun PortableNoteExport(note: Note, onMessage: (String) -> Unit) {
+internal fun PortableNoteExport(note: Note, enabled: Boolean, onMessage: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
@@ -66,7 +66,7 @@ internal fun PortableNoteExport(note: Note, onMessage: (String) -> Unit) {
         ActivityResultContracts.CreateDocument("text/markdown")
     ) { uri -> write(uri, true) }
     Box {
-        IconButton(onClick = { expanded = true }, enabled = !busy) {
+        IconButton(onClick = { expanded = true }, enabled = !busy && enabled) {
             Icon(Icons.Outlined.FileDownload, contentDescription = stringResource(R.string.portable_export_note))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
