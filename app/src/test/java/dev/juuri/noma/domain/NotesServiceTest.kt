@@ -42,6 +42,38 @@ class NotesServiceTest {
         assertEquals(saved, repo.list().single())
     }
 
+    @Test fun capturedTextIsPersistedAtomicallyWithTitleAndBody() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo, { 42L }, { "share-unique-id" })
+        val note = service.captureText("A relevant title", "Text received from another app\n🦊")
+        assertEquals("share-unique-id", note.id)
+        assertEquals(42L, note.createdAt)
+        assertEquals(42L, note.updatedAt)
+        assertEquals("A relevant title", note.title)
+        assertEquals("Text received from another app\n🦊", note.body)
+        assertEquals(note, repo.list().single())
+    }
+
+    @Test fun blankSharedTextIsRejectedWithoutSavingAnything() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo)
+        try {
+            service.captureText("Subject", " \n ")
+            org.junit.Assert.fail("Blank share accepted")
+        } catch (_: IllegalArgumentException) { }
+        assertTrue(repo.list().isEmpty())
+    }
+
+    @Test fun tooLargeSharedTextIsRejectedWithoutSavingAnything() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo)
+        try {
+            service.captureText("", "x".repeat(100_001))
+            org.junit.Assert.fail("Oversized share accepted")
+        } catch (_: IllegalArgumentException) { }
+        assertTrue(repo.list().isEmpty())
+    }
+
     @Test fun updatesTimestampAndContent() = runBlocking {
         val repo = MemoryRepository()
         val service = NotesService(repo, { 100L })
