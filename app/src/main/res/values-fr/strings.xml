@@ -104,4 +104,5 @@
     <string name="widget_style_frosted_green">Vert dépoli</string>
     <string name="widget_style_liquid_glass">Liquid Glass</string>
     <string name="widget_style_glass_note">Les styles translucides dépendent du lanceur et ne floutent pas le fond d’écran en temps réel.</string>
+    <string name="quick_capture_deferred">La nouvelle note s’ouvrira après l’enregistrement du brouillon actuel.</string>
 </resources>
