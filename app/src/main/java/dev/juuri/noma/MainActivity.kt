@@ -7,6 +7,8 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import dev.juuri.noma.capture.AndroidCaptureIntents
 import dev.juuri.noma.capture.CaptureRequest
+import dev.juuri.noma.capture.NomaWidgetPreferences
+import dev.juuri.noma.capture.NomaQuickCaptureWidget
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -110,6 +112,9 @@ class MainActivity : ComponentActivity() {
             var appearance by remember {
                 mutableStateOf(NomaAppearance.fromStorage(preferences.getString("mode", null)))
             }
+            var widgetStyle by remember {
+                mutableStateOf(NomaWidgetPreferences.read(applicationContext))
+            }
             val dark = isNomaDark(appearance)
             SideEffect {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -121,6 +126,13 @@ class MainActivity : ComponentActivity() {
                 NomaApp(
                     viewModel = notesViewModel,
                     appearance = appearance,
+                    widgetStyle = widgetStyle,
+                    onWidgetStyleChange = { selected ->
+                        // Write first, then notify the widget host. The choice survives restarts.
+                        NomaWidgetPreferences.save(applicationContext, selected)
+                        widgetStyle = selected
+                        NomaQuickCaptureWidget.refreshAll(applicationContext)
+                    },
                     onAppearanceChange = { selected ->
                         appearance = selected
                         preferences.edit().putString("mode", selected.name).apply()
