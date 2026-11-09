@@ -132,13 +132,40 @@ class NomaUiTest {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(viewModel) } }
-        compose.onNodeWithTag("noma_new_note").performClick()
+        // Empty notebook offers the centered action, not a duplicate FAB.
+        compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
+        compose.onNodeWithText("New note").performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
         compose.onNodeWithTag("noma_title_input").performTextInput("Weekend plan")
         compose.onNodeWithTag("noma_editor_back").performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_note_list"))
         compose.onNodeWithTag("noma_search").performTextInput("Weekend")
         compose.onNodeWithText("Weekend plan").assertExists()
+    }
+
+    @Test fun populatedNotebookRetainsTheFastCreationFab() {
+        val repo = FakeRepository(listOf(
+            Note("existing", "Present note", "Body", false, 1L, 2L)
+        ))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_new_note").assertExists()
+    }
+
+    @Test fun sectionTitleFollowsSortAndSearchInsteadOfClaimingEverythingIsRecent() {
+        val repo = FakeRepository(listOf(
+            Note("a", "Café", "Bring coffee", false, 1L, 2L),
+            Note("b", "Agenda", "Plan", false, 2L, 3L)
+        ))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithText("Recent").assertExists()
+        compose.onNodeWithContentDescription("Sort notes").performClick()
+        compose.onNodeWithText("Title (A–Z)").performClick()
+        compose.onNodeWithText("A–Z").assertExists()
+        compose.onNodeWithTag("noma_search").performTextInput("Cafe")
+        compose.onNodeWithText("Search results").assertExists()
+        compose.onNodeWithText("Café").assertExists()
     }
 
     @Test fun clearingSearchFiltersRestoresAllNotes() {
