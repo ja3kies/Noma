@@ -90,4 +90,12 @@
     </plurals>
     <string name="portable_actions">Importer et exporter des notes</string>
     <string name="save_before_navigation">Enregistrez la note actuelle avant de changer de note ou de la supprimer.</string>
+    <string name="shortcut_new_note">Nouvelle note</string>
+    <string name="shortcut_new_note_detail">Saisir une note dans Noma</string>
+    <string name="incoming_share_title">Enregistrer le texte partagé ?</string>
+    <string name="incoming_share_body">Vérifiez ce texte avant de créer une note sur cet appareil.</string>
+    <string name="incoming_share_confirm">Enregistrer</string>
+    <string name="incoming_share_discard">Ignorer</string>
+    <string name="incoming_share_saved">Texte partagé enregistré dans Noma</string>
+    <string name="incoming_share_size">%1$d caractères</string>
 </resources>
