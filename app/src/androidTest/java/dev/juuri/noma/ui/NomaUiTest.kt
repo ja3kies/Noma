@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -471,13 +472,32 @@ class NomaUiTest {
         compose.waitUntil(10_000) {
             repo.saveAttempts > before && model.saveState.value is EditorSaveState.Failed
         }
-        compose.onNodeWithTag("noma_retry_save").assertExists()
+        compose.waitForIdle() // The same failure text can be conflated across rapid retries.
+        compose.onNodeWithTag("noma_retry_save").assertExists().assertIsDisplayed()
+        val secondBefore = repo.saveAttempts
         compose.runOnIdle {
             assertTrue(model.active.value?.body?.contains("added") == true)
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
             repo.failWrites = false
         }
         compose.onNodeWithTag("noma_retry_save").performClick()
-        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+        try {
+            compose.waitUntil(10_000) { repo.saveAttempts > secondBefore }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Second Retry click did not start a write; attempts=${repo.saveAttempts}, " +
+                    "before=$secondBefore, state=${model.saveState.value}", failure
+            )
+        }
+        try {
+            compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Second Retry write did not commit; attempts=${repo.saveAttempts}, " +
+                    "state=${model.saveState.value}, disk=${(repo.notes.value as NotesSnapshot.Ready).entries.single().body}",
+                failure
+            )
+        }
         compose.runOnIdle {
             assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.single().body.contains("added"))
         }
@@ -570,6 +590,66 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
         compose.waitUntil(5_000) { !model.archivedOnly.value }
         compose.onNodeWithTag("noma_new_note").assertExists()
+    }
+
+
+    @Test fun pendingExportMenuExplainsWhyBackupIsDisabled() {
+        val repo = FakeRepository()
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = repo.notes.value,
+                    onImport = { 0 },
+                    snapshotForExport = { emptyList() },
+                    onMessage = {},
+                    canExport = false
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Finish saving before exporting").assertIsNotEnabled()
+        compose.onNodeWithText("Check backup file").assertExists()
+        compose.onNodeWithText("Import JSON").assertExists()
+    }
+
+    @Test fun confirmationDisablesExportIfNoteBecomesDirtyBeforeFinalConsent() {
+        val ready = mutableStateOf(true)
+        val repo = FakeRepository()
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = repo.notes.value,
+                    onImport = { 0 },
+                    snapshotForExport = { emptyList() },
+                    onMessage = {},
+                    canExport = ready.value
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Export JSON").performClick()
+        compose.onNodeWithText("Unencrypted export").assertExists()
+        compose.runOnIdle { ready.value = false }
+        compose.onNodeWithText("Export JSON").assertIsNotEnabled()
+        compose.onNodeWithText("A note is still being created or captured. Finish that operation before exporting.").assertExists()
+    }
+
+    @Test fun existingNoteCardCannotInterruptSlowCreation() {
+        val existing = Note("existing", "Existing note", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(existing))
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_new_note").performClick()
+        compose.waitUntil(5_000) { model.creating.value }
+        compose.onNodeWithTag("noma_note_existing").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_note_actions_existing").assertIsNotEnabled()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
+        compose.runOnIdle {
+            assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
