@@ -127,6 +127,21 @@ class NotesViewModelTest {
         assertTrue(model.active.value != null)
     }
 
+    @Test fun failedQuickCapturePreservesCurrentSearchAndFilters() = runTest {
+        val old = Note("existing", "Keep me", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.onQueryChange("keep")
+        model.togglePinnedOnly()
+        model.createNote()
+        advanceUntilIdle()
+        assertEquals("keep", model.query.value)
+        assertEquals(true, model.pinnedOnly.value)
+        assertEquals(null, model.active.value)
+        assertEquals(false, model.creating.value)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
