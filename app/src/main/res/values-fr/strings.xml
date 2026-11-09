@@ -107,4 +107,8 @@
     <string name="quick_capture_deferred">La nouvelle note s’ouvrira après l’enregistrement du brouillon actuel.</string>
     <string name="widget_style_save_error">Impossible d’enregistrer l’apparence du widget.</string>
     <string name="portable_export_unverified">Export écrit, mais le fournisseur de fichiers empêche sa vérification. Vérifiez le fichier JSON avant de compter sur cette sauvegarde.</string>
+    <string name="portable_verify_action">Vérifier une sauvegarde</string>
+    <string name="portable_verify_success_title">Fichier de sauvegarde lisible</string>
+    <string name="portable_verify_summary">%1$d notes · %2$d épinglées · %3$d archivées</string>
+    <string name="portable_verify_no_import">Le fichier a été vérifié sans importer ni modifier de notes.</string>
 </resources>

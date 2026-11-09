@@ -107,4 +107,8 @@
     <string name="quick_capture_deferred">Your new note will open after the current draft is saved.</string>
     <string name="widget_style_save_error">Widget appearance could not be saved.</string>
     <string name="portable_export_unverified">Export written, but the file provider does not allow verification. Check the JSON file before relying on this backup.</string>
+    <string name="portable_verify_action">Check backup file</string>
+    <string name="portable_verify_success_title">Backup file is readable</string>
+    <string name="portable_verify_summary">%1$d notes · %2$d pinned · %3$d archived</string>
+    <string name="portable_verify_no_import">The file was checked without importing or changing any notes.</string>
 </resources>
