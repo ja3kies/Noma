@@ -83,4 +83,5 @@
     <string name="portable_note_export_done">Note exportée</string>
     <string name="portable_export_warning_title">Export non chiffré</string>
     <string name="portable_export_warning_detail">Cette archive contient toutes les notes en texte lisible. Enregistrez-la uniquement dans un emplacement fiable et supprimez les copies non souhaitées.</string>
+    <string name="clear_all_filters">Effacer la recherche et les filtres</string>
 </resources>
