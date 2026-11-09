@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
             null
         }
         when (request) {
-            is CaptureRequest.NewNote -> notesViewModel.createNote()
+            is CaptureRequest.NewNote -> notesViewModel.requestQuickNote()
             is CaptureRequest.SharedText -> notesViewModel.receiveSharedText(request)
             null -> Unit
         }
