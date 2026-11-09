@@ -70,6 +70,20 @@ class NomaUiTest {
         compose.onNodeWithText("Réunion").assertExists()
     }
 
+    @Test fun accentInsensitiveSearchShowsMatchingNoteAndRelevantBodyLine() {
+        val note = Note(
+            "accent", "Réunion", "Un premier paragraphe\nPréparer le café avec Nadia",
+            false, 1L, 2L
+        )
+        val repo = FakeRepository(listOf(note))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_search").performTextInput("reunion cafe")
+        compose.onNodeWithText("Réunion").assertExists()
+        compose.onNodeWithText("Préparer le café avec Nadia").assertExists()
+        compose.onNodeWithText("1 result").assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
