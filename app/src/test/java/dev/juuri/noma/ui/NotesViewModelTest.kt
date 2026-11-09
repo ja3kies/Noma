@@ -34,6 +34,8 @@ class NotesViewModelTest {
         override val notes: StateFlow<NotesSnapshot> = state
         var gate: CompletableDeferred<Unit>? = null
         var failWrites = false
+        var failImports = false
+        var importGate: CompletableDeferred<Unit>? = null
 
         override suspend fun save(note: Note) {
             gate?.await()
@@ -46,6 +48,8 @@ class NotesViewModelTest {
             state.value = NotesSnapshot.Ready(old.filterNot { it.id == id })
         }
         override suspend fun importMissing(notes: List<Note>): Int {
+            importGate?.await()
+            if (failImports) throw IllegalStateException("Simulated import failure")
             val old = (state.value as NotesSnapshot.Ready).entries
             val ids = old.mapTo(HashSet<String>()) { it.id }
             val missing = notes.filter { ids.add(it.id) }
@@ -335,6 +339,38 @@ class NotesViewModelTest {
         repo.failWrites = false
         model.retrySave()
         advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun acknowledgedImportWaitsForRepositoryCommit() = runTest {
+        val old = Note("old", "Existing", "", false, 1L, 1L)
+        val incoming = Note("new", "Imported", "Body", false, 2L, 3L)
+        val repo = FakeRepository(old)
+        repo.importGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val task = async { model.importNotesAwait(listOf(incoming)) }
+        runCurrent()
+        assertTrue(!task.isCompleted)
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        repo.importGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, task.await())
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun failedImportReportsFailureWithoutInsertingAndCanRetry() = runTest {
+        val old = Note("old", "Original", "", false, 1L, 1L)
+        val incoming = Note("new", "Restored", "Content", false, 4L, 5L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        repo.failImports = true
+        try {
+            model.importNotesAwait(listOf(incoming))
+            org.junit.Assert.fail("Failed import incorrectly acknowledged")
+        } catch (_: IllegalStateException) { }
+        assertEquals(listOf(old), (repo.notes.value as NotesSnapshot.Ready).entries)
+        repo.failImports = false
+        assertEquals(1, model.importNotesAwait(listOf(incoming)))
         assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
