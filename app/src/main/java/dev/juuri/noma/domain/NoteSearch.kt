@@ -55,6 +55,55 @@ object NoteSearch {
         }
     }
 
+    /**
+     * Original UTF-16 ranges for each visible match. Unlike lowercase-only
+     * substring search this handles accents, ligatures and supplementary code
+     * points without changing the source text or the editor selection.
+     */
+    fun matchRanges(text: String, query: String, maxMatches: Int = 24): List<IntRange> {
+        val words = terms(query).distinct()
+        if (words.isEmpty() || text.isEmpty() || maxMatches <= 0) return emptyList()
+        val folded = StringBuilder()
+        val starts = ArrayList<Int>()
+        val ends = ArrayList<Int>()
+        var index = 0
+        while (index < text.length) {
+            val point = Character.codePointAt(text, index)
+            val width = Character.charCount(point)
+            val representation = normalize(String(Character.toChars(point)))
+            repeat(representation.length) {
+                starts.add(index)
+                ends.add(index + width)
+            }
+            folded.append(representation)
+            index += width
+        }
+        val locations = ArrayList<IntRange>()
+        for (word in words) {
+            var from = 0
+            while (locations.size < maxMatches) {
+                val found = folded.indexOf(word, from)
+                if (found < 0) break
+                val last = found + word.length - 1
+                if (found < starts.size && last < ends.size) {
+                    locations.add(starts[found] until ends[last])
+                }
+                from = found + word.length
+            }
+            if (locations.size >= maxMatches) break
+        }
+        val ordered = locations.sortedWith(compareBy<IntRange> { it.first }.thenBy { it.last })
+        if (ordered.isEmpty()) return ordered
+        val result = ArrayList<IntRange>()
+        for (range in ordered) {
+            val previous = result.lastOrNull()
+            if (previous != null && range.first <= previous.last + 1) {
+                result[result.lastIndex] = previous.first..maxOf(previous.last, range.last)
+            } else result.add(range)
+        }
+        return result
+    }
+
     private const val PREVIEW_LIMIT = 160
     private const val PREVIEW_LEADING_CONTEXT = 48
 
