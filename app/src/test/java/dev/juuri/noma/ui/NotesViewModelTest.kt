@@ -342,6 +342,29 @@ class NotesViewModelTest {
         assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
+    @Test fun discardedFailedDraftCancelsOldDeferredWidgetCapture() = runTest {
+        val original = Note("id", "Existing", "Original", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Unsaved edit")
+        model.requestQuickNote()
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+
+        // The user explicitly chooses Leave unsaved in the editor.
+        model.closeNote()
+        repo.failWrites = false
+        model.openNote(original)
+        model.changeTitle("After discard")
+        advanceUntilIdle()
+
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("id", model.active.value?.id)
+        assertEquals("After discard", model.active.value?.title)
+    }
+
     @Test fun acknowledgedImportWaitsForRepositoryCommit() = runTest {
         val old = Note("old", "Existing", "", false, 1L, 1L)
         val incoming = Note("new", "Imported", "Body", false, 2L, 3L)
