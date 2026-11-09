@@ -45,6 +45,7 @@ internal fun PortableDocuments(
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var busy by remember { mutableStateOf(false) }
     var importMenu by remember { mutableStateOf(false) }
+    var confirmPlaintextExport by remember { mutableStateOf(false) }
     val exporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -157,9 +158,27 @@ internal fun PortableDocuments(
             }
         }
         TextButton(
-            onClick = { exporter.launch("noma-notes.json") },
+            onClick = { confirmPlaintextExport = true },
             enabled = !busy && snapshot is NotesSnapshot.Ready
         ) { Text(stringResource(R.string.portable_export_json)) }
+    }
+    if (confirmPlaintextExport) {
+        AlertDialog(
+            onDismissRequest = { confirmPlaintextExport = false },
+            title = { Text(stringResource(R.string.portable_export_warning_title)) },
+            text = { Text(stringResource(R.string.portable_export_warning_detail)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmPlaintextExport = false
+                    exporter.launch("noma-notes.json")
+                }) { Text(stringResource(R.string.portable_export_json)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmPlaintextExport = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
     pending?.let { notes ->
         AlertDialog(
