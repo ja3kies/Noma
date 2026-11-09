@@ -62,7 +62,7 @@ class NomaUiTest {
             NomaTheme {
                 PortableDocuments(
                     snapshot = NotesSnapshot.Error("Local database unreadable"),
-                    onImport = {},
+                    onImport = { 0 },
                     snapshotForExport = { emptyList() },
                     onMessage = {}
                 )
