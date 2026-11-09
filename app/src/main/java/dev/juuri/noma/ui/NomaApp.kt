@@ -98,6 +98,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -310,7 +312,9 @@ private fun NotesListScreen(
                 TextField(
                     value = query,
                     onValueChange = viewModel::onQueryChange,
-                    modifier = Modifier.fillMaxWidth().testTag("noma_search"),
+                    modifier = Modifier.fillMaxWidth()
+                        .semantics { contentDescription = context.getString(R.string.search_hint) }
+                        .testTag("noma_search"),
                     singleLine = true,
                     shape = MaterialTheme.shapes.large,
                     placeholder = { Text(stringResource(R.string.search_hint)) },
@@ -407,7 +411,8 @@ private fun NotesListScreen(
                             pluralStringResource(R.plurals.search_results_total, filteredCount, filteredCount)
                         else pluralStringResource(R.plurals.note_total, count, count),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     )
                 }
             }
