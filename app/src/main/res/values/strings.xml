@@ -83,4 +83,5 @@
     <string name="portable_note_export_done">Note exported</string>
     <string name="portable_export_warning_title">Unencrypted export</string>
     <string name="portable_export_warning_detail">This archive contains every note in readable plaintext. Save it only to a trusted location and delete unintended copies.</string>
+    <string name="clear_all_filters">Clear search and filters</string>
 </resources>
