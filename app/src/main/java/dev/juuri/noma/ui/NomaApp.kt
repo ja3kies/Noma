@@ -593,7 +593,8 @@ private fun NoteCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (relevantPreview.isNotEmpty() && note.title.isNotBlank()) {
+                if (relevantPreview.isNotEmpty() &&
+                    (note.title.isNotBlank() || relevantPreview != note.displayTitle)) {
                     Spacer(Modifier.height(NomaSpacing.tiny))
                     Text(
                         text = relevantPreview,
