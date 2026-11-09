@@ -30,13 +30,44 @@ object NoteSearch {
         return terms.all { title.contains(it) || body.contains(it) }
     }
 
+    private const val PREVIEW_LIMIT = 160
+    private const val PREVIEW_LEADING_CONTEXT = 48
+
+    /**
+     * A long body line should reveal the actual matching passage rather than
+     * truncating it off screen. Return a bounded excerpt and preserve the original
+     * text, including accents and capitalization.
+     */
+    private fun excerpt(line: String, words: List<String>): String {
+        if (line.length <= PREVIEW_LIMIT) return line
+        val folded = StringBuilder()
+        val positions = ArrayList<Int>()
+        var original = 0
+        while (original < line.length) {
+            val cp = Character.codePointAt(line, original)
+            val piece = normalize(String(Character.toChars(cp)))
+            repeat(piece.length) { positions.add(original) }
+            folded.append(piece)
+            original += Character.charCount(cp)
+        }
+        val found = words.map { folded.indexOf(it) }.filter { it >= 0 }.minOrNull()
+        val hit = found?.let { positions.getOrNull(it) } ?: 0
+        val start = if (hit <= PREVIEW_LEADING_CONTEXT) 0
+            else (hit - PREVIEW_LEADING_CONTEXT).coerceAtMost(line.length - PREVIEW_LIMIT)
+        val end = (start + PREVIEW_LIMIT).coerceAtMost(line.length)
+        return (if (start > 0) "…" else "") +
+            line.substring(start, end).trim() +
+            (if (end < line.length) "…" else "")
+    }
+
     /** The nearest body line with a match makes search results recognisable. */
     fun matchingPreview(note: Note, query: String): String {
         val words = terms(query)
-        if (words.isEmpty()) return note.preview
-        return note.body.lineSequence()
+        if (words.isEmpty()) return excerpt(note.preview, emptyList())
+        val candidate = note.body.lineSequence()
             .map(String::trim)
             .firstOrNull { line -> words.any { normalize(line).contains(it) } }
             ?: note.preview
+        return excerpt(candidate, words)
     }
 }
