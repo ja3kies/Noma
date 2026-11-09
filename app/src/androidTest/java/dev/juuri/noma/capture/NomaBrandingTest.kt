@@ -15,7 +15,12 @@ class NomaBrandingTest {
 
     @Test fun installedApplicationUsesNewAdaptiveLauncherIcon() {
         val info = context.applicationInfo
-        assertEquals(R.mipmap.noma_launcher, info.icon)
+        // Android may resolve the round icon as ApplicationInfo.icon,
+        // depending on the emulator/launcher mask and device configuration.
+        assertTrue(
+            info.icon == R.mipmap.noma_launcher ||
+                info.icon == R.mipmap.noma_launcher_round
+        )
         // ApplicationInfo does not expose roundIcon on all SDK stubs.
         assertNotNull(context.getDrawable(R.mipmap.noma_launcher_round))
         assertTrue(context.getDrawable(info.icon) is AdaptiveIconDrawable)
