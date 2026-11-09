@@ -197,6 +197,17 @@ fun NomaApp(
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    if (incoming.body.length > 500) {
+                        Text(
+                            stringResource(
+                                R.string.incoming_share_preview_truncated,
+                                500,
+                                incoming.body.length
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
                         stringResource(R.string.incoming_share_size, incoming.body.length),
                         style = MaterialTheme.typography.labelSmall
@@ -736,7 +747,10 @@ private fun NoteCard(
             }
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Outlined.MoreHoriz, contentDescription = stringResource(R.string.note_actions))
+                    Icon(
+                        Icons.Outlined.MoreHoriz,
+                        contentDescription = stringResource(R.string.note_actions_for, title)
+                    )
                 }
                 NoteActionsMenu(
                     expanded = menuExpanded,
