@@ -24,8 +24,13 @@ object NotesBackupVerification {
             it.write(bytes)
             it.flush()
         }
-        val input = try { openRead() } catch (_: java.io.IOException) { null }
-            ?: return Status.UNVERIFIED_PROVIDER
+        val input = try {
+            openRead()
+        } catch (_: java.io.IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        } ?: return Status.UNVERIFIED_PROVIDER
         input.use { stream ->
             val expected = MessageDigest.getInstance("SHA-256").digest(bytes)
             val actual = MessageDigest.getInstance("SHA-256")
