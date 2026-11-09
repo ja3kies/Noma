@@ -244,7 +244,18 @@ internal fun PortableDocuments(
         AlertDialog(
             onDismissRequest = { pending = null },
             title = { Text(stringResource(R.string.portable_import_confirm, notes.size)) },
-            text = { Text(stringResource(R.string.portable_import_warning, duplicateCount)) },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    Text(stringResource(
+                        R.string.portable_import_details,
+                        notes.size - duplicateCount,
+                        duplicateCount,
+                        notes.count { it.isPinned },
+                        notes.count { it.isArchived }
+                    ))
+                    Text(stringResource(R.string.portable_import_warning, duplicateCount))
+                }
+            },
             confirmButton = {
                 TextButton(
                     enabled = snapshot is NotesSnapshot.Ready && !busy,
