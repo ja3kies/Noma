@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#4F6885" android:pathData="M0,0h108v108h-108z"/>
-    <path android:fillColor="#E6EAF0" android:pathData="M30,19 Q30,15 34,15 L78,15 Q82,15 82,19 L82,83 Q82,87 78,87 L34,87 Q30,87 30,83 Z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M24,25 Q24,21 28,21 L72,21 Q76,21 76,25 L76,89 Q76,93 72,93 L28,93 Q24,93 24,89 Z"/>
-    <path android:fillColor="#4F6885" android:pathData="M34,37h32v5h-32z M34,49h26v4h-26z M34,60h30v4h-30z"/>
-    <path android:fillColor="#E5B47E" android:pathData="M34,73h14v5h-14z"/>
-</vector>
+<!-- Compatibility alias for existing non-launcher references. Adaptive icons use @mipmap/noma_launcher. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/noma_launcher_background" />
+    <item android:drawable="@drawable/noma_launcher_foreground" />
+</layer-list>
