@@ -397,6 +397,7 @@ private fun NotesListScreen(
                 TextField(
                     value = query,
                     onValueChange = viewModel::onQueryChange,
+                    enabled = snapshot is NotesSnapshot.Ready,
                     modifier = Modifier.fillMaxWidth()
                         .semantics { contentDescription = searchAccessibilityLabel }
                         .testTag("noma_search"),
@@ -432,6 +433,7 @@ private fun NotesListScreen(
                         FilterChip(
                             selected = archivedOnly,
                             onClick = viewModel::toggleArchiveView,
+                            enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier.testTag("noma_archive_filter"),
                             label = { Text(stringResource(R.string.archive_view)) },
                             leadingIcon = {
@@ -445,6 +447,7 @@ private fun NotesListScreen(
                             FilterChip(
                                 selected = pinnedOnly,
                                 onClick = viewModel::togglePinnedOnly,
+                                enabled = snapshot is NotesSnapshot.Ready,
                                 label = { Text(stringResource(R.string.pinned_filter)) },
                                 leadingIcon = {
                                     Icon(
@@ -456,7 +459,10 @@ private fun NotesListScreen(
                         }
                     }
                     Box {
-                        IconButton(onClick = { sortMenuExpanded = true }) {
+                        IconButton(
+                            onClick = { sortMenuExpanded = true },
+                            enabled = snapshot is NotesSnapshot.Ready
+                        ) {
                             Icon(Icons.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
                         }
                         DropdownMenu(
