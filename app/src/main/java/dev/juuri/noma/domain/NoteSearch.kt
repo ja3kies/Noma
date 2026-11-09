@@ -23,8 +23,11 @@ object NoteSearch {
 
     fun matches(note: Note, terms: List<String>): Boolean {
         if (terms.isEmpty()) return true
-        val searchable = normalize(note.title + "\n" + note.body)
-        return terms.all(searchable::contains)
+        val title = normalize(note.title)
+        // Avoid normalizing or allocating the body for title-only searches.
+        if (terms.all(title::contains)) return true
+        val body = normalize(note.body)
+        return terms.all { title.contains(it) || body.contains(it) }
     }
 
     /** The nearest body line with a match makes search results recognisable. */
