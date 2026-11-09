@@ -20,7 +20,7 @@ class NotesArchiveSummaryTest {
         )
         val before = original.toList()
         assertEquals(
-            NotesArchiveSummary(3, 2, 2, 60L, 5L, 16L),
+            NotesArchiveSummary(3, 2, 2, 60L, 5L, 15L),
             NotesArchiveSummary.fromNotes(original)
         )
         assertEquals(before, original)
