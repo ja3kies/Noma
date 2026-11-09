@@ -13,6 +13,7 @@
     <string name="no_results_detail">Try a different search or filter.</string>
     <string name="empty_title">A little space to begin</string>
     <string name="empty_detail">Your thoughts, lists and ideas will live here.</string>
+    <string name="pinned_note_indicator">Pinned note</string>
     <string name="pinned_section">Pinned</string>
     <string name="recent_section">Recent</string>
     <string name="untitled">Untitled note</string>
