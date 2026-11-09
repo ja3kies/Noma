@@ -141,8 +141,9 @@ fun NomaApp(
     val undo = stringResource(R.string.undo)
     val failurePrefix = stringResource(R.string.error_prefix)
     val importResult = stringResource(R.string.portable_import_result)
+    val saveBeforeNav = stringResource(R.string.save_before_navigation)
 
-    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult) {
+    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -155,6 +156,7 @@ fun NomaApp(
                     if (result == SnackbarResult.ActionPerformed) viewModel.undoArchive(event.previous)
                 }
                 is NoteUiEvent.Imported -> snackbar.showSnackbar(importResult.format(event.added, event.skipped))
+                NoteUiEvent.SaveBeforeNavigation -> snackbar.showSnackbar(saveBeforeNav)
                 is NoteUiEvent.Failure ->
                     snackbar.showSnackbar(failurePrefix + event.message, withDismissAction = true)
             }
