@@ -277,6 +277,22 @@ class NotesServiceTest {
         )
     }
 
+    @Test fun contextualExcerptNeverSplitsEmojiSurrogatePairs() {
+        val body = "🦊 ".repeat(200) + "important closing words"
+        val excerpt = NoteSearch.matchingPreview(note("emoji", body = body), "closing")
+        assertTrue(excerpt.contains("closing"))
+        excerpt.forEachIndexed { index, char ->
+            if (Character.isHighSurrogate(char)) {
+                assertTrue(index + 1 < excerpt.length)
+                assertTrue(Character.isLowSurrogate(excerpt[index + 1]))
+            }
+            if (Character.isLowSurrogate(char)) {
+                assertTrue(index > 0)
+                assertTrue(Character.isHighSurrogate(excerpt[index - 1]))
+            }
+        }
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
