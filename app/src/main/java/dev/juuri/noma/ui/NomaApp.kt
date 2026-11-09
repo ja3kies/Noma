@@ -134,6 +134,8 @@ fun NomaApp(
 ) {
     val active by viewModel.active.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
+    val pendingShare by viewModel.pendingShare.collectAsState()
+    val capturingShare by viewModel.capturingShare.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val deleted = stringResource(R.string.deleted_message)
     val archived = stringResource(R.string.archived_message)
@@ -141,9 +143,10 @@ fun NomaApp(
     val undo = stringResource(R.string.undo)
     val failurePrefix = stringResource(R.string.error_prefix)
     val importResult = stringResource(R.string.portable_import_result)
+    val sharedCaptureSaved = stringResource(R.string.incoming_share_saved)
     val saveBeforeNav = stringResource(R.string.save_before_navigation)
 
-    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav) {
+    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -157,12 +160,54 @@ fun NomaApp(
                 }
                 is NoteUiEvent.Imported -> snackbar.showSnackbar(importResult.format(event.added, event.skipped))
                 NoteUiEvent.SaveBeforeNavigation -> snackbar.showSnackbar(saveBeforeNav)
+                NoteUiEvent.SharedCaptureSaved -> snackbar.showSnackbar(sharedCaptureSaved)
                 is NoteUiEvent.Failure ->
                     snackbar.showSnackbar(failurePrefix + event.message, withDismissAction = true)
             }
         }
     }
 
+    pendingShare?.let { incoming ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSharedText,
+            title = { Text(stringResource(R.string.incoming_share_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                    Text(stringResource(R.string.incoming_share_body))
+                    if (incoming.title.isNotEmpty()) {
+                        Text(
+                            incoming.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Text(
+                        incoming.body.take(500),
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        stringResource(R.string.incoming_share_size, incoming.body.length),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !capturingShare,
+                    onClick = viewModel::confirmSharedText
+                ) { Text(stringResource(R.string.incoming_share_confirm)) }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !capturingShare,
+                    onClick = viewModel::dismissSharedText
+                ) { Text(stringResource(R.string.incoming_share_discard)) }
+            }
+        )
+    }
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= 840.dp
