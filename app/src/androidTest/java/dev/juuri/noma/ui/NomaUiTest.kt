@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.capture.CaptureRequest
+import dev.juuri.noma.capture.NomaWidgetStyle
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
@@ -147,6 +148,27 @@ class NomaUiTest {
             assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
             assertEquals(null, model.pendingShare.value)
         }
+    }
+
+    @Test fun appearanceSettingsExposeThreeWidgetStyles() {
+        val repo = FakeRepository()
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        var chosen = NomaWidgetStyle.MATERIAL_YOU
+        compose.setContent {
+            NomaTheme {
+                NomaApp(
+                    viewModel = viewModel,
+                    widgetStyle = chosen,
+                    onWidgetStyleChange = { chosen = it }
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performClick()
+        compose.onNodeWithText("Material You").assertExists()
+        compose.onNodeWithText("Frosted green").assertExists()
+        compose.onNodeWithText("Liquid Glass").performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(NomaWidgetStyle.LIQUID_GLASS, chosen) }
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
