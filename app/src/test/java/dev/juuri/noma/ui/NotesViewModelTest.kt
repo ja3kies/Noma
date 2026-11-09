@@ -99,6 +99,34 @@ class NotesViewModelTest {
         assertEquals("Imported", entries["new"]?.title)
     }
 
+    @Test fun creatingNoteFromSearchClearsDiscoveryConstraints() = runTest {
+        val old = Note("existing", "Existing", "Body", true, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.onQueryChange("impossible phrase")
+        model.togglePinnedOnly()
+        model.createNote()
+        advanceUntilIdle()
+        assertEquals("", model.query.value)
+        assertEquals(false, model.pinnedOnly.value)
+        assertEquals(false, model.archivedOnly.value)
+        assertTrue(model.active.value != null)
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+    }
+
+    @Test fun creatingNoteFromArchiveReturnsToNormalNotebook() = runTest {
+        val old = Note("existing", "Existing", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.toggleArchiveView()
+        model.onQueryChange("old archive search")
+        model.createNote()
+        advanceUntilIdle()
+        assertEquals(false, model.archivedOnly.value)
+        assertEquals("", model.query.value)
+        assertTrue(model.active.value != null)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
