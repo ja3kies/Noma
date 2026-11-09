@@ -111,4 +111,5 @@
     <string name="portable_verify_success_title">Fichier de sauvegarde lisible</string>
     <string name="portable_verify_summary">%1$d notes · %2$d épinglées · %3$d archivées</string>
     <string name="portable_verify_no_import">Le fichier a été vérifié sans importer ni modifier de notes.</string>
+    <string name="portable_verify_failed">Vérification de la sauvegarde impossible : %1$s</string>
 </resources>
