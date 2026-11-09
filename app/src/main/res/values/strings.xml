@@ -81,4 +81,6 @@
     <string name="portable_export_txt">Export as TXT</string>
     <string name="portable_export_md">Export as Markdown</string>
     <string name="portable_note_export_done">Note exported</string>
+    <string name="portable_export_warning_title">Unencrypted export</string>
+    <string name="portable_export_warning_detail">This archive contains every note in readable plaintext. Save it only to a trusted location and delete unintended copies.</string>
 </resources>
