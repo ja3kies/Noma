@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import dev.juuri.noma.R
 import dev.juuri.noma.data.NotesPortableFormat
+import dev.juuri.noma.data.NotesPlainTextFormat
+import android.provider.OpenableColumns
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +65,41 @@ internal fun PortableDocuments(
             }
         }
     }
+    val textImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null && !busy) {
+            busy = true
+            scope.launch {
+                try {
+                    val note = withContext(Dispatchers.IO) {
+                        val filename = context.contentResolver.query(
+                            uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                        )?.use { cursor ->
+                            if (cursor.moveToFirst()) cursor.getString(0) else null
+                        }
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val output = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(8192)
+                            while (true) {
+                                val size = stream.read(buffer)
+                                if (size < 0) break
+                                output.write(buffer, 0, size)
+                                require(output.size() <= NotesPortableFormat.MAX_IMPORT_BYTES) {
+                                    "File exceeds size limit"
+                                }
+                            }
+                            output.toByteArray()
+                        } ?: error(readFailed)
+                        NotesPlainTextFormat.decode(bytes, filename)
+                    }
+                    pending = listOf(note)
+                } catch (e: Exception) {
+                    onMessage(importFailure.format(e.localizedMessage ?: readFailed))
+                } finally { busy = false }
+            }
+        }
+    }
     val importer = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -93,6 +130,9 @@ internal fun PortableDocuments(
         }
     }
     Row {
+        TextButton(onClick = { textImporter.launch(arrayOf("text/plain", "text/markdown", "text/x-markdown")) }, enabled = !busy) {
+            Text(stringResource(R.string.portable_import_text))
+        }
         TextButton(onClick = { importer.launch(arrayOf("application/json")) }, enabled = !busy) {
             Text(stringResource(R.string.portable_import_json))
         }
