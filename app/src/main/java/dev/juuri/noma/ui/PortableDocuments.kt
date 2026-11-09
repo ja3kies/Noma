@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import dev.juuri.noma.R
 import dev.juuri.noma.data.NotesPortableFormat
+import dev.juuri.noma.data.NotesBackupVerification
 import dev.juuri.noma.data.NotesPlainTextFormat
 import android.provider.OpenableColumns
 import dev.juuri.noma.domain.Note
@@ -44,6 +45,7 @@ internal fun PortableDocuments(
     val writeFailed = stringResource(R.string.portable_write_failed)
     val readFailed = stringResource(R.string.portable_read_failed)
     val exportResult = stringResource(R.string.portable_export_result)
+    val unverifiedExport = stringResource(R.string.portable_export_unverified)
     val importFailure = stringResource(R.string.portable_import_failed)
     val exportFailure = stringResource(R.string.portable_export_failed)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
@@ -57,16 +59,21 @@ internal fun PortableDocuments(
             busy = true
             scope.launch {
                 try {
-                    val count = withContext(Dispatchers.IO) {
+                    val (count, verification) = withContext(Dispatchers.IO) {
                         val notes = snapshotForExport()
                         val bytes = NotesPortableFormat.encode(notes)
-                        context.contentResolver.openOutputStream(uri, "wt")?.use {
-                            it.write(bytes)
-                            it.flush()
-                        } ?: error(writeFailed)
-                        notes.size
+                        val status = NotesBackupVerification.writeAndVerify(
+                            bytes,
+                            openWrite = { context.contentResolver.openOutputStream(uri, "wt") },
+                            openRead = { context.contentResolver.openInputStream(uri) }
+                        )
+                        notes.size to status
                     }
-                    onMessage(exportResult.format(count))
+                    onMessage(
+                        if (verification == NotesBackupVerification.Status.VERIFIED)
+                            exportResult.format(count)
+                        else unverifiedExport
+                    )
                 } catch (e: Exception) {
                     onMessage(exportFailure.format(e.localizedMessage ?: writeFailed))
                 } finally { busy = false }
