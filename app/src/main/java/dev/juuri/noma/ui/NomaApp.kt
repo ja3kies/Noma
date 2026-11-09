@@ -398,7 +398,7 @@ private fun NotesListScreen(
                     }
                     PortableDocuments(
                         snapshot = snapshot,
-                        onImport = viewModel::importNotes,
+                        onImport = viewModel::importNotesAwait,
                         snapshotForExport = viewModel::snapshotForExport,
                         onMessage = { message ->
                             portableScope.launch { snackbar.showSnackbar(message) }
