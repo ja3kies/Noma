@@ -360,7 +360,8 @@ private fun NotesListScreen(
         floatingActionButton = {
             // Do not offer creation while the repository is loading or unavailable.
             // Recovery and backup inspection remain discoverable in the header.
-            if (snapshot is NotesSnapshot.Ready) {
+            if (snapshot is NotesSnapshot.Ready &&
+                (snapshot as NotesSnapshot.Ready).entries.isNotEmpty()) {
                 ExtendedFloatingActionButton(
                     onClick = { if (!creating) viewModel.createNote() },
                     expanded = true,
