@@ -346,16 +346,20 @@ private fun NotesListScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { if (!creating && snapshot is NotesSnapshot.Ready) viewModel.createNote() },
-                expanded = true,
-                icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
-                text = { Text(newNoteLabel) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                modifier = Modifier.testTag("noma_new_note")
-            )
+            // Do not offer creation while the repository is loading or unavailable.
+            // Recovery and backup inspection remain discoverable in the header.
+            if (snapshot is NotesSnapshot.Ready) {
+                ExtendedFloatingActionButton(
+                    onClick = { if (!creating) viewModel.createNote() },
+                    expanded = true,
+                    icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+                    text = { Text(newNoteLabel) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                    modifier = Modifier.testTag("noma_new_note")
+                )
+            }
         }
     ) { insets ->
         Column(Modifier.fillMaxSize().padding(insets)) {
