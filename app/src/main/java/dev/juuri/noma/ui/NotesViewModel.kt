@@ -45,6 +45,7 @@ class NotesViewModel(
 ) : ViewModel() {
     val snapshot = repository.notes
 
+    private val queuedIncomingShares = ArrayDeque<dev.juuri.noma.capture.CaptureRequest.SharedText>()
     private val _pendingShare = MutableStateFlow<dev.juuri.noma.capture.CaptureRequest.SharedText?>(null)
     val pendingShare: StateFlow<dev.juuri.noma.capture.CaptureRequest.SharedText?> =
         _pendingShare.asStateFlow()
@@ -129,12 +130,23 @@ class NotesViewModel(
     }
 
     fun receiveSharedText(request: dev.juuri.noma.capture.CaptureRequest.SharedText) {
-        // Never overwrite an unconfirmed incoming share.
-        if (_pendingShare.value == null) _pendingShare.value = request
+        // Never overwrite an unconfirmed incoming share when another app shares again.
+        if (_pendingShare.value == null) {
+            _pendingShare.value = request
+        } else if (queuedIncomingShares.size < 16) {
+            queuedIncomingShares.addLast(request)
+        } else {
+            eventChannel.trySend(NoteUiEvent.Failure("Too many incoming notes; finish current captures first"))
+        }
+    }
+
+    private fun showNextShare() {
+        _pendingShare.value = if (queuedIncomingShares.isEmpty()) null
+            else queuedIncomingShares.removeFirst()
     }
 
     fun dismissSharedText() {
-        if (!_capturingShare.value) _pendingShare.value = null
+        if (!_capturingShare.value) showNextShare()
     }
 
     fun confirmSharedText() {
@@ -148,7 +160,7 @@ class NotesViewModel(
         viewModelScope.launch {
             try {
                 val created = service.captureText(pending.title, pending.body)
-                _pendingShare.value = null
+                showNextShare()
                 clearDiscoveryFilters()
                 editorRevision++
                 _active.value = created
