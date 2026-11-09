@@ -249,6 +249,20 @@ class NotesServiceTest {
         assertEquals("Premier paragraphe", NoteSearch.matchingPreview(candidate, "essai"))
     }
 
+    @Test fun ligaturesAndEuropeanLettersMatchPlainKeyboardInput() {
+        val service = NotesService(MemoryRepository())
+        val entries = listOf(
+            note("heart", "Le cœur du sujet"),
+            note("encyclopedia", "Encyclopædia"),
+            note("street", "Straße"),
+            note("city", "Łódź")
+        )
+        assertEquals(listOf("heart"), service.visible(entries, "coeur", false).map { it.id })
+        assertEquals(listOf("encyclopedia"), service.visible(entries, "encyclopaedia", false).map { it.id })
+        assertEquals(listOf("street"), service.visible(entries, "strasse", false).map { it.id })
+        assertEquals(listOf("city"), service.visible(entries, "lodz", false).map { it.id })
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
