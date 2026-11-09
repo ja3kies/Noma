@@ -64,10 +64,18 @@ object NoteSearch {
     fun matchingPreview(note: Note, query: String): String {
         val words = terms(query)
         if (words.isEmpty()) return excerpt(note.preview, emptyList())
+        val inTitle = normalize(note.title)
+        val targetWords = words.filterNot(inTitle::contains).ifEmpty { words }
         val candidate = note.body.lineSequence()
             .map(String::trim)
-            .firstOrNull { line -> words.any { normalize(line).contains(it) } }
-            ?: note.preview
-        return excerpt(candidate, words)
+            .filter(String::isNotEmpty)
+            .map { line ->
+                val folded = normalize(line)
+                line to targetWords.count(folded::contains)
+            }
+            .filter { it.second > 0 }
+            .maxByOrNull { it.second }
+            ?.first ?: note.preview
+        return excerpt(candidate, targetWords)
     }
 }
