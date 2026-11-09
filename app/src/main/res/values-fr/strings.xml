@@ -77,4 +77,8 @@
     <string name="portable_read_failed">Lecture du fichier impossible</string>
     <string name="portable_write_failed">Écriture du fichier impossible</string>
     <string name="portable_import_text">Importer TXT / Markdown</string>
+    <string name="portable_export_note">Exporter cette note</string>
+    <string name="portable_export_txt">Exporter en TXT</string>
+    <string name="portable_export_md">Exporter en Markdown</string>
+    <string name="portable_note_export_done">Note exportée</string>
 </resources>
