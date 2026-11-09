@@ -40,7 +40,8 @@ internal fun PortableDocuments(
     snapshot: NotesSnapshot,
     onImport: suspend (List<Note>) -> Int,
     snapshotForExport: suspend () -> List<Note>,
-    onMessage: (String) -> Unit
+    onMessage: (String) -> Unit,
+    canExport: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -53,6 +54,7 @@ internal fun PortableDocuments(
     val verificationFailure = stringResource(R.string.portable_verify_failed)
     val exportFailure = stringResource(R.string.portable_export_failed)
     val unsavedExport = stringResource(R.string.portable_export_unsaved_edits)
+    val activeCaptureExport = stringResource(R.string.portable_export_active_capture)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var inspectedArchive by remember { mutableStateOf<NotesArchiveSummary?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -81,8 +83,11 @@ internal fun PortableDocuments(
                         else unverifiedExport
                     )
                 } catch (e: Exception) {
-                    val reason = if (e is UnsavedEditorChangesException) unsavedExport
-                        else e.localizedMessage ?: writeFailed
+                    val reason = when (e) {
+                        is UnsavedEditorChangesException -> unsavedExport
+                        is CaptureStillSavingException -> activeCaptureExport
+                        else -> e.localizedMessage ?: writeFailed
+                    }
                     onMessage(exportFailure.format(reason))
                 } finally { busy = false }
             }
@@ -193,8 +198,11 @@ internal fun PortableDocuments(
                 }
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.portable_export_json)) },
-                enabled = snapshot is NotesSnapshot.Ready && !busy,
+                text = {
+                    Text(stringResource(if (canExport) R.string.portable_export_json
+                        else R.string.portable_export_wait))
+                },
+                enabled = snapshot is NotesSnapshot.Ready && canExport && !busy,
                 onClick = {
                     actionsExpanded = false
                     confirmPlaintextExport = true
@@ -225,12 +233,18 @@ internal fun PortableDocuments(
         AlertDialog(
             onDismissRequest = { confirmPlaintextExport = false },
             title = { Text(stringResource(R.string.portable_export_warning_title)) },
-            text = { Text(stringResource(R.string.portable_export_warning_detail)) },
+            text = {
+                Text(stringResource(if (canExport) R.string.portable_export_warning_detail
+                    else R.string.portable_export_active_capture))
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    confirmPlaintextExport = false
-                    exporter.launch("noma-notes.json")
-                }) { Text(stringResource(R.string.portable_export_json)) }
+                TextButton(
+                    enabled = canExport && !busy && snapshot is NotesSnapshot.Ready,
+                    onClick = {
+                        confirmPlaintextExport = false
+                        exporter.launch("noma-notes.json")
+                    }
+                ) { Text(stringResource(R.string.portable_export_json)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmPlaintextExport = false }) {

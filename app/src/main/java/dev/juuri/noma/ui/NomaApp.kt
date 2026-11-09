@@ -155,6 +155,7 @@ fun NomaApp(
     val saveState by viewModel.saveState.collectAsState()
     val pendingShare by viewModel.pendingShare.collectAsState()
     val capturingShare by viewModel.capturingShare.collectAsState()
+    val creatingNote by viewModel.creating.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val deleted = stringResource(R.string.deleted_message)
     val archived = stringResource(R.string.archived_message)
@@ -228,7 +229,7 @@ fun NomaApp(
             },
             confirmButton = {
                 TextButton(
-                    enabled = !capturingShare,
+                    enabled = !capturingShare && !creatingNote,
                     onClick = viewModel::confirmSharedText
                 ) { Text(stringResource(R.string.incoming_share_confirm)) }
             },
@@ -312,7 +313,10 @@ private fun NotesListScreen(
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val creating by viewModel.creating.collectAsState()
     val editorSaveState by viewModel.saveState.collectAsState()
+    val capturingShare by viewModel.capturingShare.collectAsState()
+    val navigationEnabled = !creating && !capturingShare
     val filteredNotes = remember(snapshot, query, pinnedOnly, archivedOnly, sort) {
         (snapshot as? NotesSnapshot.Ready)?.let { state ->
             viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
@@ -322,7 +326,6 @@ private fun NotesListScreen(
     LaunchedEffect(query, pinnedOnly, archivedOnly, sort) {
         if (!filteredNotes.isNullOrEmpty()) listState.scrollToItem(0)
     }
-    val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val searchKeyboard = LocalSoftwareKeyboardController.current
@@ -441,6 +444,7 @@ private fun NotesListScreen(
                         snapshot = snapshot,
                         onImport = viewModel::importNotesAwait,
                         snapshotForExport = viewModel::snapshotForExport,
+                        canExport = editorSaveState == EditorSaveState.Saved && navigationEnabled,
                         onMessage = { message ->
                             portableScope.launch { snackbar.showSnackbar(message) }
                         }
@@ -689,6 +693,7 @@ private fun NotesListScreen(
                                         onDelete = { deleting = note },
                                         onShare = { shareNote(context, note) },
                                         actionsEnabled = note.id != selectedId || editorSaveState == EditorSaveState.Saved,
+                                        navigationEnabled = navigationEnabled,
                                         onMenuOpen = {
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
@@ -724,6 +729,7 @@ private fun NotesListScreen(
                                         onDelete = { deleting = note },
                                         onShare = { shareNote(context, note) },
                                         actionsEnabled = note.id != selectedId || editorSaveState == EditorSaveState.Saved,
+                                        navigationEnabled = navigationEnabled,
                                         onMenuOpen = {
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
@@ -777,9 +783,13 @@ private fun NoteCard(
     onDelete: () -> Unit,
     onShare: () -> Unit,
     actionsEnabled: Boolean,
+    navigationEnabled: Boolean,
     onMenuOpen: () -> Unit
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
+    LaunchedEffect(navigationEnabled) {
+        if (!navigationEnabled) menuExpanded = false
+    }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
@@ -788,6 +798,7 @@ private fun NoteCard(
         else MaterialTheme.colorScheme.surface
     Card(
         onClick = onOpen,
+        enabled = navigationEnabled,
         modifier = Modifier.fillMaxWidth()
             .testTag("noma_note_${note.id}")
             .semantics { this.selected = selected }
@@ -841,6 +852,7 @@ private fun NoteCard(
                         onMenuOpen()
                         menuExpanded = true
                     },
+                    enabled = navigationEnabled,
                     modifier = Modifier.testTag("noma_note_actions_${note.id}")
                 ) {
                     Icon(
@@ -856,7 +868,7 @@ private fun NoteCard(
                     onArchive = onArchive,
                     onDelete = onDelete,
                     onShare = onShare,
-                    destructiveEnabled = actionsEnabled
+                    destructiveEnabled = actionsEnabled && navigationEnabled
                 )
             }
         }

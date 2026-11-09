@@ -34,6 +34,9 @@ sealed interface EditorSaveState {
 /** Prevents a stale export from appearing complete while the editor has unsaved changes. */
 class UnsavedEditorChangesException : IllegalStateException("The current note has unsaved changes")
 
+/** Creation and share capture write outside the serial editor queue. */
+class CaptureStillSavingException : IllegalStateException("A note is still being created or captured")
+
 private sealed interface WriteOperation {
     data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
@@ -94,6 +97,11 @@ class NotesViewModel(
                 try {
                     when (operation) {
                         is WriteOperation.Save -> {
+                            // Ignore superseded queued revisions. The final editor revision
+                            // persists the complete buffer, avoiding unnecessary disk writes
+                            // and post-discard writes that have not started.
+                            if (operation.editorRevision != null &&
+                                operation.editorRevision != editorRevision) continue
                             service.save(operation.note)
                             if (operation.editorRevision != null &&
                                 operation.editorRevision == editorRevision) {
@@ -110,6 +118,11 @@ class NotesViewModel(
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
                         is WriteOperation.ExportSnapshot -> {
+                            // Creation/share capture do not use the editor operations queue.
+                            // An export must not silently omit a concurrently created note.
+                            if (_creating.value || _capturingShare.value) {
+                                throw CaptureStillSavingException()
+                            }
                             // Export is ordered behind queued saves. Refuse a stale backup
                             // if the final editor write still has no disk acknowledgement.
                             if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
@@ -180,7 +193,7 @@ class NotesViewModel(
 
     fun confirmSharedText() {
         val pending = _pendingShare.value ?: return
-        if (_capturingShare.value) return
+        if (_capturingShare.value || _creating.value) return
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
@@ -236,7 +249,8 @@ class NotesViewModel(
     }
 
     fun createNote() {
-        if (_creating.value) return
+        // Do not race a note created from an external share.
+        if (_creating.value || _capturingShare.value) return
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
@@ -264,6 +278,9 @@ class NotesViewModel(
     }
 
     fun openNote(note: Note) {
+        // Otherwise a completed creation/capture could unexpectedly replace
+        // the note selected while that operation was in progress.
+        if (_creating.value || _capturingShare.value) return
         // Selecting the same card on a tablet must not mark an in-flight save
         // as completed or replace its unsaved editor buffer.
         if (_active.value?.id == note.id) return
