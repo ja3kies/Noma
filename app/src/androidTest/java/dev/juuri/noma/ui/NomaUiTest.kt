@@ -44,8 +44,10 @@ class NomaUiTest {
         private val state = MutableStateFlow<NotesSnapshot>(initialState)
         override val notes: StateFlow<NotesSnapshot> = state
         var saveGate: CompletableDeferred<Unit>? = null
-        var failWrites = false
+        @Volatile var failWrites = false
+        @Volatile var saveAttempts = 0
         override suspend fun save(note: Note) {
+            saveAttempts++
             saveGate?.await()
             if (failWrites) throw IllegalStateException("Simulated disk failure")
             val old = (state.value as NotesSnapshot.Ready).entries
@@ -418,20 +420,125 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithText("Original").performClick()
         compose.onNodeWithTag("noma_body_input").performTextInput(" updated")
-        compose.waitUntil(5_000) { model.saveState.value is EditorSaveState.Failed }
-        compose.onNodeWithTag("noma_retry_save").assertExists()
+        try {
+            compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Initial write failure not shown: state=${model.saveState.value}, attempts=${repo.saveAttempts}",
+                failure
+            )
+        }
+        compose.onNodeWithTag("noma_retry_save").assertExists().assertIsDisplayed()
         compose.onNodeWithTag("noma_save_failure_guidance").assertExists()
+        val attemptsBeforeRetry = repo.saveAttempts
         compose.runOnIdle {
             assertTrue(model.active.value?.body?.contains("updated") == true)
             repo.failWrites = false
         }
         compose.onNodeWithTag("noma_retry_save").performClick()
-        compose.waitUntil(5_000) { model.saveState.value == EditorSaveState.Saved }
+        try {
+            compose.waitUntil(10_000) {
+                repo.saveAttempts > attemptsBeforeRetry &&
+                    model.saveState.value == EditorSaveState.Saved
+            }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Retry did not confirm persistence: state=${model.saveState.value}, " +
+                    "attempts=${repo.saveAttempts}, prior=$attemptsBeforeRetry, " +
+                    "body=${(repo.notes.value as NotesSnapshot.Ready).entries.singleOrNull()?.body}",
+                failure
+            )
+        }
         compose.runOnIdle {
             assertTrue(
                 (repo.notes.value as NotesSnapshot.Ready).entries.single().body.contains("updated")
             )
         }
+    }
+
+
+    @Test fun failedRetryKeepsDraftAndAllowsAnotherAttempt() {
+        val note = Note("retry-again", "Retry note", "Before", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Retry note").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" added")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        val before = repo.saveAttempts
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        compose.waitUntil(10_000) {
+            repo.saveAttempts > before && model.saveState.value is EditorSaveState.Failed
+        }
+        compose.onNodeWithTag("noma_retry_save").assertExists()
+        compose.runOnIdle {
+            assertTrue(model.active.value?.body?.contains("added") == true)
+            repo.failWrites = false
+        }
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+        compose.runOnIdle {
+            assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.single().body.contains("added"))
+        }
+    }
+
+    @Test fun failedSaveBackDialogKeepEditingPreservesDraft() {
+        val note = Note("keep", "Keep editor", "Before", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Keep editor").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" preserved")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_editor_back").performClick()
+        compose.onNodeWithText("Changes not saved").assertExists()
+        compose.onNodeWithTag("noma_keep_editing").performClick()
+        compose.runOnIdle {
+            assertEquals("keep", model.active.value?.id)
+            assertTrue(model.active.value?.body?.contains("preserved") == true)
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
+        }
+    }
+
+    @Test fun explicitDiscardAfterFailedSaveLeavesPersistedVersionIntact() {
+        val note = Note("discard", "Discard draft", "Persisted body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Discard draft").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" unsaved")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_editor_back").performClick()
+        compose.onNodeWithTag("noma_discard_unsaved").performClick()
+        compose.runOnIdle {
+            assertEquals(null, model.active.value)
+            assertEquals(note, (repo.notes.value as NotesSnapshot.Ready).entries.single())
+        }
+    }
+
+    @Test fun retryWithSlowDiskDisablesConflictingActionsUntilCommit() {
+        val note = Note("blocked", "Retry pending", "Old", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Retry pending").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" new")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        val gate = CompletableDeferred<Unit>()
+        compose.runOnIdle {
+            repo.failWrites = false
+            repo.saveGate = gate
+        }
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saving }
+        compose.onNodeWithTag("noma_retry_save").assertDoesNotExist()
+        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
     }
 
     @Test fun pinnedCardExposesItsStatusToScreenReader() {

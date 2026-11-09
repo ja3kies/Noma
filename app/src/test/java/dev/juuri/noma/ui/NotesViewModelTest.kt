@@ -8,9 +8,11 @@ import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -614,6 +616,24 @@ class NotesViewModelTest {
         assertEquals("id", model.active.value?.id)
         assertEquals("Keep this draft", model.active.value?.body)
         assertTrue(model.saveState.value is EditorSaveState.Failed)
+    }
+
+
+    @Test fun supersededFailedAutosavesEmitOnlyLatestError() = runTest {
+        val original = Note("id", "Original", "Body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        val events = mutableListOf<NoteUiEvent>()
+        backgroundScope.launch { model.events.collect { events.add(it) } }
+        runCurrent()
+        model.openNote(original)
+        model.changeTitle("Draft title")
+        model.changeBody("Draft body")
+        advanceUntilIdle()
+        assertEquals(1, events.filterIsInstance<NoteUiEvent.Failure>().size)
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        assertEquals("Draft body", model.active.value?.body)
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {

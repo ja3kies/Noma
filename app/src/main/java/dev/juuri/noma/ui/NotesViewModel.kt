@@ -131,12 +131,18 @@ class NotesViewModel(
                         operation.result?.completeExceptionally(failure)
                     }
                     val message = failure.localizedMessage ?: "Storage unavailable"
-                    if (operation is WriteOperation.Save &&
+                    val currentEditorWrite = operation is WriteOperation.Save &&
                         operation.editorRevision != null &&
-                        operation.editorRevision == editorRevision) {
+                        operation.editorRevision == editorRevision
+                    if (currentEditorWrite) {
                         _saveState.value = EditorSaveState.Failed(message)
                     }
-                    if (operation !is WriteOperation.Import || operation.result == null) {
+                    // Superseded autosaves can fail while a newer revision is queued.
+                    // Only the newest editor failure should interrupt the user.
+                    val relevantFailure = operation !is WriteOperation.Save ||
+                        operation.editorRevision == null || currentEditorWrite
+                    if (relevantFailure &&
+                        (operation !is WriteOperation.Import || operation.result == null)) {
                         eventChannel.send(NoteUiEvent.Failure(message))
                     }
                 }
