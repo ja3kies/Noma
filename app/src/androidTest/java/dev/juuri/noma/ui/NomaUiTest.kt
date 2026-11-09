@@ -3,6 +3,8 @@ package dev.juuri.noma.ui
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -31,8 +33,11 @@ import org.junit.Test
 class NomaUiTest {
     @get:Rule val compose = createComposeRule()
 
-    private class FakeRepository(initial: List<Note> = emptyList()) : NotesRepository {
-        private val state = MutableStateFlow<NotesSnapshot>(NotesSnapshot.Ready(initial))
+    private class FakeRepository(
+        initial: List<Note> = emptyList(),
+        initialState: NotesSnapshot = NotesSnapshot.Ready(initial)
+    ) : NotesRepository {
+        private val state = MutableStateFlow<NotesSnapshot>(initialState)
         override val notes: StateFlow<NotesSnapshot> = state
         override suspend fun save(note: Note) {
             val old = (state.value as NotesSnapshot.Ready).entries
@@ -65,6 +70,24 @@ class NomaUiTest {
         }
         compose.onNodeWithContentDescription("Import and export notes").performClick()
         compose.onNodeWithText("Check backup file").assertExists()
+    }
+
+    @Test fun repositoryFailureDoesNotOfferBrokenCaptureButton() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("unreadable"))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
+        compose.onNodeWithTag("noma_search").assertIsNotEnabled()
+        compose.onNodeWithText("Retry").assertExists()
+        compose.onNodeWithContentDescription("Import and export notes").assertExists()
+    }
+
+    @Test fun pendingRepositoryStillDisablesDiscoveryAndCapture() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Loading)
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
+        compose.onNodeWithTag("noma_search").assertIsNotEnabled()
     }
 
     @Test fun quickCaptureAndSearchKeepNoteDiscoverable() {
