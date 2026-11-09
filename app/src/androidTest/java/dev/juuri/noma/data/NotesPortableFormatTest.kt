@@ -27,13 +27,11 @@ class NotesPortableFormatTest {
     }
 
     @Test fun rejectsDuplicateIdsWithoutWritingAnything() {
-        val duplicate = notes + notes[0]
-        val payload = NotesPortableFormat.encode(duplicate)
         try {
-            NotesPortableFormat.decode(payload)
+            NotesPortableFormat.encode(notes + notes[0])
             throw AssertionError("Duplicate IDs accepted")
         } catch (expected: IllegalArgumentException) {
-            assertTrue(expected.message!!.contains("duplicate"))
+            assertTrue(expected.message!!.contains("Duplicate"))
         }
     }
 
