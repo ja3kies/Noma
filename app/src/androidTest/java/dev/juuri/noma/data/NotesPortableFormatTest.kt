@@ -64,6 +64,49 @@ class NotesPortableFormatTest {
         assertEquals("Body only", NotesPortableFormat.toMarkdown(notes[1]))
     }
 
+    @Test fun invalidUtf8IsRejectedWithoutReplacementCharacters() {
+        try {
+            NotesPortableFormat.decode(byteArrayOf(0xC3.toByte(), 0x28))
+            throw AssertionError("Malformed UTF-8 accepted")
+        } catch (_: java.nio.charset.CharacterCodingException) { }
+    }
+
+    @Test fun rejectsTruncatedArchiveWithoutSideEffects() {
+        val valid = NotesPortableFormat.encode(notes)
+        try {
+            NotesPortableFormat.decode(valid.copyOf(valid.size / 2))
+            throw AssertionError("Truncated JSON accepted")
+        } catch (_: org.json.JSONException) { }
+    }
+
+    @Test fun refusesInvalidExportTimestamps() {
+        try {
+            NotesPortableFormat.encode(listOf(notes[0].copy(updatedAt = 1L)))
+            throw AssertionError("Timestamp mismatch accepted")
+        } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun rejectsDuplicateNoteIdsInImportedArchive() {
+        val bytes = NotesPortableFormat.encode(notes)
+        val root = org.json.JSONObject(String(bytes, Charsets.UTF_8))
+        val entries = root.getJSONArray("notes")
+        entries.put(org.json.JSONObject(entries.getJSONObject(0).toString()))
+        try {
+            NotesPortableFormat.decode(root.toString().toByteArray(Charsets.UTF_8))
+            throw AssertionError("Duplicate IDs accepted")
+        } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun rejectsInvalidVersionEvenWhenNotesAreEmpty() {
+        val root = org.json.JSONObject()
+            .put("format", "noma-notes").put("version", 2)
+            .put("notes", org.json.JSONArray())
+        try {
+            NotesPortableFormat.decode(root.toString().toByteArray())
+            throw AssertionError("Future archive accepted")
+        } catch (_: IllegalArgumentException) { }
+    }
+
     @Test fun fileNameCannotContainPathSeparators() {
         val unsafe = notes[0].copy(title = "../private/notes:*?")
         val name = NotesPortableFormat.suggestedName(unsafe, "md")
