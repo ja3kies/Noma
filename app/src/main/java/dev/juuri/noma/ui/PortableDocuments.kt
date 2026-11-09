@@ -27,6 +27,7 @@ import dev.juuri.noma.data.NotesBackupVerification
 import dev.juuri.noma.data.NotesPlainTextFormat
 import android.provider.OpenableColumns
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NotesImportPreview
 import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -200,10 +201,14 @@ internal fun PortableDocuments(
         )
     }
     pending?.let { notes ->
+        val duplicateCount = remember(notes, snapshot) {
+            val existing = (snapshot as? NotesSnapshot.Ready)?.entries.orEmpty()
+            NotesImportPreview.duplicateCount(existing, notes)
+        }
         AlertDialog(
             onDismissRequest = { pending = null },
             title = { Text(stringResource(R.string.portable_import_confirm, notes.size)) },
-            text = { Text(stringResource(R.string.portable_import_warning, notes.count { note -> (snapshot as? NotesSnapshot.Ready)?.entries?.any { it.id == note.id } == true })) },
+            text = { Text(stringResource(R.string.portable_import_warning, duplicateCount)) },
             confirmButton = {
                 TextButton(onClick = { onImport(notes); pending = null }) { Text(stringResource(R.string.portable_import_action)) }
             },
