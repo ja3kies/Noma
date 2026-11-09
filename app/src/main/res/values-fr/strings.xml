@@ -98,4 +98,5 @@
     <string name="incoming_share_discard">Ignorer</string>
     <string name="incoming_share_saved">Texte partagé enregistré dans Noma</string>
     <string name="incoming_share_size">%1$d caractères</string>
+    <string name="widget_description">Créer une note rapidement</string>
 </resources>
