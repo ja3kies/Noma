@@ -402,6 +402,69 @@ class NotesViewModelTest {
         assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
+
+    @Test fun staleListPinNeverReplacesUnsavedEditorText() = runTest {
+        val original = Note("id", "Original", "Before", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Draft not yet on disk")
+        model.togglePin(original)
+        assertEquals("Draft not yet on disk", model.active.value?.body)
+        assertEquals(true, model.active.value?.isPinned)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        val persisted = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals("Draft not yet on disk", persisted.body)
+        assertEquals(true, persisted.isPinned)
+    }
+
+    @Test fun archivedNotesCannotBePinnedThroughViewModel() = runTest {
+        val archived = Note("id", "Archived", "Body", false, 1L, 1L)
+            .copy(isArchived = true)
+        val repo = FakeRepository(archived)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(archived)
+        model.togglePin(archived)
+        advanceUntilIdle()
+        assertEquals(false, model.active.value?.isPinned)
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+    }
+
+    @Test fun archivingSelectedNoteUsesItsLatestSavedBody() = runTest {
+        val old = Note("id", "Original", "Before", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.changeBody("Latest saved body")
+        advanceUntilIdle()
+        model.toggleArchive(old) // Deliberately stale card snapshot
+        advanceUntilIdle()
+        val archived = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(true, archived.isArchived)
+        assertEquals("Latest saved body", archived.body)
+    }
+
+    @Test fun keepingFailedDraftCancelsDeferredQuickCapture() = runTest {
+        val original = Note("id", "Original", "Before", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Keep editing")
+        model.requestQuickNote()
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        model.cancelDeferredQuickNote()
+        repo.failWrites = false
+        model.retrySave()
+        advanceUntilIdle()
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("id", model.active.value?.id)
+        assertEquals("Keep editing", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
