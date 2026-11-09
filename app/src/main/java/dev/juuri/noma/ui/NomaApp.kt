@@ -683,7 +683,9 @@ private fun NoteCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
-    val relevantPreview = remember(note.body, query) { NoteSearch.matchingPreview(note, query) }
+    val relevantPreview = remember(note.title, note.body, query) {
+        NoteSearch.matchingPreview(note, query)
+    }
     val cardColor = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surface
     Card(
