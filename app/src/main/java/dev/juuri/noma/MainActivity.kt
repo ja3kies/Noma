@@ -75,9 +75,27 @@ class MainActivity : ComponentActivity() {
         shortcuts.dynamicShortcuts = listOf(entry)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Unconfirmed text stays editable after a process recreation.
+        notesViewModel.pendingShare.value?.let { pending ->
+            outState.putString("noma_pending_share_title", pending.title)
+            outState.putString("noma_pending_share_body", pending.body)
+        }
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (notesViewModel.pendingShare.value == null) {
+            val body = savedInstanceState?.getString("noma_pending_share_body")
+            if (!body.isNullOrBlank()) {
+                notesViewModel.receiveSharedText(CaptureRequest.SharedText(
+                    savedInstanceState.getString("noma_pending_share_title").orEmpty(),
+                    body
+                ))
+            }
+        }
         registerQuickCaptureShortcut()
         acceptCaptureIntent(intent)
         setContent {
