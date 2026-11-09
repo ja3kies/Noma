@@ -396,8 +396,16 @@ private fun NotesListScreen(
                     val count = (snapshot as NotesSnapshot.Ready).entries.count {
                         it.isArchived == archivedOnly
                     }
+                    val filteredCount = if (query.isNotBlank() || pinnedOnly) {
+                        viewModel.visible(
+                            (snapshot as NotesSnapshot.Ready).entries,
+                            query, pinnedOnly, archivedOnly, sort
+                        ).size
+                    } else count
                     Text(
-                        text = pluralStringResource(R.plurals.note_total, count, count),
+                        text = if (query.isNotBlank() || pinnedOnly)
+                            pluralStringResource(R.plurals.search_results_total, filteredCount, filteredCount)
+                        else pluralStringResource(R.plurals.note_total, count, count),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
