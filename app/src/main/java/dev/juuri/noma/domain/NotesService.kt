@@ -1,6 +1,5 @@
 package dev.juuri.noma.domain
 
-import java.util.Locale
 import java.util.UUID
 
 enum class NoteSort { RECENT, TITLE }
@@ -41,7 +40,7 @@ class NotesService(
         val comparator = when (sort) {
             NoteSort.RECENT -> pinnedFirst.thenByDescending { it.updatedAt }.thenBy { it.id }
             NoteSort.TITLE -> pinnedFirst
-                .thenBy { it.displayTitle.lowercase(Locale.ROOT) }
+                .thenBy { NoteSearch.normalize(it.displayTitle) }
                 .thenByDescending { it.updatedAt }
                 .thenBy { it.id }
         }
