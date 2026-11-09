@@ -14,6 +14,12 @@ object NoteSearch {
         Normalizer.normalize(value, Normalizer.Form.NFD)
             .replace(combiningMarks, "")
             .lowercase(Locale.ROOT)
+            // NFD alone does not expand French ligatures or some European letters.
+            .replace("œ", "oe")
+            .replace("æ", "ae")
+            .replace("ß", "ss")
+            .replace("ø", "o")
+            .replace("ł", "l")
 
     fun terms(query: String): List<String> =
         normalize(query).trim().split(Regex("\\s+")).filter(String::isNotEmpty)
