@@ -222,6 +222,11 @@ private fun NotesListScreen(
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val filteredNotes = remember(snapshot, query, pinnedOnly, archivedOnly, sort) {
+        (snapshot as? NotesSnapshot.Ready)?.let { state ->
+            viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
+        }
+    }
     val creating by viewModel.creating.collectAsState()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -396,12 +401,7 @@ private fun NotesListScreen(
                     val count = (snapshot as NotesSnapshot.Ready).entries.count {
                         it.isArchived == archivedOnly
                     }
-                    val filteredCount = if (query.isNotBlank() || pinnedOnly) {
-                        viewModel.visible(
-                            (snapshot as NotesSnapshot.Ready).entries,
-                            query, pinnedOnly, archivedOnly, sort
-                        ).size
-                    } else count
+                    val filteredCount = filteredNotes?.size ?: 0
                     Text(
                         text = if (query.isNotBlank() || pinnedOnly)
                             pluralStringResource(R.plurals.search_results_total, filteredCount, filteredCount)
@@ -435,9 +435,7 @@ private fun NotesListScreen(
                     OutlinedButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
                 }
                 is NotesSnapshot.Ready -> {
-                    val visible = remember(state.entries, query, pinnedOnly, archivedOnly, sort) {
-                        viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
-                    }
+                    val visible = filteredNotes.orEmpty()
                     if (visible.isEmpty()) {
                         CenterMessage {
                             Icon(
