@@ -107,6 +107,33 @@ class NotesPortableFormatTest {
         } catch (_: IllegalArgumentException) { }
     }
 
+    @Test fun archiveInspectorReportsStructureWithoutImportSideEffects() {
+        val bytes = NotesPortableFormat.encode(notes)
+        val summary = NotesArchiveSummary.inspect(bytes)
+        assertEquals(2, summary.total)
+        assertEquals(1, summary.pinned)
+        assertEquals(1, summary.archived)
+        assertEquals(20L, summary.mostRecentEdit)
+        assertEquals(0L, summary.oldestCreation)
+        assertEquals(notes.sumOf { it.body.length.toLong() }, summary.totalBodyCharacters)
+    }
+
+    @Test fun archiveInspectorRefusesUnknownVersion() {
+        val root = org.json.JSONObject(String(NotesPortableFormat.encode(notes), Charsets.UTF_8))
+        root.put("version", 202)
+        try {
+            NotesArchiveSummary.inspect(root.toString().toByteArray())
+            throw AssertionError("Invalid version was marked readable")
+        } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun archiveInspectorRejectsCorruptedJson() {
+        try {
+            NotesArchiveSummary.inspect("{ invalid json".toByteArray())
+            throw AssertionError("Malformed JSON was accepted")
+        } catch (_: org.json.JSONException) { }
+    }
+
     @Test fun fileNameCannotContainPathSeparators() {
         val unsafe = notes[0].copy(title = "../private/notes:*?")
         val name = NotesPortableFormat.suggestedName(unsafe, "md")
