@@ -84,6 +84,21 @@ class NomaUiTest {
         compose.onNodeWithText("1 result").assertExists()
     }
 
+    @Test fun newNoteDuringSearchIsVisibleAfterReturningToNotebook() {
+        val repo = FakeRepository(listOf(
+            Note("existing", "Previous", "Contains café", false, 1L, 2L)
+        ))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_search").performTextInput("unknown")
+        compose.onNodeWithTag("noma_new_note").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
+        compose.onNodeWithTag("noma_title_input").performTextInput("A new thought")
+        compose.onNodeWithTag("noma_editor_back").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_note_list"))
+        compose.onNodeWithText("A new thought").assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
