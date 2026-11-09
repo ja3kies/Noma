@@ -122,6 +122,50 @@ class NotesServiceTest {
         assertEquals(1L, repo.list().single().createdAt)
     }
 
+    @Test fun searchHandlesAccentsAndCaseWithoutMutatingNotes() {
+        val entries = listOf(note("a", "Réunion à Nantes", "Préparer le café"))
+        val service = NotesService(MemoryRepository())
+        assertEquals(listOf("a"), service.visible(entries, "REUNION CAFE", false).map { it.id })
+        assertEquals("Réunion à Nantes", entries.single().title)
+    }
+
+    @Test fun searchMatchesWordsAcrossTitleAndBodyInAnyOrder() {
+        val entries = listOf(
+            note("one", "Weekend plans", "Buy fresh croissants"),
+            note("two", "Weekend plans", "Go swimming")
+        )
+        val service = NotesService(MemoryRepository())
+        assertEquals(listOf("one"), service.visible(entries, "croissants weekend", false).map { it.id })
+        assertEquals(listOf("one"), service.visible(entries, "  WEEKEND    fresh ", false).map { it.id })
+    }
+
+    @Test fun searchDoesNotMatchWhenAnyWordIsMissing() {
+        val service = NotesService(MemoryRepository())
+        val entries = listOf(note("one", "Project plan", "Research design references"))
+        assertTrue(service.visible(entries, "project impossible", false).isEmpty())
+    }
+
+    @Test fun searchPreviewUsesMatchingBodyLine() {
+        val entry = note("one", "A note", "First line\nMore context\nCafé at noon")
+        assertEquals("Café at noon", NoteSearch.matchingPreview(entry, "cafe"))
+        assertEquals("First line", NoteSearch.matchingPreview(entry, ""))
+    }
+
+    @Test fun searchPreviewFallsBackWhenOnlyTitleMatches() {
+        val entry = note("one", "Project Atlas", "A first line\nAnother line")
+        assertEquals("A first line", NoteSearch.matchingPreview(entry, "Atlas"))
+    }
+
+    @Test fun searchKeepsArchiveAndPinnedFilters() {
+        val entries = listOf(
+            note("active", "Été", "Projet", true),
+            note("archived", "ETE", "Archive").copy(isArchived = true)
+        )
+        val service = NotesService(MemoryRepository())
+        assertEquals(listOf("active"), service.visible(entries, "ete", true).map { it.id })
+        assertEquals(listOf("archived"), service.visible(entries, "ete", false, archivedOnly = true).map { it.id })
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
