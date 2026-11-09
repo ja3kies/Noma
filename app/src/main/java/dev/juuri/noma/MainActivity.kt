@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
             val entry = ShortcutInfo.Builder(this, "noma-new-note")
                 .setShortLabel(getString(R.string.shortcut_new_note))
                 .setLongLabel(getString(R.string.shortcut_new_note_detail))
-                .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
+                .setIcon(Icon.createWithResource(this, R.mipmap.noma_launcher))
                 .setIntent(target)
                 .build()
             shortcuts.addDynamicShortcuts(listOf(entry))
