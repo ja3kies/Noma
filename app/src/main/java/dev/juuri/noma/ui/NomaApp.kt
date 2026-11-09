@@ -233,6 +233,7 @@ private fun NotesListScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val portableScope = rememberCoroutineScope()
+    val searchAccessibilityLabel = stringResource(R.string.search_hint)
 
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -313,7 +314,7 @@ private fun NotesListScreen(
                     value = query,
                     onValueChange = viewModel::onQueryChange,
                     modifier = Modifier.fillMaxWidth()
-                        .semantics { contentDescription = context.getString(R.string.search_hint) }
+                        .semantics { contentDescription = searchAccessibilityLabel }
                         .testTag("noma_search"),
                     singleLine = true,
                     shape = MaterialTheme.shapes.large,
