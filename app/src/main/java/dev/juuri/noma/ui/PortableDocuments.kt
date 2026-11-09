@@ -50,6 +50,7 @@ internal fun PortableDocuments(
     val exportResult = stringResource(R.string.portable_export_result)
     val unverifiedExport = stringResource(R.string.portable_export_unverified)
     val importFailure = stringResource(R.string.portable_import_failed)
+    val verificationFailure = stringResource(R.string.portable_verify_failed)
     val exportFailure = stringResource(R.string.portable_export_failed)
     var pending by remember { mutableStateOf<List<Note>?>(null) }
     var inspectedArchive by remember { mutableStateOf<NotesArchiveSummary?>(null) }
@@ -113,6 +114,7 @@ internal fun PortableDocuments(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null && !busy) {
+            inspectedArchive = null
             busy = true
             scope.launch {
                 try {
@@ -123,7 +125,7 @@ internal fun PortableDocuments(
                         NotesArchiveSummary.inspect(bytes)
                     }
                 } catch (failure: Exception) {
-                    onMessage(importFailure.format(failure.localizedMessage ?: readFailed))
+                    onMessage(verificationFailure.format(failure.localizedMessage ?: readFailed))
                 } finally {
                     busy = false
                 }
@@ -165,6 +167,7 @@ internal fun PortableDocuments(
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.portable_verify_action)) },
+                enabled = !busy,
                 onClick = {
                     actionsExpanded = false
                     verifier.launch(arrayOf("application/json"))
@@ -243,7 +246,10 @@ internal fun PortableDocuments(
             title = { Text(stringResource(R.string.portable_import_confirm, notes.size)) },
             text = { Text(stringResource(R.string.portable_import_warning, duplicateCount)) },
             confirmButton = {
-                TextButton(onClick = { onImport(notes); pending = null }) { Text(stringResource(R.string.portable_import_action)) }
+                TextButton(
+                    enabled = snapshot is NotesSnapshot.Ready && !busy,
+                    onClick = { onImport(notes); pending = null }
+                ) { Text(stringResource(R.string.portable_import_action)) }
             },
             dismissButton = {
                 TextButton(onClick = { pending = null }) { Text(stringResource(R.string.cancel)) }
