@@ -44,11 +44,13 @@ class NotesService(
                 .thenByDescending { it.updatedAt }
                 .thenBy { it.id }
         }
+        val resultOrder = if (words.isEmpty()) comparator else
+            compareBy<Note> { NoteSearch.relevance(it, query) }.then(comparator)
         return notes.asSequence()
             .filter { it.isArchived == archivedOnly }
             .filter { !pinnedOnly || it.isPinned }
             .filter { NoteSearch.matches(it, words) }
-            .sortedWith(comparator)
+            .sortedWith(resultOrder)
             .toList()
     }
 }
