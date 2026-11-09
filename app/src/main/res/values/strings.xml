@@ -98,4 +98,5 @@
     <string name="incoming_share_discard">Discard</string>
     <string name="incoming_share_saved">Shared text saved to Noma</string>
     <string name="incoming_share_size">%1$d characters</string>
+    <string name="widget_description">Quickly create a note</string>
 </resources>
