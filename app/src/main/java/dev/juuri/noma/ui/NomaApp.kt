@@ -6,7 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,6 +95,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -1120,6 +1124,24 @@ private fun WidgetStyleDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selected == style, onClick = null)
+                        Spacer(Modifier.width(NomaSpacing.small))
+                        val previewBrush = when (style) {
+                            NomaWidgetStyle.MATERIAL_YOU -> Brush.linearGradient(
+                                listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                            NomaWidgetStyle.FROSTED_GREEN -> Brush.linearGradient(
+                                listOf(Color(0xFFD7EADD), Color(0xFF9FC8AB), Color(0xFFDBEDE2))
+                            )
+                            NomaWidgetStyle.LIQUID_GLASS -> Brush.linearGradient(
+                                listOf(Color(0xFFFBFEFF), Color(0xFFBDD6E9), Color(0xFFE6F6FF))
+                            )
+                        }
+                        Box(
+                            modifier = Modifier.size(width = 52.dp, height = 32.dp)
+                                .background(previewBrush, RoundedCornerShape(12.dp))
+                                .padding(2.dp)
+                                .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
+                        )
                         Spacer(Modifier.width(NomaSpacing.comfortable))
                         Text(stringResource(label), style = MaterialTheme.typography.bodyLarge)
                     }
