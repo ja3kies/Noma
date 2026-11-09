@@ -1,12 +1,8 @@
 package dev.juuri.noma.capture
 
-import android.content.ComponentName
 import android.graphics.drawable.AdaptiveIconDrawable
-import android.graphics.drawable.Drawable
-import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.juuri.noma.MainActivity
 import dev.juuri.noma.R
 import org.junit.Assert.*
 import org.junit.Test

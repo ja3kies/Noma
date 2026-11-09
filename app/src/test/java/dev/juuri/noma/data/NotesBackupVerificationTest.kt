@@ -28,6 +28,17 @@ class NotesBackupVerificationTest {
         assertEquals("Noma", output.toString("UTF-8"))
     }
 
+    @Test fun securityDeniedReadDoesNotHideSuccessfulWrite() {
+        val output = ByteArrayOutputStream()
+        assertEquals(
+            NotesBackupVerification.Status.UNVERIFIED_PROVIDER,
+            NotesBackupVerification.writeAndVerify(
+                "user notes".toByteArray(), { output }, { throw SecurityException("No read grant") }
+            )
+        )
+        assertEquals("user notes", output.toString("UTF-8"))
+    }
+
     @Test fun silentContentCorruptionIsRejected() {
         try {
             NotesBackupVerification.writeAndVerify(
