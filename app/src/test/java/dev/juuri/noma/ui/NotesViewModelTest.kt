@@ -1,6 +1,7 @@
 package dev.juuri.noma.ui
 
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.capture.CaptureRequest
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
@@ -10,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -34,10 +36,12 @@ class NotesViewModelTest {
         override val notes: StateFlow<NotesSnapshot> = state
         var gate: CompletableDeferred<Unit>? = null
         var failWrites = false
+        var saveCallCount = 0
         var failImports = false
         var importGate: CompletableDeferred<Unit>? = null
 
         override suspend fun save(note: Note) {
+            saveCallCount++
             gate?.await()
             if (failWrites) throw IllegalStateException("Simulated disk failure")
             val old = (state.value as NotesSnapshot.Ready).entries
@@ -463,6 +467,153 @@ class NotesViewModelTest {
         assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
         assertEquals("id", model.active.value?.id)
         assertEquals("Keep editing", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+
+    @Test fun retryFromAlreadySavedEditorDoesNotRewriteTheNote() = runTest {
+        val note = Note("id", "Saved", "Content", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.retrySave()
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals(0, repo.saveCallCount)
+        assertEquals(note, (repo.notes.value as NotesSnapshot.Ready).entries.single())
+    }
+
+    @Test fun retryDuringPendingSaveDoesNotQueueDuplicateWrite() = runTest {
+        val note = Note("id", "Initial", "", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("Unconfirmed text")
+        runCurrent()
+        model.retrySave()
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, repo.saveCallCount)
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals("Unconfirmed text", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+    @Test fun cancellingDeferredCaptureDuringPendingSaveCreatesNoExtraNote() = runTest {
+        val note = Note("id", "Original", "Before", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("After")
+        model.requestQuickNote()
+        model.cancelDeferredQuickNote()
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("After", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+        assertEquals("id", model.active.value?.id)
+    }
+
+    @Test fun deletingStaleCardRestoresLatestSavedEditorContentOnUndo() = runTest {
+        val old = Note("id", "Title", "Old content", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.changeBody("Latest content")
+        advanceUntilIdle()
+        model.deleteNote(old)
+        advanceUntilIdle()
+        val deleted = model.events.first() as NoteUiEvent.Deleted
+        assertEquals("Latest content", deleted.note.body)
+        assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        model.undoDelete(deleted.note)
+        advanceUntilIdle()
+        assertEquals("Latest content", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+    @Test fun archivingStaleCardRestoresLatestSavedEditorContentOnUndo() = runTest {
+        val old = Note("id", "Title", "Old content", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.changeBody("Latest content")
+        advanceUntilIdle()
+        model.toggleArchive(old)
+        advanceUntilIdle()
+        val changed = model.events.first() as NoteUiEvent.ArchiveChanged
+        assertEquals("Latest content", changed.previous.body)
+        assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isArchived)
+        model.undoArchive(changed.previous)
+        advanceUntilIdle()
+        val restored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(false, restored.isArchived)
+        assertEquals("Latest content", restored.body)
+    }
+
+    @Test fun rapidEditsPersistOnlyTheLatestConfirmedRevision() = runTest {
+        val old = Note("id", "Original", "Before", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.changeTitle("After title edit")
+        model.changeBody("After body edit")
+        runCurrent()
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals(2, repo.saveCallCount)
+        val saved = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals("After title edit", saved.title)
+        assertEquals("After body edit", saved.body)
+    }
+
+    @Test fun searchFiltersAndSortingNeverModifyPersistedNotes() = runTest {
+        val original = Note("id", "Original", "Content", true, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.onQueryChange("something")
+        model.togglePinnedOnly()
+        model.toggleArchiveView()
+        model.selectSort(NoteSort.TITLE)
+        model.clearDiscoveryFilters()
+        advanceUntilIdle()
+        assertEquals(0, repo.saveCallCount)
+        assertEquals(original, (repo.notes.value as NotesSnapshot.Ready).entries.single())
+        assertEquals(NoteSort.TITLE, model.sort.value)
+    }
+
+    @Test fun repeatedCreateTapDuringSlowDiskWritePersistsOneNewNote() = runTest {
+        val original = Note("id", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        model.createNote()
+        runCurrent()
+        assertEquals(true, model.creating.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, repo.saveCallCount)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals(false, model.creating.value)
+    }
+
+    @Test fun failedEditorSavePreventsSwitchingToDifferentNote() = runTest {
+        val original = Note("id", "Original", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Keep this draft")
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        model.openNote(Note("other", "Other", "", false, 2L, 2L))
+        advanceUntilIdle()
+        assertEquals("id", model.active.value?.id)
+        assertEquals("Keep this draft", model.active.value?.body)
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {
