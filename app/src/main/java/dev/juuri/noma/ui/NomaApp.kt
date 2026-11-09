@@ -465,6 +465,14 @@ private fun NotesListScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (state.entries.isNotEmpty() &&
+                                (query.isNotBlank() || pinnedOnly || archivedOnly)) {
+                                Spacer(Modifier.height(NomaSpacing.section))
+                                OutlinedButton(
+                                    onClick = viewModel::clearDiscoveryFilters,
+                                    modifier = Modifier.testTag("noma_clear_filters")
+                                ) { Text(stringResource(R.string.clear_all_filters)) }
+                            }
                             if (state.entries.isEmpty()) {
                                 Spacer(Modifier.height(NomaSpacing.section))
                                 Button(onClick = viewModel::createNote) {
