@@ -116,4 +116,6 @@
     <string name="incoming_share_preview_truncated">Preview shows the first %1$d of %2$d characters. The full text will be saved.</string>
     <string name="note_actions_for">Actions for %1$s</string>
     <string name="portable_import_in_progress">Importing…</string>
+    <string name="search_section">Search results</string>
+    <string name="alphabetical_section">A–Z</string>
 </resources>
