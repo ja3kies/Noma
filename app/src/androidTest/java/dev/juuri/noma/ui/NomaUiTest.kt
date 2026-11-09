@@ -60,6 +60,16 @@ class NomaUiTest {
         compose.onNodeWithText("Weekend plan").assertExists()
     }
 
+    @Test fun clearingSearchFiltersRestoresAllNotes() {
+        val original = Note("one", "Réunion", "Important content", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val viewModel = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(viewModel) } }
+        compose.onNodeWithTag("noma_search").performTextInput("not found")
+        compose.onNodeWithTag("noma_clear_filters").performClick()
+        compose.onNodeWithText("Réunion").assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
