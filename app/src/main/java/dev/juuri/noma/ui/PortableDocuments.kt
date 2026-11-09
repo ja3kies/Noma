@@ -38,7 +38,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun PortableDocuments(
     snapshot: NotesSnapshot,
-    onImport: (List<Note>) -> Unit,
+    onImport: suspend (List<Note>) -> Int,
     snapshotForExport: suspend () -> List<Note>,
     onMessage: (String) -> Unit
 ) {
@@ -242,7 +242,7 @@ internal fun PortableDocuments(
             NotesImportPreview.duplicateCount(existing, notes)
         }
         AlertDialog(
-            onDismissRequest = { pending = null },
+            onDismissRequest = { if (!busy) pending = null },
             title = { Text(stringResource(R.string.portable_import_confirm, notes.size)) },
             text = {
                 androidx.compose.foundation.layout.Column {
@@ -259,11 +259,32 @@ internal fun PortableDocuments(
             confirmButton = {
                 TextButton(
                     enabled = snapshot is NotesSnapshot.Ready && !busy,
-                    onClick = { onImport(notes); pending = null }
-                ) { Text(stringResource(R.string.portable_import_action)) }
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                onImport(notes)
+                                pending = null
+                            } catch (failure: Exception) {
+                                // Keep the parsed document and duplicate preview for retry.
+                                onMessage(importFailure.format(failure.localizedMessage ?: readFailed))
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                ) {
+                    Text(stringResource(
+                        if (busy) R.string.portable_import_in_progress
+                        else R.string.portable_import_action
+                    ))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { pending = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(
+                    enabled = !busy,
+                    onClick = { pending = null }
+                ) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
