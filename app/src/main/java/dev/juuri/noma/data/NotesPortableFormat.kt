@@ -16,6 +16,7 @@ object NotesPortableFormat {
 
     fun encode(notes: List<Note>): ByteArray {
         require(notes.size <= MAX_NOTES) { "Too many notes" }
+        require(notes.map { it.id }.toSet().size == notes.size) { "Duplicate note IDs" }
         val entries = JSONArray()
         notes.sortedBy { it.id }.forEach { note ->
             entries.put(JSONObject().apply {
@@ -32,12 +33,16 @@ object NotesPortableFormat {
             put("format", "noma-notes")
             put("version", VERSION)
             put("notes", entries)
-        }.toString(2).toByteArray(StandardCharsets.UTF_8)
+        }.toString(2).toByteArray(StandardCharsets.UTF_8).also {
+            require(it.size <= MAX_IMPORT_BYTES) { "Archive exceeds size limit" }
+        }
     }
 
     fun decode(input: ByteArray): List<Note> {
         require(input.size <= MAX_IMPORT_BYTES) { "Archive exceeds size limit" }
-        val root = JSONObject(String(input, StandardCharsets.UTF_8))
+        val decoder = StandardCharsets.UTF_8.newDecoder()
+        val decoded = decoder.decode(java.nio.ByteBuffer.wrap(input)).toString()
+        val root = JSONObject(decoded)
         require(root.getString("format") == "noma-notes") { "Unsupported archive format" }
         require(root.getInt("version") == VERSION) { "Unsupported archive version" }
         val array = root.getJSONArray("notes")
