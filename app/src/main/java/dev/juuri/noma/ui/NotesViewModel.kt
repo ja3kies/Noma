@@ -127,6 +127,12 @@ class NotesViewModel(
         _pinnedOnly.value = false
     }
     fun selectSort(value: NoteSort) { _sort.value = value }
+    /** Reset only discovery constraints, leaving note data and the user's sort intact. */
+    fun clearDiscoveryFilters() {
+        _query.value = ""
+        _pinnedOnly.value = false
+        _archivedOnly.value = false
+    }
 
     fun visible(
         notes: List<Note>, query: String, pinnedOnly: Boolean,
