@@ -77,7 +77,8 @@
     <string name="portable_import_result">%1$d notes importées ; %2$d notes existantes ignorées</string>
     <string name="portable_export_failed">Échec de l’export : %1$s</string>
     <string name="portable_export_unsaved_edits">Une note contient des modifications non enregistrées. Réessayez l’enregistrement ou abandonnez-les explicitement avant l’export.</string>
-    <string name="portable_export_wait">Terminez l’enregistrement avant d’exporter</string>
+    <string name="portable_export_wait">Terminez l’enregistrement ou la capture avant d’exporter</string>
+    <string name="portable_export_pending_message">Cet export ne peut pas continuer tant que des enregistrements ou captures sont en cours, ou que des modifications restent non enregistrées.</string>
     <string name="portable_export_active_capture">Une note est encore en cours de création ou de capture. Terminez cette opération avant d’exporter.</string>
     <string name="portable_import_failed">Échec de l’import : %1$s</string>
     <string name="portable_not_ready">Chargement des notes en cours</string>

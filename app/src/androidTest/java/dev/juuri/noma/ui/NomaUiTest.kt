@@ -607,7 +607,7 @@ class NomaUiTest {
             }
         }
         compose.onNodeWithContentDescription("Import and export notes").performClick()
-        compose.onNodeWithText("Finish saving before exporting").assertIsNotEnabled()
+        compose.onNodeWithText("Finish saving or capturing before exporting").assertIsNotEnabled()
         compose.onNodeWithText("Check backup file").assertExists()
         compose.onNodeWithText("Import JSON").assertExists()
     }
@@ -631,7 +631,7 @@ class NomaUiTest {
         compose.onNodeWithText("Unencrypted export").assertExists()
         compose.runOnIdle { ready.value = false }
         compose.onNodeWithText("Export JSON").assertIsNotEnabled()
-        compose.onNodeWithText("A note is still being created or captured. Finish that operation before exporting.").assertExists()
+        compose.onNodeWithText("This export cannot continue until note saves or captures finish, and any unsaved changes are resolved.").assertExists()
     }
 
     @Test fun existingNoteCardCannotInterruptSlowCreation() {

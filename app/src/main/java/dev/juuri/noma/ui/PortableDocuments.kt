@@ -235,7 +235,7 @@ internal fun PortableDocuments(
             title = { Text(stringResource(R.string.portable_export_warning_title)) },
             text = {
                 Text(stringResource(if (canExport) R.string.portable_export_warning_detail
-                    else R.string.portable_export_active_capture))
+                    else R.string.portable_export_pending_message))
             },
             confirmButton = {
                 TextButton(

@@ -77,7 +77,8 @@
     <string name="portable_import_result">Imported %1$d notes; skipped %2$d existing</string>
     <string name="portable_export_failed">Export failed: %1$s</string>
     <string name="portable_export_unsaved_edits">A note has unsaved changes. Retry saving or explicitly discard them before exporting.</string>
-    <string name="portable_export_wait">Finish saving before exporting</string>
+    <string name="portable_export_wait">Finish saving or capturing before exporting</string>
+    <string name="portable_export_pending_message">This export cannot continue until note saves or captures finish, and any unsaved changes are resolved.</string>
     <string name="portable_export_active_capture">A note is still being created or captured. Finish that operation before exporting.</string>
     <string name="portable_import_failed">Import failed: %1$s</string>
     <string name="portable_not_ready">Notes are still loading</string>
