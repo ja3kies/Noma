@@ -152,8 +152,9 @@ fun NomaApp(
     val importResult = stringResource(R.string.portable_import_result)
     val sharedCaptureSaved = stringResource(R.string.incoming_share_saved)
     val saveBeforeNav = stringResource(R.string.save_before_navigation)
+    val deferredCaptureLabel = stringResource(R.string.quick_capture_deferred)
 
-    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved) {
+    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, deferredCaptureLabel) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -167,6 +168,7 @@ fun NomaApp(
                 }
                 is NoteUiEvent.Imported -> snackbar.showSnackbar(importResult.format(event.added, event.skipped))
                 NoteUiEvent.SaveBeforeNavigation -> snackbar.showSnackbar(saveBeforeNav)
+                NoteUiEvent.QuickCaptureDeferred -> snackbar.showSnackbar(deferredCaptureLabel)
                 NoteUiEvent.SharedCaptureSaved -> snackbar.showSnackbar(sharedCaptureSaved)
                 is NoteUiEvent.Failure ->
                     snackbar.showSnackbar(failurePrefix + event.message, withDismissAction = true)
