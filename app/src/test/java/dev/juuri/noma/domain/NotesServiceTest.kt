@@ -343,6 +343,37 @@ class NotesServiceTest {
         )
     }
 
+    @Test fun highlightRangesFollowOriginalAccentedCharacters() {
+        val text = "Un café, puis une réunion"
+        val ranges = NoteSearch.matchRanges(text, "cafe reunion")
+        assertEquals(listOf("café", "réunion"), ranges.map { text.substring(it.first, it.last + 1) })
+    }
+
+    @Test fun highlightRangesCoverLigatureWithoutSplittingIt() {
+        val text = "Mon cœur"
+        val ranges = NoteSearch.matchRanges(text, "coeur")
+        assertEquals(listOf("cœur"), ranges.map { text.substring(it.first, it.last + 1) })
+    }
+
+    @Test fun highlightRangesKeepSupplementaryCodePointsIntact() {
+        val text = "🦊 mon café 🦊"
+        val ranges = NoteSearch.matchRanges(text, "cafe")
+        assertEquals(1, ranges.size)
+        assertEquals("café", text.substring(ranges[0].first, ranges[0].last + 1))
+    }
+
+    @Test fun highlightRangesNeverProduceOverlappingSpans() {
+        val text = "réunion réunion"
+        val ranges = NoteSearch.matchRanges(text, "reunion union")
+        assertEquals(2, ranges.size)
+        assertTrue(ranges.zipWithNext().all { (a, b) -> a.last < b.first })
+    }
+
+    @Test fun highlightRangesSkipWhitespaceQueryAndRespectLimit() {
+        assertTrue(NoteSearch.matchRanges("anything", "  ").isEmpty())
+        assertEquals(2, NoteSearch.matchRanges("café café café", "cafe", 2).size)
+    }
+
     @Test fun notePresentationFallbackUsesBody() {
         val entry = note("a", body = "\n  A line about today\nSomething else")
         assertEquals("A line about today", entry.displayTitle)
