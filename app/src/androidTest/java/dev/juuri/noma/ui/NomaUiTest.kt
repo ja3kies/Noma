@@ -652,6 +652,26 @@ class NomaUiTest {
         }
     }
 
+
+    @Test fun exportReturnsToAvailableAfterSaveFinishes() {
+        val ready = mutableStateOf(false)
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = NotesSnapshot.Ready(emptyList()),
+                    onImport = { 0 },
+                    snapshotForExport = { emptyList() },
+                    onMessage = {},
+                    canExport = ready.value
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Finish saving or capturing before exporting").assertIsNotEnabled()
+        compose.runOnIdle { ready.value = true }
+        compose.onNodeWithText("Export JSON").assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))

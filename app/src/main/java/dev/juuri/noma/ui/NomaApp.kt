@@ -58,7 +58,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -538,7 +538,7 @@ private fun NotesListScreen(
                                 stateDescription = currentSortLabel
                             }
                         ) {
-                            Icon(Icons.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
+                            Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
                         }
                         DropdownMenu(
                             expanded = sortMenuExpanded,

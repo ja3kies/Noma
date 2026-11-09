@@ -1062,6 +1062,85 @@ class NotesViewModelTest {
         assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
     }
 
+
+    @Test fun pinOperationOnSavedEditorPersistsAndRemainsAccessible() = runTest {
+        val note = Note("id", "Original", "Body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.togglePin(note)
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals(true, model.active.value?.isPinned)
+        assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+    }
+
+    @Test fun pinSaveFailureCanBeRetriedWithoutLosingPinIntent() = runTest {
+        val note = Note("id", "Original", "Body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.togglePin(note)
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        assertEquals(true, model.active.value?.isPinned)
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+        repo.failWrites = false
+        model.retrySave()
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+        assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+    }
+
+    @Test fun deleteIsBlockedDuringPendingEditorWrite() = runTest {
+        val note = Note("id", "Original", "Body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("Pending user text")
+        model.deleteNote(note)
+        assertEquals("Pending user text", model.active.value?.body)
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("Pending user text", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+    }
+
+    @Test fun archiveIsBlockedDuringPendingEditorWrite() = runTest {
+        val note = Note("id", "Original", "Body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("Pending text")
+        model.toggleArchive(note)
+        assertEquals(false, model.active.value?.isArchived)
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        val persisted = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(false, persisted.isArchived)
+        assertEquals("Pending text", persisted.body)
+    }
+
+    @Test fun failedDraftBlocksQuickCaptureWithoutDroppingEditorText() = runTest {
+        val note = Note("id", "Original", "Body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        model.changeBody("Draft")
+        advanceUntilIdle()
+        model.requestQuickNote()
+        assertEquals("id", model.active.value?.id)
+        assertEquals("Draft", model.active.value?.body)
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
