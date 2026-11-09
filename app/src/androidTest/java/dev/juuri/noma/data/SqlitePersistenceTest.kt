@@ -45,6 +45,40 @@ class SqlitePersistenceTest {
         assertFalse(migrated.isArchived)
     }
 
+    @Test fun importingSkipsExistingWithoutOverwritingAndPreservesFields() = runBlocking {
+        val repository = SqliteNotesRepository(context, testDb)
+        val original = Note("shared", "Original", "Keep original body", true, 10L, 20L, true)
+        val fresh = Note("fresh", "Import", "Unicode 🦊", false, 30L, 40L, false)
+        repository.save(original)
+        val imported = repository.importMissing(listOf(original.copy(title = "Overwritten?"), fresh))
+        assertEquals(1, imported)
+        val all = (repository.notes.value as NotesSnapshot.Ready).entries.associateBy { it.id }
+        assertEquals(2, all.size)
+        assertEquals(original, all["shared"])
+        assertEquals(fresh, all["fresh"])
+        assertEquals(0, repository.importMissing(listOf(original, fresh)))
+    }
+
+    @Test fun databaseRejectsImpossibleNoteAndRollsBackPriorInsert() = runBlocking {
+        val repository = SqliteNotesRepository(context, testDb)
+        val allowed = Note("valid", "Should be rolled back", "", false, 1L, 2L)
+        val bad = allowed.copy(id = "bad", title = "x".repeat(3000))
+        // Verify rollback via a SQL-triggered failure rather than encoding restrictions.
+        NotesOpenHelper(context, testDb).writableDatabase.execSQL(
+            "CREATE TRIGGER fail_bad BEFORE INSERT ON notes " +
+                "WHEN NEW.id = 'bad' BEGIN SELECT RAISE(ABORT, 'forced import failure'); END"
+        )
+        try {
+            repository.importMissing(listOf(allowed, bad))
+            fail("Expected transactional failure")
+        } catch (_: android.database.sqlite.SQLiteException) {
+            val current = (repository.notes.value as? NotesSnapshot.Ready)?.entries.orEmpty()
+            assertTrue(current.none { it.id == "valid" || it.id == "bad" })
+            val reopened = NotesOpenHelper(context, testDb).readAll()
+            assertTrue(reopened.isEmpty())
+        }
+    }
+
     @Test fun writesSurviveNewRepositoryInstancesAndDeletion() = runBlocking {
         val first = SqliteNotesRepository(context, testDb)
         val original = Note("persisted", "Shopping", "Coffee and bread", true, 10L, 10L, true)
