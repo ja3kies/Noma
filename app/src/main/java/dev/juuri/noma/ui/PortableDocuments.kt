@@ -32,6 +32,7 @@ import kotlinx.coroutines.withContext
 internal fun PortableDocuments(
     snapshot: NotesSnapshot,
     onImport: (List<Note>) -> Unit,
+    snapshotForExport: suspend () -> List<Note>,
     onMessage: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -50,23 +51,22 @@ internal fun PortableDocuments(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
         if (uri != null && !busy) {
-            val notes = (snapshot as? NotesSnapshot.Ready)?.entries
-            if (notes == null) onMessage(notReady)
-            else {
-                busy = true
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            context.contentResolver.openOutputStream(uri, "wt")?.use {
-                                it.write(NotesPortableFormat.encode(notes))
-                                it.flush()
-                            } ?: error(writeFailed)
-                        }
-                        onMessage(exportResult.format(notes.size))
-                    } catch (e: Exception) {
-                        onMessage(exportFailure.format(e.localizedMessage ?: writeFailed))
-                    } finally { busy = false }
-                }
+            busy = true
+            scope.launch {
+                try {
+                    val count = withContext(Dispatchers.IO) {
+                        val notes = snapshotForExport()
+                        val bytes = NotesPortableFormat.encode(notes)
+                        context.contentResolver.openOutputStream(uri, "wt")?.use {
+                            it.write(bytes)
+                            it.flush()
+                        } ?: error(writeFailed)
+                        notes.size
+                    }
+                    onMessage(exportResult.format(count))
+                } catch (e: Exception) {
+                    onMessage(exportFailure.format(e.localizedMessage ?: writeFailed))
+                } finally { busy = false }
             }
         }
     }
