@@ -1,6 +1,12 @@
 package dev.juuri.noma
 
 import android.os.Bundle
+import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
+import dev.juuri.noma.capture.AndroidCaptureIntents
+import dev.juuri.noma.capture.CaptureRequest
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,9 +39,47 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        acceptCaptureIntent(intent)
+    }
+
+    private fun acceptCaptureIntent(incoming: Intent?) {
+        val request = try {
+            AndroidCaptureIntents.parse(incoming)
+        } catch (_: RuntimeException) {
+            // Malformed or hostile Intent must not crash a note-taking app.
+            null
+        }
+        when (request) {
+            is CaptureRequest.NewNote -> notesViewModel.createNote()
+            is CaptureRequest.SharedText -> notesViewModel.receiveSharedText(request)
+            null -> Unit
+        }
+        // Avoid presenting the same share a second time after Activity recreation.
+        setIntent(Intent(Intent.ACTION_MAIN))
+    }
+
+    private fun registerQuickCaptureShortcut() {
+        val shortcuts = getSystemService(ShortcutManager::class.java) ?: return
+        val target = Intent(this, MainActivity::class.java).apply {
+            action = AndroidCaptureIntents.ACTION_NEW_NOTE
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val entry = ShortcutInfo.Builder(this, "noma-new-note")
+            .setShortLabel(getString(R.string.shortcut_new_note))
+            .setLongLabel(getString(R.string.shortcut_new_note_detail))
+            .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
+            .setIntent(target)
+            .build()
+        shortcuts.dynamicShortcuts = listOf(entry)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        registerQuickCaptureShortcut()
+        acceptCaptureIntent(intent)
         setContent {
             val preferences = remember {
                 getSharedPreferences("noma_appearance", MODE_PRIVATE)
