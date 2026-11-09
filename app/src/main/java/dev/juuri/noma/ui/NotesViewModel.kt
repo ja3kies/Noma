@@ -18,6 +18,7 @@ sealed interface NoteUiEvent {
     data class Deleted(val note: Note) : NoteUiEvent
     data class ArchiveChanged(val previous: Note) : NoteUiEvent
     data class Imported(val added: Int, val skipped: Int) : NoteUiEvent
+    data object SaveBeforeNavigation : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
 
@@ -141,6 +142,10 @@ class NotesViewModel(
 
     fun createNote() {
         if (_creating.value) return
+        if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
         _creating.value = true
         viewModelScope.launch {
             try {
@@ -164,6 +169,11 @@ class NotesViewModel(
     }
 
     fun openNote(note: Note) {
+        if (_active.value?.id != null && _active.value?.id != note.id &&
+            _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
         editorRevision++
         _active.value = note
         _saveState.value = EditorSaveState.Saved
@@ -205,6 +215,10 @@ class NotesViewModel(
     }
 
     fun deleteNote(note: Note) {
+        if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
         if (_active.value?.id == note.id) closeNote()
         operations.trySend(WriteOperation.Delete(note))
     }
@@ -214,6 +228,10 @@ class NotesViewModel(
     }
 
     fun toggleArchive(note: Note) {
+        if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
         if (_active.value?.id == note.id) closeNote()
         operations.trySend(WriteOperation.Archive(note))
     }
