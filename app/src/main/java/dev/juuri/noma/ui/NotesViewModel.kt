@@ -74,6 +74,7 @@ class NotesViewModel(
     val saveState: StateFlow<EditorSaveState> = _saveState.asStateFlow()
 
     private var editorRevision = 0L
+    private var quickNoteRequestedAfterSave = false
     private val operations = Channel<WriteOperation>(Channel.UNLIMITED)
     private val eventChannel = Channel<NoteUiEvent>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
@@ -90,6 +91,10 @@ class NotesViewModel(
                             if (operation.editorRevision != null &&
                                 operation.editorRevision == editorRevision) {
                                 _saveState.value = EditorSaveState.Saved
+                                if (quickNoteRequestedAfterSave) {
+                                    quickNoteRequestedAfterSave = false
+                                    createNote()
+                                }
                             }
                         }
                         is WriteOperation.Delete -> {
@@ -193,6 +198,16 @@ class NotesViewModel(
         notes: List<Note>, query: String, pinnedOnly: Boolean,
         archivedOnly: Boolean, sort: NoteSort
     ): List<Note> = service.visible(notes, query, pinnedOnly, archivedOnly, sort)
+
+    /** Launcher/widget capture never discards the active unsaved editor. */
+    fun requestQuickNote() {
+        if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
+            quickNoteRequestedAfterSave = true
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+        } else {
+            createNote()
+        }
+    }
 
     fun createNote() {
         if (_creating.value) return
