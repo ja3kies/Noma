@@ -35,7 +35,10 @@ private sealed interface WriteOperation {
     data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
-    data class Import(val notes: List<Note>) : WriteOperation
+    data class Import(
+        val notes: List<Note>,
+        val result: CompletableDeferred<Int>? = null
+    ) : WriteOperation
     data class ExportSnapshot(val result: CompletableDeferred<List<Note>>) : WriteOperation
     data class Archive(val previous: Note) : WriteOperation
 }
@@ -110,6 +113,7 @@ class NotesViewModel(
                         }
                         is WriteOperation.Import -> {
                             val added = repository.importMissing(operation.notes)
+                            operation.result?.complete(added)
                             eventChannel.send(NoteUiEvent.Imported(added, operation.notes.size - added))
                         }
                         is WriteOperation.Archive -> {
@@ -123,13 +127,18 @@ class NotesViewModel(
                     if (operation is WriteOperation.ExportSnapshot) {
                         operation.result.completeExceptionally(failure)
                     }
+                    if (operation is WriteOperation.Import) {
+                        operation.result?.completeExceptionally(failure)
+                    }
                     val message = failure.localizedMessage ?: "Storage unavailable"
                     if (operation is WriteOperation.Save &&
                         operation.editorRevision != null &&
                         operation.editorRevision == editorRevision) {
                         _saveState.value = EditorSaveState.Failed(message)
                     }
-                    eventChannel.send(NoteUiEvent.Failure(message))
+                    if (operation !is WriteOperation.Import || operation.result == null) {
+                        eventChannel.send(NoteUiEvent.Failure(message))
+                    }
                 }
             }
         }
@@ -314,6 +323,13 @@ class NotesViewModel(
     }
 
     fun importNotes(notes: List<Note>) { operations.trySend(WriteOperation.Import(notes)) }
+
+    /** Wait for a committed import, so the confirmation can stay open on failure. */
+    suspend fun importNotesAwait(notes: List<Note>): Int {
+        val result = CompletableDeferred<Int>()
+        operations.send(WriteOperation.Import(notes, result))
+        return result.await()
+    }
 
     /** Ordered after all queued saves, archive operations and imports. */
     suspend fun snapshotForExport(): List<Note> {
