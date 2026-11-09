@@ -58,9 +58,12 @@ object NoteSearch {
         }
         val found = words.map { folded.indexOf(it) }.filter { it >= 0 }.minOrNull()
         val hit = found?.let { positions.getOrNull(it) } ?: 0
-        val start = if (hit <= PREVIEW_LEADING_CONTEXT) 0
+        var start = if (hit <= PREVIEW_LEADING_CONTEXT) 0
             else (hit - PREVIEW_LEADING_CONTEXT).coerceAtMost(line.length - PREVIEW_LIMIT)
-        val end = (start + PREVIEW_LIMIT).coerceAtMost(line.length)
+        // UTF-16 substring boundaries must not split a supplementary character.
+        if (start > 0 && Character.isLowSurrogate(line[start])) start++
+        var end = (start + PREVIEW_LIMIT).coerceAtMost(line.length)
+        if (end < line.length && Character.isHighSurrogate(line[end - 1])) end--
         return (if (start > 0) "…" else "") +
             line.substring(start, end).trim() +
             (if (end < line.length) "…" else "")
