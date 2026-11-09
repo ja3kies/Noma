@@ -368,6 +368,7 @@ private fun NotesListScreen(
     }
 
     val newNoteLabel = stringResource(R.string.new_note)
+    val creatingNoteLabel = stringResource(R.string.creating_note)
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -387,7 +388,7 @@ private fun NotesListScreen(
                     icon = {
                         if (creating) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(20.dp).testTag("noma_creation_spinner"),
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 strokeWidth = 2.dp
                             )
@@ -401,7 +402,12 @@ private fun NotesListScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                    modifier = Modifier.testTag("noma_new_note").semantics { if (creating) disabled() }
+                    modifier = Modifier.testTag("noma_new_note").semantics {
+                        if (creating) {
+                            disabled()
+                            contentDescription = creatingNoteLabel
+                        }
+                    }
                 )
             }
         }
@@ -454,9 +460,9 @@ private fun NotesListScreen(
                     trailingIcon = if (query.isNotEmpty()) {
                         {
                             IconButton(onClick = {
-                                viewModel.onQueryChange("")
                                 focusManager.clearFocus()
                                 searchKeyboard?.hide()
+                                viewModel.onQueryChange("")
                             }) {
                                 Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.clear_search))
                             }
@@ -484,9 +490,9 @@ private fun NotesListScreen(
                         FilterChip(
                             selected = archivedOnly,
                             onClick = {
-                                viewModel.toggleArchiveView()
                                 focusManager.clearFocus()
                                 searchKeyboard?.hide()
+                                viewModel.toggleArchiveView()
                             },
                             enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier.testTag("noma_archive_filter"),
@@ -502,9 +508,9 @@ private fun NotesListScreen(
                             FilterChip(
                                 selected = pinnedOnly,
                                 onClick = {
-                                    viewModel.togglePinnedOnly()
                                     focusManager.clearFocus()
                                     searchKeyboard?.hide()
+                                    viewModel.togglePinnedOnly()
                                 },
                                 enabled = snapshot is NotesSnapshot.Ready,
                                 label = { Text(stringResource(R.string.pinned_filter)) },
@@ -532,10 +538,10 @@ private fun NotesListScreen(
                                 text = { Text(stringResource(R.string.sort_recent)) },
                                 modifier = Modifier.semantics { selected = sort == NoteSort.RECENT },
                                 onClick = {
-                                    viewModel.selectSort(NoteSort.RECENT)
-                                    sortMenuExpanded = false
                                     focusManager.clearFocus()
                                     searchKeyboard?.hide()
+                                    viewModel.selectSort(NoteSort.RECENT)
+                                    sortMenuExpanded = false
                                 },
                                 trailingIcon = if (sort == NoteSort.RECENT) {
                                     { Icon(Icons.Outlined.CheckCircleOutline, contentDescription = null) }
@@ -545,10 +551,10 @@ private fun NotesListScreen(
                                 text = { Text(stringResource(R.string.sort_title)) },
                                 modifier = Modifier.semantics { selected = sort == NoteSort.TITLE },
                                 onClick = {
-                                    viewModel.selectSort(NoteSort.TITLE)
-                                    sortMenuExpanded = false
                                     focusManager.clearFocus()
                                     searchKeyboard?.hide()
+                                    viewModel.selectSort(NoteSort.TITLE)
+                                    sortMenuExpanded = false
                                 },
                                 trailingIcon = if (sort == NoteSort.TITLE) {
                                     { Icon(Icons.Outlined.CheckCircleOutline, contentDescription = null) }
@@ -636,9 +642,9 @@ private fun NotesListScreen(
                                 Spacer(Modifier.height(NomaSpacing.section))
                                 OutlinedButton(
                                     onClick = {
-                                        viewModel.clearDiscoveryFilters()
                                         focusManager.clearFocus()
                                         searchKeyboard?.hide()
+                                        viewModel.clearDiscoveryFilters()
                                     },
                                     modifier = Modifier.testTag("noma_clear_filters")
                                 ) { Text(stringResource(R.string.clear_all_filters)) }
