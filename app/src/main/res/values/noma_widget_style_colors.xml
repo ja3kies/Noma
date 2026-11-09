@@ -1,0 +1,7 @@
+<resources>
+<color name="noma_widget_material_background">#E8F0E5</color>
+<color name="noma_widget_material_outline">#AEC2B1</color>
+<color name="noma_widget_material_text">#20352F</color>
+<color name="noma_widget_frosted_text">#203A2E</color>
+<color name="noma_widget_glass_text">#173844</color>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/noma_widget_capture" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:minHeight="56dp"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:paddingHorizontal="16dp" android:background="@drawable/noma_widget_glass_surface"
+    android:importantForAccessibility="yes"
+    android:contentDescription="@string/shortcut_new_note_detail">
+    <ImageView android:layout_width="30dp" android:layout_height="30dp"
+        android:src="@drawable/ic_noma_launcher" android:contentDescription="@null"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginStart="12dp" android:text="@string/shortcut_new_note"
+        android:textColor="@color/noma_widget_glass_text" android:textSize="16sp" android:textStyle="bold"
+        android:ellipsize="end" android:singleLine="true"/>
+</LinearLayout>
