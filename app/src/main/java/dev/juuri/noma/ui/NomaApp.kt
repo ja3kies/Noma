@@ -576,6 +576,18 @@ private fun NotesListScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     )
+                    // Keep reset near the search controls so the IME cannot obscure it.
+                    if (filteredCount == 0 && (query.isNotBlank() || pinnedOnly || archivedOnly)) {
+                        Spacer(Modifier.height(NomaSpacing.small))
+                        OutlinedButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                                viewModel.clearDiscoveryFilters()
+                            },
+                            modifier = Modifier.testTag("noma_clear_filters")
+                        ) { Text(stringResource(R.string.clear_all_filters)) }
+                    }
                 }
             }
 
@@ -638,17 +650,6 @@ private fun NotesListScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (query.isNotBlank() || pinnedOnly || archivedOnly) {
-                                Spacer(Modifier.height(NomaSpacing.section))
-                                OutlinedButton(
-                                    onClick = {
-                                        focusManager.clearFocus()
-                                        searchKeyboard?.hide()
-                                        viewModel.clearDiscoveryFilters()
-                                    },
-                                    modifier = Modifier.testTag("noma_clear_filters")
-                                ) { Text(stringResource(R.string.clear_all_filters)) }
-                            }
                         }
                     } else {
                         val pinned = if (archivedOnly) emptyList() else visible.filter { it.isPinned }
