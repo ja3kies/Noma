@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 sealed interface NoteUiEvent {
     data class Deleted(val note: Note) : NoteUiEvent
     data class ArchiveChanged(val previous: Note) : NoteUiEvent
+    data class Imported(val added: Int, val skipped: Int) : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
 
@@ -30,6 +31,7 @@ private sealed interface WriteOperation {
     data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
+    data class Import(val notes: List<Note>) : WriteOperation
     data class Archive(val previous: Note) : WriteOperation
 }
 
@@ -84,6 +86,19 @@ class NotesViewModel(
                             eventChannel.send(NoteUiEvent.Deleted(operation.note))
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
+                        is WriteOperation.Import -> {
+                            val current = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
+                                ?: error("Notes not loaded")
+                            val ids = current.entries.mapTo(HashSet<String>()) { it.id }
+                            var added = 0
+                            for (note in operation.notes) {
+                                if (ids.add(note.id)) {
+                                    repository.save(note)
+                                    added++
+                                }
+                            }
+                            eventChannel.send(NoteUiEvent.Imported(added, operation.notes.size - added))
+                        }
                         is WriteOperation.Archive -> {
                             service.save(operation.previous.copy(
                                 isArchived = !operation.previous.isArchived
@@ -196,6 +211,8 @@ class NotesViewModel(
     fun undoArchive(note: Note) {
         operations.trySend(WriteOperation.Restore(note))
     }
+
+    fun importNotes(notes: List<Note>) { operations.trySend(WriteOperation.Import(notes)) }
 
     fun retry() {
         viewModelScope.launch { repository.refresh() }
