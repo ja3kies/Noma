@@ -975,7 +975,11 @@ private fun NoteEditorScreen(
             dismissButton = {
                 Row {
                     TextButton(
-                        onClick = { confirmDiscard = false },
+                        onClick = {
+                            confirmDiscard = false
+                            closeWhenSaved = false
+                            viewModel.cancelDeferredQuickNote()
+                        },
                         modifier = Modifier.testTag("noma_keep_editing")
                     ) { Text(stringResource(R.string.keep_editing)) }
                     TextButton(
