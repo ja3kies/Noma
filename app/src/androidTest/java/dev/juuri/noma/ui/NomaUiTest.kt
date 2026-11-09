@@ -154,8 +154,10 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_new_note").performClick()
-        compose.onNodeWithText("Creating note…").assertExists()
+        compose.waitUntil(5_000) { model.creating.value }
+        compose.onNodeWithTag("noma_creation_spinner", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_new_note").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Creating note…").assertExists()
         // A repeated request while the first insert is blocked must be ignored.
         compose.runOnIdle {
             model.createNote()
@@ -345,7 +347,8 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_search").performTextInput("nothing matches")
         compose.onNodeWithTag("noma_new_note").assertExists()
         compose.onNodeWithTag("noma_clear_filters").assertExists().performClick()
-        compose.runOnIdle { assertEquals("", model.query.value) }
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithTag("noma_clear_filters").assertDoesNotExist()
         compose.onNodeWithTag("noma_new_note").assertExists()
     }
 
