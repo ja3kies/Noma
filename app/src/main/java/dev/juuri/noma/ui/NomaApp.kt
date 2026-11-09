@@ -375,8 +375,20 @@ private fun NotesListScreen(
                 ExtendedFloatingActionButton(
                     onClick = { if (!creating) viewModel.createNote() },
                     expanded = true,
-                    icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
-                    text = { Text(newNoteLabel) },
+                    icon = {
+                        if (creating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Outlined.Add, contentDescription = null)
+                        }
+                    },
+                    text = {
+                        Text(if (creating) stringResource(R.string.creating_note) else newNoteLabel)
+                    },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
@@ -600,10 +612,23 @@ private fun NotesListScreen(
                             }
                             if (state.entries.isEmpty()) {
                                 Spacer(Modifier.height(NomaSpacing.section))
-                                Button(onClick = viewModel::createNote) {
-                                    Icon(Icons.Outlined.Add, contentDescription = null)
+                                Button(
+                                    onClick = viewModel::createNote,
+                                    enabled = !creating
+                                ) {
+                                    if (creating) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    } else {
+                                        Icon(Icons.Outlined.Add, contentDescription = null)
+                                    }
                                     Spacer(Modifier.width(NomaSpacing.small))
-                                    Text(stringResource(R.string.new_note))
+                                    Text(stringResource(
+                                        if (creating) R.string.creating_note else R.string.new_note
+                                    ))
                                 }
                             }
                         }
