@@ -47,6 +47,14 @@ class SqliteNotesRepository(
         }
     }
 
+    override suspend fun importMissing(notes: List<Note>): Int = withContext(io) {
+        mutex.withLock {
+            val inserted = helper.importMissing(notes)
+            state.value = NotesSnapshot.Ready(helper.readAll())
+            inserted
+        }
+    }
+
     override suspend fun delete(id: String) = withContext(io) {
         mutex.withLock {
             helper.remove(id)

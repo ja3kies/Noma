@@ -87,16 +87,7 @@ class NotesViewModel(
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
                         is WriteOperation.Import -> {
-                            val current = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
-                                ?: error("Notes not loaded")
-                            val ids = current.entries.mapTo(HashSet<String>()) { it.id }
-                            var added = 0
-                            for (note in operation.notes) {
-                                if (ids.add(note.id)) {
-                                    repository.save(note)
-                                    added++
-                                }
-                            }
+                            val added = repository.importMissing(operation.notes)
                             eventChannel.send(NoteUiEvent.Imported(added, operation.notes.size - added))
                         }
                         is WriteOperation.Archive -> {

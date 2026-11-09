@@ -78,6 +78,34 @@ internal class NotesOpenHelper(context: Context, databaseName: String = DATABASE
         ) { "Could not save note" }
     }
 
+    /** One SQLite transaction: either all eligible imported notes persist or none do. */
+    fun importMissing(notes: List<Note>): Int {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            var inserted = 0
+            for (note in notes) {
+                val values = ContentValues().apply {
+                    put("id", note.id)
+                    put("title", note.title)
+                    put("body", note.body)
+                    put("pinned", if (note.isPinned) 1 else 0)
+                    put("archived", if (note.isArchived) 1 else 0)
+                    put("created_at", note.createdAt)
+                    put("updated_at", note.updatedAt)
+                }
+                if (db.insertWithOnConflict("notes", null, values,
+                        SQLiteDatabase.CONFLICT_IGNORE) != -1L) {
+                    inserted++
+                }
+            }
+            db.setTransactionSuccessful()
+            return inserted
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun remove(id: String) {
         writableDatabase.delete("notes", "id = ?", arrayOf(id))
     }
