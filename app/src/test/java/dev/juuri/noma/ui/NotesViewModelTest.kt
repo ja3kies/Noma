@@ -142,6 +142,41 @@ class NotesViewModelTest {
         assertEquals(false, model.creating.value)
     }
 
+    @Test fun switchingNotesDuringPendingSaveKeepsDraftAndSavingState() = runTest {
+        val original = Note("current", "Initial", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.gate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Uncommitted changes")
+        model.openNote(Note("other", "Different note", "", false, 2L, 2L))
+        assertEquals("current", model.active.value?.id)
+        assertEquals("Uncommitted changes", model.active.value?.body)
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        model.openNote(original)
+        assertEquals(EditorSaveState.Saving, model.saveState.value)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(EditorSaveState.Saved, model.saveState.value)
+    }
+
+    @Test fun failedSaveCannotBeLostThroughDeleteOrArchive() = runTest {
+        val original = Note("current", "Unchanged", "", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Draft still in memory")
+        advanceUntilIdle()
+        assertTrue(model.saveState.value is EditorSaveState.Failed)
+        model.deleteNote(original)
+        model.toggleArchive(original)
+        model.createNote()
+        assertEquals("current", model.active.value?.id)
+        assertEquals("Draft still in memory", model.active.value?.body)
+        assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)
