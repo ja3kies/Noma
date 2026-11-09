@@ -763,11 +763,15 @@ private fun NoteActionsMenu(
     onShare: () -> Unit
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
-            onClick = { onDismiss(); onPin() },
-            leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
-        )
+        // An archived note is not shown in the pinned section. Do not offer
+        // a pin action that appears to have no visible effect.
+        if (!note.isArchived) {
+            DropdownMenuItem(
+                text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
+                onClick = { onDismiss(); onPin() },
+                leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
+            )
+        }
         DropdownMenuItem(
             text = { Text(stringResource(if (note.isArchived) R.string.unarchive_note else R.string.archive_note)) },
             onClick = { onDismiss(); onArchive() },
