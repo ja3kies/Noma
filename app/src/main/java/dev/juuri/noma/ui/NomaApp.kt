@@ -113,6 +113,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.Role
@@ -400,7 +401,7 @@ private fun NotesListScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                    modifier = Modifier.testTag("noma_new_note")
+                    modifier = Modifier.testTag("noma_new_note").semantics { if (creating) disabled() }
                 )
             }
         }
