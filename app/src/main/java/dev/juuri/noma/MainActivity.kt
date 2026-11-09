@@ -72,7 +72,12 @@ class MainActivity : ComponentActivity() {
             .setIcon(Icon.createWithResource(this, R.drawable.ic_noma_launcher))
             .setIntent(target)
             .build()
-        shortcuts.dynamicShortcuts = listOf(entry)
+        try {
+            // Some OEM launchers deny dynamic-shortcut updates. The app must still open.
+            shortcuts.addDynamicShortcuts(listOf(entry))
+        } catch (failure: RuntimeException) {
+            android.util.Log.w("NomaCapture", "Launcher shortcut unavailable", failure)
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
