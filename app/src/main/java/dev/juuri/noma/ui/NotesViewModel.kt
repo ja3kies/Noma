@@ -141,15 +141,15 @@ class NotesViewModel(
 
     fun createNote() {
         if (_creating.value) return
-        // A newly created note must be discoverable when returning from the editor.
-        // In particular, an active search must not hide an empty new note.
-        _query.value = ""
-        _archivedOnly.value = false
-        _pinnedOnly.value = false
         _creating.value = true
         viewModelScope.launch {
             try {
                 val created = service.create()
+                // A failure must preserve the user's current search and filters.
+                // Once persisted, show the new note in the unfiltered notebook.
+                _query.value = ""
+                _archivedOnly.value = false
+                _pinnedOnly.value = false
                 editorRevision++
                 _active.value = created
                 _saveState.value = EditorSaveState.Saved
