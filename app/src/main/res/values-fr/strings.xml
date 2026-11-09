@@ -113,4 +113,6 @@
     <string name="portable_verify_no_import">Le fichier a été vérifié sans importer ni modifier de notes.</string>
     <string name="portable_verify_failed">Vérification de la sauvegarde impossible : %1$s</string>
     <string name="portable_import_details">%1$d nouvelles notes · %2$d déjà présentes · %3$d épinglées · %4$d archivées</string>
+    <string name="incoming_share_preview_truncated">Aperçu des %1$d premiers caractères sur %2$d. Le texte complet sera enregistré.</string>
+    <string name="note_actions_for">Actions pour %1$s</string>
 </resources>
