@@ -3,6 +3,7 @@ package dev.juuri.noma.capture
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
@@ -16,6 +17,7 @@ class NomaQuickCaptureWidget : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
+        val style = NomaWidgetPreferences.read(context)
         appWidgetIds.forEach { widgetId ->
             val capture = Intent(context, MainActivity::class.java).apply {
                 action = AndroidCaptureIntents.ACTION_NEW_NOTE
@@ -27,9 +29,27 @@ class NomaQuickCaptureWidget : AppWidgetProvider() {
                 capture,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            val views = RemoteViews(context.packageName, R.layout.noma_quick_capture_widget)
+            val views = RemoteViews(context.packageName, style.layoutId)
             views.setOnClickPendingIntent(R.id.noma_widget_capture, pending)
             appWidgetManager.updateAppWidget(widgetId, views)
         }
+    }
+
+    companion object {
+        /** Refresh installed instances after a user preference or system theme change. */
+        fun refreshAll(context: Context) {
+            val manager = AppWidgetManager.getInstance(context)
+            val ids = manager.getAppWidgetIds(
+                ComponentName(context, NomaQuickCaptureWidget::class.java)
+            )
+            if (ids.isNotEmpty()) {
+                NomaQuickCaptureWidget().onUpdate(context, manager, ids)
+            }
+        }
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) refreshAll(context)
     }
 }
