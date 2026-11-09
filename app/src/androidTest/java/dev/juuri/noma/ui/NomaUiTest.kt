@@ -5,6 +5,8 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -84,6 +86,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
         compose.onNodeWithTag("noma_search").assertIsNotEnabled()
         compose.onNodeWithText("Try again").assertExists()
+        compose.onNodeWithText("Noma could not read your notes. Try again. If the problem persists, verify a backup before making changes.").assertExists()
         compose.onNodeWithContentDescription("Import and export notes").assertExists()
     }
 
@@ -195,6 +198,20 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_search").performTextInput("Cafe")
         compose.onNodeWithText("Search results").assertExists()
         compose.onNodeWithText("Café").assertExists()
+    }
+
+    @Test fun sortButtonAnnouncesTheActualSortMode() {
+        val repo = FakeRepository(listOf(Note("sort", "One", "Body", false, 1L, 1L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_sort_button").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Recently edited")
+        )
+        compose.onNodeWithTag("noma_sort_button").performClick()
+        compose.onNodeWithText("Title (A–Z)").performClick()
+        compose.onNodeWithTag("noma_sort_button").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Title (A–Z)")
+        )
     }
 
     @Test fun deleteDialogNamesTheExactNoteAndCancelPreservesIt() {
@@ -402,6 +419,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_body_input").performTextInput(" updated")
         compose.waitUntil(5_000) { model.saveState.value is EditorSaveState.Failed }
         compose.onNodeWithTag("noma_retry_save").assertExists()
+        compose.onNodeWithTag("noma_save_failure_guidance").assertExists()
         compose.runOnIdle {
             assertTrue(model.active.value?.body?.contains("updated") == true)
             repo.failWrites = false

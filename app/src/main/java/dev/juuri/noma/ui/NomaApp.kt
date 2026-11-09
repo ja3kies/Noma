@@ -116,6 +116,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -311,6 +312,7 @@ private fun NotesListScreen(
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val editorSaveState by viewModel.saveState.collectAsState()
     val filteredNotes = remember(snapshot, query, pinnedOnly, archivedOnly, sort) {
         (snapshot as? NotesSnapshot.Ready)?.let { state ->
             viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
@@ -369,6 +371,7 @@ private fun NotesListScreen(
 
     val newNoteLabel = stringResource(R.string.new_note)
     val creatingNoteLabel = stringResource(R.string.creating_note)
+    val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -389,7 +392,7 @@ private fun NotesListScreen(
                         if (creating) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp).testTag("noma_creation_spinner"),
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 strokeWidth = 2.dp
                             )
                         } else {
@@ -399,8 +402,8 @@ private fun NotesListScreen(
                     text = {
                         Text(if (creating) stringResource(R.string.creating_note) else newNoteLabel)
                     },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = if (creating) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                    contentColor = if (creating) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
                     modifier = Modifier.testTag("noma_new_note").semantics {
                         if (creating) {
@@ -526,7 +529,10 @@ private fun NotesListScreen(
                     Box {
                         IconButton(
                             onClick = { sortMenuExpanded = true },
-                            enabled = snapshot is NotesSnapshot.Ready
+                            enabled = snapshot is NotesSnapshot.Ready,
+                            modifier = Modifier.testTag("noma_sort_button").semantics {
+                                stateDescription = currentSortLabel
+                            }
                         ) {
                             Icon(Icons.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
                         }
@@ -682,6 +688,7 @@ private fun NotesListScreen(
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
                                         onShare = { shareNote(context, note) },
+                                        actionsEnabled = note.id != selectedId || editorSaveState == EditorSaveState.Saved,
                                         onMenuOpen = {
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
@@ -716,6 +723,7 @@ private fun NotesListScreen(
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
                                         onShare = { shareNote(context, note) },
+                                        actionsEnabled = note.id != selectedId || editorSaveState == EditorSaveState.Saved,
                                         onMenuOpen = {
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
@@ -768,6 +776,7 @@ private fun NoteCard(
     onArchive: () -> Unit,
     onDelete: () -> Unit,
     onShare: () -> Unit,
+    actionsEnabled: Boolean,
     onMenuOpen: () -> Unit
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
@@ -846,7 +855,8 @@ private fun NoteCard(
                     onPin = onPin,
                     onArchive = onArchive,
                     onDelete = onDelete,
-                    onShare = onShare
+                    onShare = onShare,
+                    destructiveEnabled = actionsEnabled
                 )
             }
         }
@@ -1090,6 +1100,14 @@ private fun NoteEditorScreen(
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 16.dp, bottom = 64.dp)
             ) {
                 EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
+                if (saveState is EditorSaveState.Failed) {
+                    Text(
+                        stringResource(R.string.save_failure_guidance),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("noma_save_failure_guidance")
+                    )
+                }
                 if (closeWhenSaved && saveState == EditorSaveState.Saving) {
                     Text(
                         stringResource(R.string.wait_for_save_before_exit),
