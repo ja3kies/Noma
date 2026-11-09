@@ -17,6 +17,8 @@ import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -121,15 +123,15 @@ class NomaUiTest {
         compose.onNodeWithText("Article title").assertExists()
         compose.onNodeWithText("https://example.org/idea").assertExists()
         compose.runOnIdle {
-            assert((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
+            assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
         }
         compose.onNodeWithText("Save note").performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
         compose.runOnIdle {
             val stored = (repo.notes.value as NotesSnapshot.Ready).entries
-            assert(stored.size == 1)
-            assert(stored.single().body == "https://example.org/idea")
-            assert(stored.single().title == "Article title")
+            assertEquals(1, stored.size)
+            assertEquals("https://example.org/idea", stored.single().body)
+            assertEquals("Article title", stored.single().title)
         }
     }
 
@@ -142,8 +144,8 @@ class NomaUiTest {
         }
         compose.onNodeWithText("Discard").performClick()
         compose.runOnIdle {
-            assert((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
-            assert(model.pendingShare.value == null)
+            assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
+            assertEquals(null, model.pendingShare.value)
         }
     }
 
