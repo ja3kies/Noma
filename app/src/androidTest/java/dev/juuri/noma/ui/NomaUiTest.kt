@@ -52,6 +52,21 @@ class NomaUiTest {
         override suspend fun refresh() = Unit
     }
 
+    @Test fun backupCheckRemainsAvailableAfterLocalStorageFailure() {
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = NotesSnapshot.Error("Local database unreadable"),
+                    onImport = {},
+                    snapshotForExport = { emptyList() },
+                    onMessage = {}
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Check backup file").assertExists()
+    }
+
     @Test fun quickCaptureAndSearchKeepNoteDiscoverable() {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))
