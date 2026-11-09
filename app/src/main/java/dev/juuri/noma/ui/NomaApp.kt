@@ -106,6 +106,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -701,7 +702,9 @@ private fun NoteCard(
         else MaterialTheme.colorScheme.surface
     Card(
         onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().animateContentSize(tween(NomaMotion.quick)),
+        modifier = Modifier.fillMaxWidth()
+            .semantics { this.selected = selected }
+            .animateContentSize(tween(NomaMotion.quick)),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 0.dp else 1.dp),
@@ -740,7 +743,7 @@ private fun NoteCard(
             if (note.isPinned && !note.isArchived) {
                 Icon(
                     Icons.Outlined.PushPin,
-                    contentDescription = stringResource(R.string.pin_note),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 3.dp).size(18.dp)
                 )
@@ -1023,7 +1026,9 @@ private fun NoteEditorScreen(
 private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().animateContentSize(tween(NomaMotion.quick))
+        modifier = Modifier.fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .animateContentSize(tween(NomaMotion.quick))
     ) {
         when (saveState) {
             EditorSaveState.Saved -> {
