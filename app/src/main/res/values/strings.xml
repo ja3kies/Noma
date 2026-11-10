@@ -151,4 +151,12 @@
     <string name="body_accessibility_label">Note content</string>
     <string name="scroll_to_top">Back to top</string>
     <string name="section_count_description">%1$s: %2$s</string>
+    <string name="find_replace">Find and replace</string>
+    <string name="find_text">Find text</string>
+    <string name="replacement_text">Replace with</string>
+    <string name="replace_first">Replace first</string>
+    <string name="replace_all">Replace all</string>
+    <string name="matches_found">%1$d matches</string>
+    <string name="no_search_matches">No matches found</string>
+    <string name="find_replace_close">Close search</string>
 </resources>
