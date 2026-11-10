@@ -9,6 +9,7 @@ import java.util.Locale
  */
 object NoteSearch {
     private val combiningMarks = Regex("\\p{M}+")
+    private val whitespace = Regex("\\s+")
 
     fun normalize(value: String): String =
         Normalizer.normalize(value, Normalizer.Form.NFD)
@@ -22,7 +23,7 @@ object NoteSearch {
             .replace("ł", "l")
 
     fun terms(query: String): List<String> =
-        normalize(query).trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+        normalize(query).trim().split(whitespace).filter(String::isNotEmpty)
 
     fun matches(note: Note, query: String): Boolean =
         matches(note, terms(query))
@@ -42,13 +43,24 @@ object NoteSearch {
      * still provides a stable tie-breaker.
      */
     fun relevance(note: Note, query: String): Int {
-        val phrase = normalize(query).trim().replace(Regex("\\s+"), " ")
-        if (phrase.isEmpty()) return 0
-        val title = normalize(note.title)
         val words = terms(query)
+        return relevanceForTerms(note, words, words.joinToString(" "))
+    }
+
+    /**
+     * Accept parsed query terms from the caller so a multi-note search never
+     * repeats query normalization and whitespace splitting for each result.
+     */
+    internal fun relevanceForTerms(
+        note: Note,
+        words: List<String>,
+        normalizedPhrase: String
+    ): Int {
+        if (normalizedPhrase.isEmpty()) return 0
+        val title = normalize(note.title)
         return when {
-            title == phrase -> 0
-            title.startsWith(phrase) -> 1
+            title == normalizedPhrase -> 0
+            title.startsWith(normalizedPhrase) -> 1
             words.all(title::contains) -> 2
             words.any(title::contains) -> 3
             else -> 4
@@ -143,16 +155,25 @@ object NoteSearch {
         if (words.isEmpty()) return excerpt(note.preview, emptyList())
         val inTitle = normalize(note.title)
         val targetWords = words.filterNot(inTitle::contains).ifEmpty { words }
-        val candidate = note.body.lineSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .map { line ->
-                val folded = normalize(line)
-                line to targetWords.count(folded::contains)
+        // Preserve the first highest-scoring line, but stop immediately when
+        // every remaining query term is represented: no later line can improve
+        // that score. Avoid intermediate Pair/Sequence allocations per line.
+        var bestLine: String? = null
+        var bestScore = 0
+        for (rawLine in note.body.lineSequence()) {
+            val line = rawLine.trim()
+            if (line.isEmpty()) continue
+            val folded = normalize(line)
+            var score = 0
+            for (word in targetWords) {
+                if (folded.contains(word)) score++
             }
-            .filter { it.second > 0 }
-            .maxByOrNull { it.second }
-            ?.first ?: note.preview
-        return excerpt(candidate, targetWords)
+            if (score > bestScore) {
+                bestScore = score
+                bestLine = line
+                if (score == targetWords.size) break
+            }
+        }
+        return excerpt(bestLine ?: note.preview, targetWords)
     }
 }

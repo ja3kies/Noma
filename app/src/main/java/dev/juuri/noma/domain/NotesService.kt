@@ -53,21 +53,36 @@ class NotesService(
         sort: NoteSort = NoteSort.RECENT
     ): List<Note> {
         val words = NoteSearch.terms(query)
-        val pinnedFirst = compareByDescending<Note> { !archivedOnly && it.isPinned }
+        val normalizedPhrase = words.joinToString(" ")
+        // Compute expensive Unicode normalization and relevance only once per
+        // matching note, not on every comparison performed by the sorter.
+        data class SortEntry(val note: Note, val relevance: Int, val titleKey: String)
+        val pinnedFirst = compareByDescending<SortEntry> {
+            !archivedOnly && it.note.isPinned
+        }
         val comparator = when (sort) {
-            NoteSort.RECENT -> pinnedFirst.thenByDescending { it.updatedAt }.thenBy { it.id }
+            NoteSort.RECENT -> pinnedFirst
+                .thenByDescending { it.note.updatedAt }.thenBy { it.note.id }
             NoteSort.TITLE -> pinnedFirst
-                .thenBy { NoteSearch.normalize(it.displayTitle) }
-                .thenByDescending { it.updatedAt }
-                .thenBy { it.id }
+                .thenBy { it.titleKey }
+                .thenByDescending { it.note.updatedAt }.thenBy { it.note.id }
         }
         val resultOrder = if (words.isEmpty()) comparator else
-            compareBy<Note> { NoteSearch.relevance(it, query) }.then(comparator)
+            compareBy<SortEntry> { it.relevance }.then(comparator)
         return notes.asSequence()
             .filter { it.isArchived == archivedOnly }
             .filter { !pinnedOnly || it.isPinned }
             .filter { NoteSearch.matches(it, words) }
+            .map { note ->
+                SortEntry(
+                    note = note,
+                    relevance = if (words.isEmpty()) 0 else NoteSearch.relevanceForTerms(note, words, normalizedPhrase),
+                    titleKey = if (sort == NoteSort.TITLE) NoteSearch.normalize(note.displayTitle)
+                        else ""
+                )
+            }
             .sortedWith(resultOrder)
+            .map { it.note }
             .toList()
     }
 }
