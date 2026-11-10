@@ -5,7 +5,7 @@ create_edit_delete,editor,must,yes,partial,No 30-day trash yet
 pinned_notes,library,must,yes,yes,Existing pinned sections
 sort_by_title_date,library,must,yes,yes,Existing sort choices
 search_notes,library,must,yes,yes,Existing Unicode matching
-editor_find_replace,editor,must,yes,no,First vertical slice candidate
+editor_find_replace,editor,must,yes,partial,Replace first and replace all supported; next previous navigation pending
 checkbox_lists,editor,must,yes,no,Needs structured checklist model and editing
 folder_hierarchy,organization,must,yes,no,Needs additive SQLite schema
 subfolder_colors_icons,organization,should,yes,no,Custom metadata
