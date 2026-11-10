@@ -43,13 +43,24 @@ object NoteSearch {
      * still provides a stable tie-breaker.
      */
     fun relevance(note: Note, query: String): Int {
-        val phrase = normalize(query).trim().replace(whitespace, " ")
-        if (phrase.isEmpty()) return 0
-        val title = normalize(note.title)
         val words = terms(query)
+        return relevanceForTerms(note, words, words.joinToString(" "))
+    }
+
+    /**
+     * Accept parsed query terms from the caller so a multi-note search never
+     * repeats query normalization and whitespace splitting for each result.
+     */
+    internal fun relevanceForTerms(
+        note: Note,
+        words: List<String>,
+        normalizedPhrase: String
+    ): Int {
+        if (normalizedPhrase.isEmpty()) return 0
+        val title = normalize(note.title)
         return when {
-            title == phrase -> 0
-            title.startsWith(phrase) -> 1
+            title == normalizedPhrase -> 0
+            title.startsWith(normalizedPhrase) -> 1
             words.all(title::contains) -> 2
             words.any(title::contains) -> 3
             else -> 4
