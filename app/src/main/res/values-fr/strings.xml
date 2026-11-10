@@ -149,4 +149,6 @@
     <string name="widget_style_frosted_green_detail">Aspect vert translucide discret</string>
     <string name="widget_style_liquid_glass_detail">Style visuel inspiré du verre</string>
     <string name="body_accessibility_label">Contenu de la note</string>
+    <string name="scroll_to_top">Retour en haut</string>
+    <string name="section_count_description">%1$s : %2$d notes</string>
 </resources>

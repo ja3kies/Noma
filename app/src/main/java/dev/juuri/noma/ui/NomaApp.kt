@@ -72,6 +72,7 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.PushPin
@@ -110,6 +111,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -472,6 +474,11 @@ private fun NotesListScreen(
         }
     }
     val listState = rememberLazyListState()
+    // Limit recompositions while the user drags through long notebooks.
+    val isDeepInList by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex >= 4 }
+    }
+    val listScrollScope = rememberCoroutineScope()
     LaunchedEffect(query, pinnedOnly, archivedOnly, sort) {
         if (!filteredNotes.isNullOrEmpty()) listState.scrollToItem(0)
     }
@@ -585,6 +592,43 @@ private fun NotesListScreen(
                         Text(stringResource(R.string.clear_all_filters))
                     }
                 }
+                AnimatedVisibility(
+                    visible = isDeepInList && !imeVisible &&
+                        snapshot is NotesSnapshot.Ready && !filteredNotes.isNullOrEmpty(),
+                    enter = fadeIn(tween(NomaMotion.quick)) + expandVertically(),
+                    exit = fadeOut(tween(NomaMotion.quick)) + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth()
+                            .testTag("noma_scroll_to_top_row"),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = {
+                                sortMenuExpanded = false
+                                listScrollScope.launch { listState.animateScrollToItem(0) }
+                            },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.secondaryContainer,
+                                    CircleShape
+                                )
+                                .testTag("noma_scroll_to_top")
+                        ) {
+                            Icon(
+                                Icons.Outlined.KeyboardArrowUp,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(Modifier.width(NomaSpacing.tiny))
+                            Text(
+                                stringResource(R.string.scroll_to_top),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
                 if (resultCountLabel != null) {
                     Text(
                         resultCountLabel,
@@ -663,7 +707,11 @@ private fun NotesListScreen(
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 20.dp, bottom = 12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.weight(1f).animateContentSize(
+                            spring(dampingRatio = Spring.DampingRatioNoBouncy)
+                        )
+                    ) {
                         Text(
                             stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineLarge,
@@ -672,11 +720,17 @@ private fun NotesListScreen(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.semantics { heading() }
                         )
-                        Text(
-                            stringResource(R.string.tagline),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        AnimatedVisibility(
+                            visible = !isDeepInList,
+                            enter = fadeIn(tween(NomaMotion.standard)) + expandVertically(),
+                            exit = fadeOut(tween(NomaMotion.standard)) + shrinkVertically()
+                        ) {
+                            Text(
+                                stringResource(R.string.tagline),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     IconButton(onClick = { showAppearance = true }) {
                         Icon(Icons.Outlined.Palette, contentDescription = stringResource(R.string.appearance))
@@ -882,8 +936,12 @@ private fun NotesListScreen(
                             )
                         }
                     } else {
-                        val pinned = if (archivedOnly) emptyList() else visible.filter { it.isPinned }
-                        val others = if (archivedOnly) visible else visible.filterNot { it.isPinned }
+                        // The partition only changes when visible note data or archive
+                        // scope changes, not on every animation frame or scroll tick.
+                        val (pinned, others) = remember(visible, archivedOnly) {
+                            if (archivedOnly) emptyList<Note>() to visible
+                            else visible.partition { it.isPinned }
+                        }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize().testTag("noma_note_list"),
                             state = listState,
@@ -941,6 +999,7 @@ private fun NotesListScreen(
                                         icon = when {
                                             archivedOnly -> Icons.Outlined.Archive
                                             query.isNotBlank() -> Icons.Outlined.Search
+                                            sort == NoteSort.TITLE -> Icons.AutoMirrored.Outlined.Sort
                                             else -> Icons.Outlined.EditNote
                                         }
                                     )
@@ -1096,6 +1155,7 @@ private fun BottomSearchPill(
 
 @Composable
 private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
+    val accessibleCount = stringResource(R.string.section_count_description, title, count)
     Row(
         modifier = Modifier.fillMaxWidth()
             .padding(start = NomaSpacing.small, top = NomaSpacing.comfortable, bottom = NomaSpacing.small)
@@ -1124,7 +1184,7 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
             Text(
                 text = count.toString(),
                 modifier = Modifier.padding(horizontal = NomaSpacing.medium, vertical = NomaSpacing.tiny)
-                    .semantics { contentDescription = title + ": " + count },
+                    .semantics { contentDescription = accessibleCount },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -21,8 +21,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.capture.CaptureRequest
 import dev.juuri.noma.capture.NomaWidgetStyle
 import dev.juuri.noma.domain.NotesRepository
@@ -1238,6 +1240,70 @@ class NomaUiTest {
             compose.waitUntil(8_000) { model.query.value.isEmpty() }
             compose.waitForIdle()
             compose.onNodeWithTag("noma_clear_filters").assertDoesNotExist()
+        }
+    }
+
+
+    @Test fun longNotebookOffersSmoothReturnToTopWithoutChangingNotes() {
+        val notes = (0 until 20).map {
+            Note("long-" + it, "Notebook entry " + it, "Text", false, 1L, it.toLong())
+        }
+        val repo = FakeRepository(notes)
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_scroll_to_top").assertDoesNotExist()
+        compose.onNodeWithTag("noma_note_list").performScrollToIndex(12)
+        compose.onNodeWithTag("noma_scroll_to_top").assertIsDisplayed()
+        compose.onNodeWithText("Back to top").assertExists()
+        compose.onNodeWithTag("noma_scroll_to_top").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("noma_scroll_to_top")
+                .fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(20, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+            assertEquals("", model.query.value)
+        }
+    }
+
+    @Test fun scrollingContractsHeaderAndRestoresTaglineAtTop() {
+        val notes = (0 until 20).map {
+            Note("header-" + it, "Letter " + it, "Body", false, 1L, it.toLong())
+        }
+        val repo = FakeRepository(notes)
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("A quiet place for everything.").assertExists()
+        compose.onNodeWithTag("noma_note_list").performScrollToIndex(14)
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("A quiet place for everything.")
+                .fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("noma_scroll_to_top").performClick()
+        compose.waitUntilAtLeastOneExists(
+            androidx.compose.ui.test.hasText("A quiet place for everything.")
+        )
+    }
+
+    @Test fun scrollToTopPreservesSelectedSortOrder() {
+        val notes = (0 until 18).map {
+            Note("sorted-" + it, "Note " + it, "Body", false, 1L, it.toLong())
+        }
+        val repo = FakeRepository(notes)
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.selectSort(NoteSort.TITLE) }
+        compose.onNodeWithTag("noma_note_list").performScrollToIndex(11)
+        compose.onNodeWithTag("noma_scroll_to_top").assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("noma_scroll_to_top")
+                .fetchSemanticsNodes().isEmpty()
+        }
+        compose.runOnIdle {
+            assertEquals(NoteSort.TITLE, model.sort.value)
+            assertEquals("", model.query.value)
+            assertEquals(18, (repo.notes.value as NotesSnapshot.Ready).entries.size)
         }
     }
 
