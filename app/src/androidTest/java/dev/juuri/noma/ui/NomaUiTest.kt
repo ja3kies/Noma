@@ -1244,6 +1244,16 @@ class NomaUiTest {
     }
 
 
+    @Test fun selectedTabletNoteKeepsContextActionsAvailable() {
+        val selectedNote = Note("tablet-selected", "Selected note", "Body", false, 1L, 2L)
+        val repo = FakeRepository(listOf(selectedNote))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_actions_tablet-selected").assertExists()
+        compose.onNodeWithTag("noma_note_actions_tablet-selected").performClick()
+        compose.onNodeWithTag("noma_menu_share").assertExists()
+    }
+
     @Test fun longNotebookReturnToTopSkipsExcessiveAnimationDistance() {
         val notes = (0 until 120).map {
             Note("very-long-" + it, "Very long notebook " + it, "Body", false, 1L, it.toLong())

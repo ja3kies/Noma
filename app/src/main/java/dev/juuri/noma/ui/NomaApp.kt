@@ -1274,12 +1274,18 @@ private fun NoteCard(
     modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
-    LaunchedEffect(navigationEnabled) {
-        if (!navigationEnabled) menuExpanded = false
+    LaunchedEffect(navigationEnabled, note.isArchived) {
+        // A disabled card or a card moved into the archive must not keep
+        // an old contextual menu attached to its previous location.
+        if (!navigationEnabled || note.isArchived) menuExpanded = false
     }
-    val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
+    val fallbackTitle = stringResource(R.string.untitled)
+    val title = remember(note.title, note.body, fallbackTitle) {
+        note.displayTitle.ifBlank { fallbackTitle }
+    }
     val editedTimestamp = remember(note.updatedAt) { formatEdited(note.updatedAt) }
-    val relevantPreview = remember(note.title, note.body, query) {
+    val pinnedBadgeVisible = note.isPinned && !note.isArchived
+    val relevantPreview = remember(note.id, note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
     }
     val cardColor by animateColorAsState(
@@ -1294,23 +1300,14 @@ private fun NoteCard(
         animationSpec = tween(NomaMotion.standard),
         label = "nomaCardSelectionBorder"
     )
-    val cornerRadius by animateDpAsState(
-        targetValue = if (selected) 28.dp else 22.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        label = "nomaCardCornerRadius"
-    )
-    val cardElevation by animateDpAsState(
-        targetValue = if (selected) 0.dp else 1.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        label = "nomaCardElevation"
-    )
+    val cornerRadius = if (selected) 28.dp else 22.dp
+    val cardElevation = if (selected) 0.dp else 1.dp
     Card(
         onClick = onOpen,
         enabled = navigationEnabled,
         modifier = modifier.fillMaxWidth()
             .testTag("noma_note_${note.id}")
-            .semantics { this.selected = selected }
-            .animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy)),
+            .semantics { this.selected = selected },
         shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
@@ -1349,11 +1346,7 @@ private fun NoteCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            AnimatedVisibility(
-                visible = note.isPinned && !note.isArchived,
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally()
-            ) {
+            if (pinnedBadgeVisible) {
                 Surface(
                     modifier = Modifier.testTag("noma_card_pinned_badge"),
                     shape = CircleShape,
@@ -1379,8 +1372,10 @@ private fun NoteCard(
             Box {
                 IconButton(
                     onClick = {
-                        onMenuOpen()
-                        menuExpanded = true
+                        if (navigationEnabled) {
+                            onMenuOpen()
+                            menuExpanded = true
+                        }
                     },
                     enabled = navigationEnabled,
                     modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
