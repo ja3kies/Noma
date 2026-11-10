@@ -53,6 +53,7 @@ class NotesService(
         sort: NoteSort = NoteSort.RECENT
     ): List<Note> {
         val words = NoteSearch.terms(query)
+        val normalizedPhrase = words.joinToString(" ")
         // Compute expensive Unicode normalization and relevance only once per
         // matching note, not on every comparison performed by the sorter.
         data class SortEntry(val note: Note, val relevance: Int, val titleKey: String)
@@ -75,7 +76,7 @@ class NotesService(
             .map { note ->
                 SortEntry(
                     note = note,
-                    relevance = if (words.isEmpty()) 0 else NoteSearch.relevance(note, query),
+                    relevance = if (words.isEmpty()) 0 else NoteSearch.relevanceForTerms(note, words, normalizedPhrase),
                     titleKey = if (sort == NoteSort.TITLE) NoteSearch.normalize(note.displayTitle)
                         else ""
                 )
