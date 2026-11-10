@@ -83,6 +83,22 @@ class NoteSearchPerformanceTest {
         )
     }
 
+    @Test fun cachedRelevanceMatchesDirectRelevanceAcrossWhitespaceAndLigatures() {
+        val entry = note("Une œuvre moderne et du café", title = "Café et œuvres")
+        val queries = listOf(
+            "CAFE", "  café   œuvres  ", "œuvres\tcafe",
+            "introuvable", "   ", "cafe et", "OEUVRES"
+        )
+        for (query in queries) {
+            val words = NoteSearch.terms(query)
+            assertEquals(
+                "Unexpected cached score for: $query",
+                NoteSearch.relevance(entry, query),
+                NoteSearch.relevanceForTerms(entry, words, words.joinToString(" "))
+            )
+        }
+    }
+
     @Test fun matchedPreviewReturnsFallbackWhenNoBodyLineMatches() {
         val entry = note("A short body", title = "Café")
         assertEquals("A short body", NoteSearch.matchingPreview(entry, "cafe"))
