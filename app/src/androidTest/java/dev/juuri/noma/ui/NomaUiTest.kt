@@ -45,6 +45,7 @@ class NomaUiTest {
     ) : NotesRepository {
         private val state = MutableStateFlow<NotesSnapshot>(initialState)
         override val notes: StateFlow<NotesSnapshot> = state
+        fun updateSnapshot(snapshot: NotesSnapshot) { state.value = snapshot }
         var saveGate: CompletableDeferred<Unit>? = null
         @Volatile var failWrites = false
         @Volatile var saveAttempts = 0
@@ -756,6 +757,79 @@ class NomaUiTest {
         compose.onNodeWithText("Finish saving or capturing before exporting").assertIsNotEnabled()
         compose.runOnIdle { ready.value = true }
         compose.onNodeWithText("Export JSON").assertExists()
+    }
+
+
+    @Test fun blankSharedBodyDisablesConfirmationWithAnExplanation() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Browser", ""))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_validation_error").assertExists()
+        compose.onNodeWithText("The shared text is empty. There is nothing to save.").assertExists()
+        compose.runOnIdle { assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size) }
+    }
+
+    @Test fun whitespaceOnlySharedBodyIsRejectedBeforeAnyWrite() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Browser", "   \n  "))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_validation_error").assertExists()
+        compose.runOnIdle { assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size) }
+    }
+
+    @Test fun oversizedIncomingShareBodyExplainsCharacterLimit() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Website", "a".repeat(100_001)))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithText("Shared text exceeds the 100,000-character limit.").assertExists()
+    }
+
+    @Test fun oversizedIncomingShareTitleExplainsCharacterLimit() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("a".repeat(201), "Valid body"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithText("Shared title exceeds the 200-character limit.").assertExists()
+    }
+
+    @Test fun storageLoadingMakesIncomingShareConfirmationUnavailable() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Loading)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Website", "Valid body"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { assertEquals("Valid body", model.pendingShare.value?.body) }
+    }
+
+    @Test fun storageErrorMakesIncomingShareConfirmationUnavailable() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("disk unavailable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Website", "Valid body"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { assertEquals("Valid body", model.pendingShare.value?.body) }
+    }
+
+    @Test fun pendingShareCanBeSavedAfterStorageBecomesReady() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("temporarily unavailable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Recovered", "Captured text"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { repo.updateSnapshot(NotesSnapshot.Ready(emptyList())) }
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { model.pendingShare.value == null }
+        compose.runOnIdle {
+            assertEquals("Captured text", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+            assertEquals("Captured text", model.active.value?.body)
+        }
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
