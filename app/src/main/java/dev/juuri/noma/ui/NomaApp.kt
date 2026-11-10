@@ -366,17 +366,17 @@ fun NomaApp(
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         tonalElevation = 1.dp
                     ) {
-                    NotesListScreen(
-                        viewModel = viewModel,
-                        snackbar = snackbar,
-                        selectedId = active?.id,
-                        appearance = appearance,
-                        onAppearanceChange = onAppearanceChange,
-                        widgetStyle = widgetStyle,
-                        onWidgetStyleChange = onWidgetStyleChange,
-                        isTabletList = true,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                        NotesListScreen(
+                            viewModel = viewModel,
+                            snackbar = snackbar,
+                            selectedId = active?.id,
+                            appearance = appearance,
+                            onAppearanceChange = onAppearanceChange,
+                            widgetStyle = widgetStyle,
+                            onWidgetStyleChange = onWidgetStyleChange,
+                            isTabletList = true,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                     Surface(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -1823,17 +1823,6 @@ private fun AppearanceDialog(
                             .padding(horizontal = NomaSpacing.comfortable),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = when (mode) {
-                                NomaAppearance.SYSTEM -> Icons.Outlined.BrightnessAuto
-                                NomaAppearance.LIGHT -> Icons.Outlined.LightMode
-                                NomaAppearance.DARK -> Icons.Outlined.DarkMode
-                            },
-                            contentDescription = null,
-                            tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(NomaSpacing.medium))
                         Box(
                             modifier = Modifier.size(width = 58.dp, height = 38.dp)
                                 .background(preview, RoundedCornerShape(10.dp))
