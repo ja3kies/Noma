@@ -6,8 +6,12 @@ import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
@@ -31,6 +35,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -101,6 +106,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -426,6 +432,36 @@ private fun NotesListScreen(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbar) },
+        // Like a bottom-toolbar search field on iOS, but implemented with
+        // Compose insets and native Material colors. The Scaffold reserves
+        // room for this bar and positions its FAB above it automatically.
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = NomaSpacing.comfortable, vertical = NomaSpacing.small),
+                contentAlignment = Alignment.Center
+            ) {
+                BottomSearchPill(
+                    query = query,
+                    onQueryChange = viewModel::onQueryChange,
+                    enabled = snapshot is NotesSnapshot.Ready,
+                    accessibilityLabel = searchAccessibilityLabel,
+                    onSearchDone = {
+                        focusManager.clearFocus()
+                        searchKeyboard?.hide()
+                    },
+                    onClear = {
+                        focusManager.clearFocus()
+                        searchKeyboard?.hide()
+                        viewModel.onQueryChange("")
+                    },
+                    modifier = Modifier.widthIn(max = 600.dp)
+                )
+            }
+        },
         floatingActionButton = {
             // Offer the same creation action in empty, filtered and populated libraries.
             // Keep it hidden while storage is loading or unavailable.
@@ -496,44 +532,7 @@ private fun NotesListScreen(
                         }
                     )
                 }
-                Spacer(Modifier.height(20.dp))
-                TextField(
-                    value = query,
-                    onValueChange = viewModel::onQueryChange,
-                    enabled = snapshot is NotesSnapshot.Ready,
-                    modifier = Modifier.fillMaxWidth()
-                        .semantics { contentDescription = searchAccessibilityLabel }
-                        .testTag("noma_search"),
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.large,
-                    placeholder = { Text(stringResource(R.string.search_hint)) },
-                    leadingIcon = {
-                        Icon(Icons.Outlined.Search, contentDescription = null)
-                    },
-                    trailingIcon = if (query.isNotEmpty()) {
-                        {
-                            IconButton(onClick = {
-                                focusManager.clearFocus()
-                                searchKeyboard?.hide()
-                                viewModel.onQueryChange("")
-                            }) {
-                                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.clear_search))
-                            }
-                        }
-                    } else null,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = {
-                        focusManager.clearFocus()
-                        searchKeyboard?.hide()
-                    }),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
-                )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(NomaSpacing.medium))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Row(
                         modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
@@ -788,6 +787,80 @@ private fun NotesListScreen(
                 }
             }
         }
+    }
+}
+
+
+/**
+ * Persistent, thumb-reachable search field. The IME lifts the bottom toolbar
+ * through WindowInsets rather than a manually calculated keyboard height.
+ * Color, shape and elevation are semantic Material 3 values on every theme.
+ */
+@Composable
+private fun BottomSearchPill(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    enabled: Boolean,
+    accessibilityLabel: String,
+    onSearchDone: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var focused by remember { mutableStateOf(false) }
+    val elevation by animateDpAsState(
+        targetValue = if (focused) 8.dp else 3.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "nomaBottomSearchElevation"
+    )
+    Surface(
+        modifier = modifier.fillMaxWidth().testTag("noma_search_pill"),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 2.dp,
+        shadowElevation = elevation,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            enabled = enabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .onFocusChanged { focused = it.isFocused }
+                .semantics { contentDescription = accessibilityLabel }
+                .testTag("noma_search"),
+            singleLine = true,
+            shape = CircleShape,
+            textStyle = MaterialTheme.typography.bodyLarge,
+            placeholder = { Text(stringResource(R.string.search_hint)) },
+            leadingIcon = {
+                Icon(Icons.Outlined.Search, contentDescription = null)
+            },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = onClear, enabled = enabled) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = stringResource(R.string.clear_search)
+                        )
+                    }
+                }
+            } else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearchDone() }),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            )
+        )
     }
 }
 
