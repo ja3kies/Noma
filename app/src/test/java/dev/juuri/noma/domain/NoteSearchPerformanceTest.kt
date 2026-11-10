@@ -99,6 +99,43 @@ class NoteSearchPerformanceTest {
         }
     }
 
+    @Test fun largeNotebookSearchDoesNotMutateInputAndKeepsStableResults() {
+        val entries = (0 until 2_000).map { index ->
+            Note(
+                "id-$index",
+                if (index % 10 == 0) "Café entry $index" else "Regular entry $index",
+                if (index % 10 == 0) "Une œuvre intéressante" else "Ordinary content",
+                index == 100,
+                1L,
+                index.toLong()
+            )
+        }
+        val original = entries.toList()
+        val repo = object : NotesRepository {
+            override val notes = kotlinx.coroutines.flow.MutableStateFlow<NotesSnapshot>(
+                NotesSnapshot.Ready(entries)
+            )
+            override suspend fun refresh() = Unit
+            override suspend fun save(note: Note) = Unit
+            override suspend fun delete(id: String) = Unit
+            override suspend fun importMissing(notes: List<Note>): Int = 0
+        }
+        val results = NotesService(repo).visible(
+            entries, "CAFÉ ŒUVRE", pinnedOnly = false, sort = NoteSort.TITLE
+        )
+        assertEquals(200, results.size)
+        assertEquals("id-100", results.first().id)
+        assertEquals(original, entries)
+    }
+
+    @Test fun normalizationPreservesEmojiPositionsAndAccentedHighlightRanges() {
+        val line = "🦊 café et œuvre"
+        val ranges = NoteSearch.matchRanges(line, "CAFE ŒUVRE")
+        assertEquals(2, ranges.size)
+        assertEquals("café", line.substring(ranges[0].first, ranges[0].last + 1))
+        assertEquals("œuvre", line.substring(ranges[1].first, ranges[1].last + 1))
+    }
+
     @Test fun matchedPreviewReturnsFallbackWhenNoBodyLineMatches() {
         val entry = note("A short body", title = "Café")
         assertEquals("A short body", NoteSearch.matchingPreview(entry, "cafe"))
