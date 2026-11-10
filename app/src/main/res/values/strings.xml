@@ -105,6 +105,7 @@
     <string name="incoming_share_title">Save shared text?</string>
     <string name="incoming_share_body">Review this text before saving it as a new note on this device.</string>
     <string name="incoming_share_confirm">Save note</string>
+    <string name="incoming_share_saving">Saving shared note…</string>
     <string name="incoming_share_discard">Discard</string>
     <string name="incoming_share_saved">Shared text saved to Noma</string>
     <string name="created_while_editing">New note created. Your unfinished draft remains open.</string>

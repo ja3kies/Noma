@@ -253,12 +253,20 @@ fun NomaApp(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        incoming.body.take(500),
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().testTag("noma_share_preview"),
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainer
+                    ) {
+                        Text(
+                            incoming.body.take(500),
+                            modifier = Modifier.padding(NomaSpacing.comfortable),
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 23.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     if (incoming.body.length > 500) {
                         Text(
                             stringResource(
@@ -272,14 +280,25 @@ fun NomaApp(
                     }
                     Text(
                         stringResource(R.string.incoming_share_size, incoming.body.length),
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (storageState !is NotesSnapshot.Ready) {
+                        Text(
+                            stringResource(R.string.notes_storage_not_ready),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.testTag("noma_share_storage_guidance")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
+                        )
+                    }
                     if (invalidShareReason != null) {
                         Text(
                             invalidShareReason,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.testTag("noma_share_validation_error")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
                         )
                     }
                     if (active != null && saveState != EditorSaveState.Saved) {
@@ -288,6 +307,7 @@ fun NomaApp(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.testTag("noma_share_save_guidance")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
                         )
                     }
                 }
@@ -298,13 +318,27 @@ fun NomaApp(
                         storageState is NotesSnapshot.Ready && invalidShareReason == null &&
                         (active == null || saveState == EditorSaveState.Saved),
                     onClick = viewModel::confirmSharedText,
-                    modifier = Modifier.testTag("noma_share_confirm")
-                ) { Text(stringResource(R.string.incoming_share_confirm)) }
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        .testTag("noma_share_confirm")
+                ) {
+                    if (capturingShare) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp).testTag("noma_share_progress"),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(NomaSpacing.small))
+                        Text(stringResource(R.string.incoming_share_saving))
+                    } else {
+                        Text(stringResource(R.string.incoming_share_confirm))
+                    }
+                }
             },
             dismissButton = {
                 TextButton(
                     enabled = !capturingShare,
-                    onClick = viewModel::dismissSharedText
+                    onClick = viewModel::dismissSharedText,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        .testTag("noma_share_discard")
                 ) { Text(stringResource(R.string.incoming_share_discard)) }
             }
         )
@@ -1837,7 +1871,11 @@ private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfir
         title = { Text(stringResource(R.string.delete_confirm_title)) },
         text = { Text(stringResource(R.string.delete_confirm_body_named, noteTitle.take(80))) },
         confirmButton = {
-            TextButton(onClick = onConfirm, modifier = Modifier.testTag("noma_confirm_delete")) {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    .testTag("noma_confirm_delete")
+            ) {
                 Text(
                     stringResource(R.string.delete_note),
                     color = MaterialTheme.colorScheme.error
@@ -1845,7 +1883,11 @@ private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfir
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    .testTag("noma_cancel_delete")
+            ) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
