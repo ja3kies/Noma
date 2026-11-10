@@ -510,7 +510,7 @@ private fun NotesListScreen(
                             viewModel.clearDiscoveryFilters()
                         }
                     ) {
-                        Icon(Icons.Outlined.Close, contentDescription = null, Modifier.size(16.dp))
+                        Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(NomaSpacing.small))
                         Text(stringResource(R.string.clear_all_filters))
                     }
