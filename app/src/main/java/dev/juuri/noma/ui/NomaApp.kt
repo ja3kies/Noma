@@ -1082,7 +1082,8 @@ private fun NoteActionsMenu(
             text = {
                 Text(
                     stringResource(R.string.delete_note),
-                    color = MaterialTheme.colorScheme.error
+                    color = if (destructiveEnabled) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             enabled = destructiveEnabled,
@@ -1091,7 +1092,8 @@ private fun NoteActionsMenu(
                 Icon(
                     Icons.Outlined.DeleteOutline,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
+                    tint = if (destructiveEnabled) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         )
@@ -1212,65 +1214,65 @@ private fun NoteEditorScreen(
         topBar = {
             Column(Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy))) {
                 TopAppBar(
-                title = {
-                    Text(
-                        if (expanded) stringResource(R.string.editor_title) else safeTitle,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = ::requestClose,
-                        modifier = Modifier.testTag("noma_editor_back")
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back_to_notes)
+                    title = {
+                        Text(
+                            if (expanded) stringResource(R.string.editor_title) else safeTitle,
+                            style = MaterialTheme.typography.titleMedium
                         )
-                    }
-                },
-                actions = {
-                    val portableScope = rememberCoroutineScope()
-                    PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
-                        portableScope.launch { snackbar.showSnackbar(message) }
-                    })
-                    IconButton(
-                        onClick = { viewModel.togglePin(note) },
-                        enabled = saveState == EditorSaveState.Saved && !note.isArchived,
-                        modifier = Modifier.testTag("noma_editor_pin")
-                    ) {
-                        Icon(
-                            Icons.Outlined.PushPin,
-                            contentDescription = stringResource(
-                                if (note.isPinned) R.string.unpin_note else R.string.pin_note
-                            ),
-                            tint = if (note.isPinned) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Box {
+                    },
+                    navigationIcon = {
                         IconButton(
-                            onClick = { menuExpanded = true },
-                            modifier = Modifier.testTag("noma_editor_actions")
+                            onClick = ::requestClose,
+                            modifier = Modifier.testTag("noma_editor_back")
                         ) {
                             Icon(
-                                Icons.Outlined.MoreHoriz,
-                                contentDescription = stringResource(R.string.note_actions)
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back_to_notes)
                             )
                         }
-                        NoteActionsMenu(
-                            expanded = menuExpanded,
-                            note = note,
-                            onDismiss = { menuExpanded = false },
-                            onPin = { viewModel.togglePin(note) },
-                            onArchive = { viewModel.toggleArchive(note) },
-                            onDelete = { confirmDelete = true },
-                            onShare = { shareNote(context, note) },
-                            showPinAction = false,
-                            destructiveEnabled = saveState == EditorSaveState.Saved
-                        )
+                    },
+                    actions = {
+                        val portableScope = rememberCoroutineScope()
+                        PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
+                            portableScope.launch { snackbar.showSnackbar(message) }
+                        })
+                        IconButton(
+                            onClick = { viewModel.togglePin(note) },
+                            enabled = saveState == EditorSaveState.Saved && !note.isArchived,
+                            modifier = Modifier.testTag("noma_editor_pin")
+                        ) {
+                            Icon(
+                                Icons.Outlined.PushPin,
+                                contentDescription = stringResource(
+                                    if (note.isPinned) R.string.unpin_note else R.string.pin_note
+                                ),
+                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Box {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier.testTag("noma_editor_actions")
+                            ) {
+                                Icon(
+                                    Icons.Outlined.MoreHoriz,
+                                    contentDescription = stringResource(R.string.note_actions)
+                                )
+                            }
+                            NoteActionsMenu(
+                                expanded = menuExpanded,
+                                note = note,
+                                onDismiss = { menuExpanded = false },
+                                onPin = { viewModel.togglePin(note) },
+                                onArchive = { viewModel.toggleArchive(note) },
+                                onDelete = { confirmDelete = true },
+                                onShare = { shareNote(context, note) },
+                                showPinAction = false,
+                                destructiveEnabled = saveState == EditorSaveState.Saved
+                            )
+                        }
                     }
-                }
                 )
                 // A save failure must stay actionable even while the editor has
                 // scrolled and the IME is visible; never bury Retry in the document.
