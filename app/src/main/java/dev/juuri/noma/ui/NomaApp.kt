@@ -479,8 +479,11 @@ private fun NotesListScreen(
         derivedStateOf { listState.firstVisibleItemIndex >= 4 }
     }
     val listScrollScope = rememberCoroutineScope()
+    var returningToTop by remember { mutableStateOf(false) }
     LaunchedEffect(query, pinnedOnly, archivedOnly, sort) {
-        if (!filteredNotes.isNullOrEmpty()) listState.scrollToItem(0)
+        // A filter can collapse the list to zero rows; reset its previous scroll
+        // position so returning results never starts at a stale offset.
+        listState.scrollToItem(0)
     }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -604,9 +607,22 @@ private fun NotesListScreen(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(
+                            enabled = !returningToTop,
                             onClick = {
+                                if (returningToTop) return@TextButton
+                                returningToTop = true
                                 sortMenuExpanded = false
-                                listScrollScope.launch { listState.animateScrollToItem(0) }
+                                listScrollScope.launch {
+                                    // Avoid animating across hundreds of composed rows.
+                                    if (listState.firstVisibleItemIndex > 40) {
+                                        listState.scrollToItem(12)
+                                    }
+                                    try {
+                                        listState.animateScrollToItem(0)
+                                    } finally {
+                                        returningToTop = false
+                                    }
+                                }
                             },
                             modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                                 .background(
@@ -647,7 +663,11 @@ private fun NotesListScreen(
                     enabled = snapshot is NotesSnapshot.Ready,
                     accessibilityLabel = searchAccessibilityLabel,
                     hint = contextualSearchHint,
-                    onSearchFocus = { sortMenuExpanded = false },
+                    onSearchFocus = {
+                        sortMenuExpanded = false
+                        showAppearance = false
+                        showWidgetStyles = false
+                    },
                     onSearchDone = {
                         focusManager.clearFocus()
                         searchKeyboard?.hide()
@@ -658,7 +678,10 @@ private fun NotesListScreen(
                     },
                     // Clearing keeps the search field focused so another query
                     // can be typed without dismissing and reopening the IME.
-                    onClear = { viewModel.onQueryChange("") },
+                    onClear = {
+                        sortMenuExpanded = false
+                        viewModel.onQueryChange("")
+                    },
                     modifier = Modifier.widthIn(max = 600.dp)
                 )
             }
@@ -669,9 +692,12 @@ private fun NotesListScreen(
             if (snapshot is NotesSnapshot.Ready) {
                 ExtendedFloatingActionButton(
                     onClick = {
-                        focusManager.clearFocus()
-                        searchKeyboard?.hide()
-                        if (!creatingOrCapturing) viewModel.createNote()
+                        if (!creatingOrCapturing) {
+                            focusManager.clearFocus()
+                            searchKeyboard?.hide()
+                            sortMenuExpanded = false
+                            viewModel.createNote()
+                        }
                     },
                     expanded = !imeVisible || creatingOrCapturing,
                     icon = {
@@ -732,7 +758,15 @@ private fun NotesListScreen(
                             )
                         }
                     }
-                    IconButton(onClick = { showAppearance = true }) {
+                    IconButton(
+                        onClick = {
+                            sortMenuExpanded = false
+                            focusManager.clearFocus()
+                            searchKeyboard?.hide()
+                            showAppearance = true
+                        },
+                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    ) {
                         Icon(Icons.Outlined.Palette, contentDescription = stringResource(R.string.appearance))
                     }
                     PortableDocuments(
@@ -797,9 +831,16 @@ private fun NotesListScreen(
                     }
                     Box {
                         IconButton(
-                            onClick = { sortMenuExpanded = true },
+                            onClick = {
+                                if (!showAppearance && !showWidgetStyles) {
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
+                                    sortMenuExpanded = true
+                                }
+                            },
                             enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                                 .background(sortButtonBackground, CircleShape)
                                 .testTag("noma_sort_button")
                                 .semantics { stateDescription = currentSortLabel }
@@ -818,7 +859,10 @@ private fun NotesListScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.sort_recent)) },
-                                modifier = Modifier.semantics { selected = sort == NoteSort.RECENT },
+                                modifier = Modifier.semantics {
+                                    selected = sort == NoteSort.RECENT
+                                    stateDescription = currentSortLabel
+                                },
                                 onClick = {
                                     focusManager.clearFocus()
                                     searchKeyboard?.hide()
@@ -846,8 +890,10 @@ private fun NotesListScreen(
                     }
                 }
                 if (snapshot is NotesSnapshot.Ready) {
-                    val count = (snapshot as NotesSnapshot.Ready).entries.count {
-                        it.isArchived == archivedOnly
+                    val count = remember(snapshot, archivedOnly) {
+                        (snapshot as NotesSnapshot.Ready).entries.count {
+                            it.isArchived == archivedOnly
+                        }
                     }
                     val filteredCount = filteredNotes?.size ?: 0
                     if (query.isBlank()) {

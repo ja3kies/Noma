@@ -1244,6 +1244,47 @@ class NomaUiTest {
     }
 
 
+    @Test fun longNotebookReturnToTopSkipsExcessiveAnimationDistance() {
+        val notes = (0 until 120).map {
+            Note("very-long-" + it, "Very long notebook " + it, "Body", false, 1L, it.toLong())
+        }
+        val repo = FakeRepository(notes)
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_list").performScrollToIndex(100)
+        compose.onNodeWithTag("noma_scroll_to_top").assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("noma_scroll_to_top").fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(120, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+    @Test fun changingFiltersAfterDeepScrollResetsReturnToTopState() {
+        val notes = (0 until 36).map {
+            Note("filter-long-" + it, "List entry " + it, "Body", false, 1L, it.toLong())
+        }
+        val repo = FakeRepository(notes)
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_list").performScrollToIndex(25)
+        compose.onNodeWithTag("noma_scroll_to_top").assertIsDisplayed()
+        compose.runOnIdle { model.onQueryChange("no matching notes") }
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("noma_note_list").fetchSemanticsNodes().isEmpty()
+        }
+        compose.runOnIdle { model.onQueryChange("") }
+        compose.waitUntilAtLeastOneExists(
+            androidx.compose.ui.test.hasTestTag("noma_note_list")
+        )
+        compose.onNodeWithTag("noma_scroll_to_top").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(36, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
     @Test fun longNotebookOffersSmoothReturnToTopWithoutChangingNotes() {
         val notes = (0 until 20).map {
             Note("long-" + it, "Notebook entry " + it, "Text", false, 1L, it.toLong())
