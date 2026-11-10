@@ -1274,10 +1274,10 @@ private fun NoteCard(
     modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
-    LaunchedEffect(navigationEnabled, note.isArchived, selected) {
+    LaunchedEffect(navigationEnabled, note.isArchived) {
         // A disabled card or a card moved into the archive must not keep
         // an old contextual menu attached to its previous location.
-        if (!navigationEnabled || note.isArchived || selected) menuExpanded = false
+        if (!navigationEnabled || note.isArchived) menuExpanded = false
     }
     val fallbackTitle = stringResource(R.string.untitled)
     val title = remember(note.title, note.body, fallbackTitle) {
@@ -1372,12 +1372,12 @@ private fun NoteCard(
             Box {
                 IconButton(
                     onClick = {
-                        if (navigationEnabled && !selected) {
+                        if (navigationEnabled) {
                             onMenuOpen()
                             menuExpanded = true
                         }
                     },
-                    enabled = navigationEnabled && !selected,
+                    enabled = navigationEnabled,
                     modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                         .testTag("noma_note_actions_${note.id}")
                 ) {
