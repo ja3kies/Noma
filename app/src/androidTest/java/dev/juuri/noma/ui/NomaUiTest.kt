@@ -1254,6 +1254,37 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_menu_share").assertExists()
     }
 
+    @Test fun editorFindAndReplaceAllUpdatesActiveNote() {
+        val original = Note("find-replace", "Meeting", "café and café", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(original) }
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("café")
+        compose.onNodeWithTag("noma_replace_input").performTextInput("tea")
+        compose.onNodeWithTag("noma_replace_all").assertIsEnabled().performClick()
+        compose.waitUntil(10_000) {
+            model.active.value?.body == "tea and tea"
+        }
+        compose.onNodeWithTag("noma_find_result_count").assertExists()
+        compose.onNodeWithTag("noma_find_replace_close").performClick()
+    }
+
+    @Test fun editorFindAndReplaceRejectsAbsentTerms() {
+        val original = Note("no-match", "Notes", "original text", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(original) }
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("missing")
+        compose.onNodeWithTag("noma_replace_first").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_replace_all").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_find_replace_close").performClick()
+        compose.runOnIdle { assertEquals("original text", model.active.value?.body) }
+    }
+
     @Test fun longNotebookReturnToTopSkipsExcessiveAnimationDistance() {
         val notes = (0 until 120).map {
             Note("very-long-" + it, "Very long notebook " + it, "Body", false, 1L, it.toLong())
