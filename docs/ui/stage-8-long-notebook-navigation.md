@@ -1,6 +1,6 @@
 # Noma · Stage 8 — Long notebook navigation and purposeful motion
 
-**Branch planned:** `feature/noma-ui-stage8-long-notebooks` from stage 7 after its full CI gate. Staged and audited as an atomic, non-pushed Git commit until stage 7 finishes validation.
+**Branch:** `feature/noma-ui-stage8-long-notebooks`, isolated from stage 7. CI runs separately; merging remains strictly blocked until both stages pass all gates.
 
 ## Implemented work (20 items)
 
@@ -38,7 +38,7 @@ Three new Compose UI tests cover:
 
 ## Acceptance gates
 
-- [x] Stage 8 changes prepared as Git commit(s), not merged into the earlier PR
+- [x] Stage 8 changes prepared on a separate branch, not merged into the earlier PR
 - [x] New Android tests and French/English strings staged
 - [ ] Stage 7 push and PR CI completely PASS
 - [ ] Stage 8 JVM compilation, lint, debug APK and emulator UI tests PASS
