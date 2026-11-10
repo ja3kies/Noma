@@ -75,9 +75,9 @@ object NoteSearch {
     fun matchRanges(text: String, query: String, maxMatches: Int = 24): List<IntRange> {
         val words = terms(query).distinct()
         if (words.isEmpty() || text.isEmpty() || maxMatches <= 0) return emptyList()
-        val folded = StringBuilder()
-        val starts = ArrayList<Int>()
-        val ends = ArrayList<Int>()
+        val folded = StringBuilder(text.length)
+        val starts = ArrayList<Int>(text.length)
+        val ends = ArrayList<Int>(text.length)
         var index = 0
         while (index < text.length) {
             val point = Character.codePointAt(text, index)
@@ -90,7 +90,7 @@ object NoteSearch {
             folded.append(representation)
             index += width
         }
-        val locations = ArrayList<IntRange>()
+        val locations = ArrayList<IntRange>(minOf(maxMatches, 24))
         for (word in words) {
             var from = 0
             while (locations.size < maxMatches) {
@@ -106,7 +106,7 @@ object NoteSearch {
         }
         val ordered = locations.sortedWith(compareBy<IntRange> { it.first }.thenBy { it.last })
         if (ordered.isEmpty()) return ordered
-        val result = ArrayList<IntRange>()
+        val result = ArrayList<IntRange>(ordered.size)
         for (range in ordered) {
             val previous = result.lastOrNull()
             if (previous != null && range.first <= previous.last + 1) {
@@ -126,8 +126,8 @@ object NoteSearch {
      */
     private fun excerpt(line: String, words: List<String>): String {
         if (line.length <= PREVIEW_LIMIT) return line
-        val folded = StringBuilder()
-        val positions = ArrayList<Int>()
+        val folded = StringBuilder(line.length)
+        val positions = ArrayList<Int>(line.length)
         var original = 0
         while (original < line.length) {
             val cp = Character.codePointAt(line, original)
@@ -136,7 +136,14 @@ object NoteSearch {
             folded.append(piece)
             original += Character.charCount(cp)
         }
-        val found = words.map { folded.indexOf(it) }.filter { it >= 0 }.minOrNull()
+        var found: Int? = null
+        for (word in words) {
+            val offset = folded.indexOf(word)
+            if (offset >= 0 && (found == null || offset < found)) {
+                found = offset
+                if (offset == 0) break
+            }
+        }
         val hit = found?.let { positions.getOrNull(it) } ?: 0
         var start = if (hit <= PREVIEW_LEADING_CONTEXT) 0
             else (hit - PREVIEW_LEADING_CONTEXT).coerceAtMost(line.length - PREVIEW_LIMIT)
@@ -151,7 +158,7 @@ object NoteSearch {
 
     /** The nearest body line with a match makes search results recognisable. */
     fun matchingPreview(note: Note, query: String): String {
-        val words = terms(query)
+        val words = terms(query).distinct()
         if (words.isEmpty()) return excerpt(note.preview, emptyList())
         val inTitle = normalize(note.title)
         val targetWords = words.filterNot(inTitle::contains).ifEmpty { words }
