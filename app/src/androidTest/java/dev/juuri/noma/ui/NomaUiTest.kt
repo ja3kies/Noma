@@ -1071,7 +1071,7 @@ class NomaUiTest {
         compose.onNodeWithText("Pinned").assertExists()
         compose.onNodeWithText("Recent").assertExists()
         compose.onAllNodesWithTag("noma_section_header").assertCountEquals(2)
-        compose.onNodeWithTag("noma_card_pinned_badge").assertExists()
+        compose.onNodeWithTag("noma_card_pinned_badge", useUnmergedTree = true).assertExists()
     }
 
     @Test fun archivedCardHasAnArchivedBadgeButNoPinBadge() {
@@ -1080,8 +1080,8 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_archive_filter").performClick()
-        compose.onNodeWithTag("noma_card_archived_badge").assertExists()
-        compose.onNodeWithTag("noma_card_pinned_badge").assertDoesNotExist()
+        compose.onNodeWithTag("noma_card_archived_badge", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_card_pinned_badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("Archived notes").assertExists()
     }
 
@@ -1093,6 +1093,87 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_note_actions_actions-test").performClick()
         compose.onNodeWithText("Archive note").assertExists()
         compose.runOnIdle { assertEquals(null, model.active.value) }
+    }
+
+
+    @Test fun editorFailureAndRetryStayInStickyHeader() {
+        val note = Note("sticky", "Draft", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Draft").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" changed")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_editor_save_bar").assertIsDisplayed()
+        compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+        compose.onNodeWithTag("noma_save_failure_guidance").assertIsDisplayed()
+    }
+
+    @Test fun cardActionMenuHasDistinctAccessibleControls() {
+        val note = Note("menu-42", "Menu test", "Body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_actions_menu-42").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertExists()
+        compose.onNodeWithTag("noma_menu_archive").assertExists()
+        compose.onNodeWithTag("noma_menu_share").assertExists()
+        compose.onNodeWithTag("noma_delete_action").assertExists()
+        compose.runOnIdle { assertEquals(null, model.active.value) }
+    }
+
+    @Test fun shareReviewHasBoundedPreview() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Browser", "a".repeat(1000)))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_preview", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("1000 characters").assertExists()
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled()
+    }
+
+    @Test fun shareCaptureShowsProgressBeforeSaveCompletes() {
+        val repo = FakeRepository()
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Browser", "Important"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").performClick()
+        compose.waitUntil(5_000) { model.capturingShare.value }
+        compose.onNodeWithTag("noma_share_progress", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(10_000) { model.pendingShare.value == null }
+    }
+
+    @Test fun appearanceAndWidgetPreviewsArePresent() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithTag("noma_theme_preview_SYSTEM", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_theme_preview_LIGHT", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_theme_preview_DARK", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Widget appearance").performClick()
+        compose.onNodeWithTag("noma_widget_preview_MATERIAL_YOU", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_widget_preview_FROSTED_GREEN", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS", useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun cancelledDeleteDialogLeavesNoteIntact() {
+        val note = Note("safe-1", "Safe note", "Body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_actions_safe-1").performClick()
+        compose.onNodeWithTag("noma_delete_action").performClick()
+        compose.onNodeWithTag("noma_confirm_delete").assertExists()
+        compose.onNodeWithTag("noma_cancel_delete").performClick()
+        compose.runOnIdle {
+            assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
