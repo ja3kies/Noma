@@ -120,6 +120,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
@@ -805,13 +806,17 @@ private fun NotesListScreen(
                             contentPadding = PaddingValues(
                                 start = NomaSpacing.comfortable,
                                 end = NomaSpacing.comfortable,
-                                bottom = 108.dp
+                                bottom = 96.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             if (pinned.isNotEmpty()) {
                                 item(key = "pinned_section") {
-                                    SectionHeader(stringResource(R.string.pinned_section))
+                                    SectionHeader(
+                                        title = stringResource(R.string.pinned_section),
+                                        count = pinned.size,
+                                        icon = Icons.Outlined.PushPin
+                                    )
                                 }
                                 items(pinned, key = { it.id }) { note ->
                                     NoteCard(
@@ -840,14 +845,20 @@ private fun NotesListScreen(
                             if (others.isNotEmpty()) {
                                 item(key = "recent_section") {
                                     SectionHeader(
-                                        stringResource(
+                                        title = stringResource(
                                             when {
                                                 archivedOnly -> R.string.archived_section
                                                 query.isNotBlank() -> R.string.search_section
                                                 sort == NoteSort.TITLE -> R.string.alphabetical_section
                                                 else -> R.string.recent_section
                                             }
-                                        )
+                                        ),
+                                        count = others.size,
+                                        icon = when {
+                                            archivedOnly -> Icons.Outlined.Archive
+                                            query.isNotBlank() -> Icons.Outlined.Search
+                                            else -> Icons.Outlined.EditNote
+                                        }
                                     )
                                 }
                                 items(others, key = { it.id }) { note ->
@@ -1000,13 +1011,40 @@ private fun BottomSearchPill(
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        modifier = Modifier.padding(start = NomaSpacing.small, top = NomaSpacing.medium, bottom = 2.dp),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .padding(start = NomaSpacing.small, top = NomaSpacing.comfortable, bottom = NomaSpacing.small)
+            .testTag("noma_section_header"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Text(
+                text = count.toString(),
+                modifier = Modifier.padding(horizontal = NomaSpacing.medium, vertical = NomaSpacing.tiny)
+                    .semantics { contentDescription = title + ": " + count },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
@@ -1049,8 +1087,28 @@ private fun NoteCard(
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
     }
-    val cardColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh
-        else MaterialTheme.colorScheme.surfaceContainerLow
+    val cardColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaCardSelectedSurface"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaCardSelectionBorder"
+    )
+    val cornerRadius by animateDpAsState(
+        targetValue = if (selected) 28.dp else 22.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "nomaCardCornerRadius"
+    )
+    val cardElevation by animateDpAsState(
+        targetValue = if (selected) 0.dp else 1.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "nomaCardElevation"
+    )
     Card(
         onClick = onOpen,
         enabled = navigationEnabled,
@@ -1058,17 +1116,15 @@ private fun NoteCard(
             .testTag("noma_note_${note.id}")
             .semantics { this.selected = selected }
             .animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy)),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 0.dp else 1.dp),
-        border = if (selected) BorderStroke(
-            1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-        ) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        border = BorderStroke(if (selected) 1.5.dp else 1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .defaultMinSize(minHeight = 88.dp)
-                .padding(start = 20.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
+                .defaultMinSize(minHeight = 96.dp)
+                .padding(start = 20.dp, top = 18.dp, end = 8.dp, bottom = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
@@ -1077,6 +1133,7 @@ private fun NoteCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (relevantPreview.isNotEmpty() &&
@@ -1086,23 +1143,42 @@ private fun NoteCard(
                         text = highlightMatches(relevantPreview, query),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(NomaSpacing.small))
                 Text(
                     text = formatEdited(note.updatedAt),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (note.isPinned && !note.isArchived) {
+            AnimatedVisibility(
+                visible = note.isPinned && !note.isArchived,
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally()
+            ) {
+                Surface(
+                    modifier = Modifier.testTag("noma_card_pinned_badge"),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Icon(
+                        Icons.Outlined.PushPin,
+                        contentDescription = stringResource(R.string.pinned_note_indicator),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(8.dp).size(16.dp)
+                    )
+                }
+            }
+            if (note.isArchived) {
                 Icon(
-                    Icons.Outlined.PushPin,
-                    contentDescription = stringResource(R.string.pinned_note_indicator),
+                    Icons.Outlined.Archive,
+                    contentDescription = stringResource(R.string.archived_section),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 3.dp).size(18.dp)
+                    modifier = Modifier.testTag("noma_card_archived_badge")
+                        .padding(start = NomaSpacing.small).size(18.dp)
                 )
             }
             Box {
@@ -1112,7 +1188,8 @@ private fun NoteCard(
                         menuExpanded = true
                     },
                     enabled = navigationEnabled,
-                    modifier = Modifier.testTag("noma_note_actions_${note.id}")
+                    modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        .testTag("noma_note_actions_${note.id}")
                 ) {
                     Icon(
                         Icons.Outlined.MoreHoriz,
