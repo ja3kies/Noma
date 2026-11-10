@@ -1176,6 +1176,70 @@ class NomaUiTest {
         }
     }
 
+
+    @Test fun sectionHeadingsExposeAccessibleHeadingSemantics() {
+        val pinned = Note("heading-pin", "Pinned note", "Body", true, 1L, 1L)
+        val other = Note("heading-normal", "Normal note", "Body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(pinned, other))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onAllNodesWithTag("noma_section_header", useUnmergedTree = true)
+            .assertCountEquals(2)
+        compose.onAllNodesWithTag("noma_section_header", useUnmergedTree = true)
+            .onFirst()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+    }
+
+    @Test fun editorTitleAndBodyExposeDistinctAccessibleFieldDescriptions() {
+        val note = Note("fields", "A title", "Saved body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("A title").performClick()
+        compose.onNodeWithTag("noma_title_input")
+            .assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.ContentDescription, listOf("Title")
+            ))
+        compose.onNodeWithTag("noma_body_input")
+            .assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.ContentDescription, listOf("Note content")
+            ))
+    }
+
+    @Test fun emptyLibraryHeadingIsAccessibleAndCreationRemainsVisible() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("A little space to begin")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        compose.onNodeWithTag("noma_new_note").assertExists()
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
+    @Test fun storageErrorHasHeadingAndLargeRetryTarget() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("temporarily unavailable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Your notes couldn’t be opened")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        compose.onNodeWithTag("noma_storage_retry").assertIsDisplayed()
+    }
+
+    @Test fun repeatedClearFiltersWithImeDoesNotRestorePreviousQuery() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        repeat(3) { index ->
+            val term = "unmatched query " + index
+            compose.onNodeWithTag("noma_search").performTextInput(term)
+            compose.waitUntil(5_000) { model.query.value == term }
+            compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
+            compose.waitUntil(8_000) { model.query.value.isEmpty() }
+            compose.waitForIdle()
+            compose.onNodeWithTag("noma_clear_filters").assertDoesNotExist()
+        }
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
