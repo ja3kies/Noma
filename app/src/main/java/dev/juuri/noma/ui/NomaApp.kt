@@ -419,6 +419,7 @@ private fun NotesListScreen(
 
     val newNoteLabel = stringResource(R.string.new_note)
     val creatingNoteLabel = stringResource(R.string.creating_note)
+    val creatingOrCapturing = creating || capturingShare
     val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
     Scaffold(
         modifier = modifier,
@@ -433,11 +434,11 @@ private fun NotesListScreen(
                     onClick = {
                         focusManager.clearFocus()
                         searchKeyboard?.hide()
-                        if (!creating) viewModel.createNote()
+                        if (!creatingOrCapturing) viewModel.createNote()
                     },
                     expanded = true,
                     icon = {
-                        if (creating) {
+                        if (creatingOrCapturing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp).testTag("noma_creation_spinner"),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -448,13 +449,13 @@ private fun NotesListScreen(
                         }
                     },
                     text = {
-                        Text(if (creating) stringResource(R.string.creating_note) else newNoteLabel)
+                        Text(if (creatingOrCapturing) stringResource(R.string.creating_note) else newNoteLabel)
                     },
-                    containerColor = if (creating) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
-                    contentColor = if (creating) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
+                    containerColor = if (creatingOrCapturing) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                    contentColor = if (creatingOrCapturing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
                     modifier = Modifier.testTag("noma_new_note").semantics {
-                        if (creating) {
+                        if (creatingOrCapturing) {
                             disabled()
                             contentDescription = creatingNoteLabel
                         }
