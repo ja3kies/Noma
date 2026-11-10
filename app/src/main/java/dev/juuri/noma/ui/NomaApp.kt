@@ -156,6 +156,7 @@ fun NomaApp(
     val pendingShare by viewModel.pendingShare.collectAsState()
     val capturingShare by viewModel.capturingShare.collectAsState()
     val creatingNote by viewModel.creating.collectAsState()
+    val storageState by viewModel.snapshot.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val deleted = stringResource(R.string.deleted_message)
     val archived = stringResource(R.string.archived_message)
@@ -169,8 +170,15 @@ fun NomaApp(
     val shareNeedsSave = stringResource(R.string.incoming_share_save_current_first)
     val saveBeforeNav = stringResource(R.string.save_before_navigation)
     val deferredCaptureLabel = stringResource(R.string.quick_capture_deferred)
+    val busyCaptureLabel = stringResource(R.string.quick_capture_busy)
+    val unavailableStorageLabel = stringResource(R.string.notes_storage_not_ready)
+    val sharedEmptyLabel = stringResource(R.string.share_empty_body)
+    val sharedLongLabel = stringResource(R.string.share_body_too_long)
+    val sharedTitleLabel = stringResource(R.string.share_title_too_long)
+    val shareQueueFullLabel = stringResource(R.string.share_queue_full)
+    val captureInProgressLabel = stringResource(R.string.capture_in_progress)
 
-    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, createdWhileEditing, shareSavedWhileEditing, deferredCaptureLabel) {
+    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, createdWhileEditing, shareSavedWhileEditing, deferredCaptureLabel, busyCaptureLabel, unavailableStorageLabel, sharedEmptyLabel, sharedLongLabel, sharedTitleLabel, shareQueueFullLabel, captureInProgressLabel) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -185,6 +193,13 @@ fun NomaApp(
                 is NoteUiEvent.Imported -> snackbar.showSnackbar(importResult.format(event.added, event.skipped))
                 NoteUiEvent.SaveBeforeNavigation -> snackbar.showSnackbar(saveBeforeNav)
                 NoteUiEvent.QuickCaptureDeferred -> snackbar.showSnackbar(deferredCaptureLabel)
+                NoteUiEvent.QuickCaptureBusy -> snackbar.showSnackbar(busyCaptureLabel)
+                NoteUiEvent.StorageNotReady -> snackbar.showSnackbar(unavailableStorageLabel)
+                NoteUiEvent.SharedTextEmpty -> snackbar.showSnackbar(sharedEmptyLabel)
+                NoteUiEvent.SharedTextTooLong -> snackbar.showSnackbar(sharedLongLabel)
+                NoteUiEvent.SharedTitleTooLong -> snackbar.showSnackbar(sharedTitleLabel)
+                NoteUiEvent.ShareQueueFull -> snackbar.showSnackbar(shareQueueFullLabel)
+                NoteUiEvent.CaptureInProgress -> snackbar.showSnackbar(captureInProgressLabel)
                 NoteUiEvent.SharedCaptureSaved -> snackbar.showSnackbar(sharedCaptureSaved)
                 NoteUiEvent.CreatedWhileEditing -> snackbar.showSnackbar(createdWhileEditing)
                 NoteUiEvent.SharedCaptureSavedWhileEditing -> snackbar.showSnackbar(shareSavedWhileEditing)
@@ -195,6 +210,12 @@ fun NomaApp(
     }
 
     pendingShare?.let { incoming ->
+        val invalidShareReason = when {
+            incoming.body.isBlank() -> stringResource(R.string.share_empty_body)
+            incoming.body.length > 100_000 -> stringResource(R.string.share_body_too_long)
+            incoming.title.length > 200 -> stringResource(R.string.share_title_too_long)
+            else -> null
+        }
         AlertDialog(
             onDismissRequest = viewModel::dismissSharedText,
             title = { Text(stringResource(R.string.incoming_share_title)) },
@@ -230,6 +251,14 @@ fun NomaApp(
                         stringResource(R.string.incoming_share_size, incoming.body.length),
                         style = MaterialTheme.typography.labelSmall
                     )
+                    if (invalidShareReason != null) {
+                        Text(
+                            invalidShareReason,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag("noma_share_validation_error")
+                        )
+                    }
                     if (active != null && saveState != EditorSaveState.Saved) {
                         Text(
                             shareNeedsSave,
@@ -243,6 +272,7 @@ fun NomaApp(
             confirmButton = {
                 TextButton(
                     enabled = !capturingShare && !creatingNote &&
+                        storageState is NotesSnapshot.Ready && invalidShareReason == null &&
                         (active == null || saveState == EditorSaveState.Saved),
                     onClick = viewModel::confirmSharedText,
                     modifier = Modifier.testTag("noma_share_confirm")

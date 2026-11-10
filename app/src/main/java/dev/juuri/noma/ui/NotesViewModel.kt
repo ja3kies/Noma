@@ -20,6 +20,13 @@ sealed interface NoteUiEvent {
     data class Imported(val added: Int, val skipped: Int) : NoteUiEvent
     data object SaveBeforeNavigation : NoteUiEvent
     data object QuickCaptureDeferred : NoteUiEvent
+    data object QuickCaptureBusy : NoteUiEvent
+    data object StorageNotReady : NoteUiEvent
+    data object SharedTextEmpty : NoteUiEvent
+    data object SharedTextTooLong : NoteUiEvent
+    data object SharedTitleTooLong : NoteUiEvent
+    data object ShareQueueFull : NoteUiEvent
+    data object CaptureInProgress : NoteUiEvent
     data object SharedCaptureSaved : NoteUiEvent
     data object CreatedWhileEditing : NoteUiEvent
     data object SharedCaptureSavedWhileEditing : NoteUiEvent
@@ -180,7 +187,7 @@ class NotesViewModel(
         } else if (queuedIncomingShares.size < 16) {
             queuedIncomingShares.addLast(request)
         } else {
-            eventChannel.trySend(NoteUiEvent.Failure("Too many incoming notes; finish current captures first"))
+            eventChannel.trySend(NoteUiEvent.ShareQueueFull)
         }
     }
 
@@ -196,6 +203,24 @@ class NotesViewModel(
     fun confirmSharedText() {
         val pending = _pendingShare.value ?: return
         if (_capturingShare.value || _creating.value) return
+        if (snapshot.value !is dev.juuri.noma.domain.NotesSnapshot.Ready) {
+            eventChannel.trySend(NoteUiEvent.StorageNotReady)
+            return
+        }
+        when {
+            pending.body.isBlank() -> {
+                eventChannel.trySend(NoteUiEvent.SharedTextEmpty)
+                return
+            }
+            pending.body.length > 100_000 -> {
+                eventChannel.trySend(NoteUiEvent.SharedTextTooLong)
+                return
+            }
+            pending.title.length > 200 -> {
+                eventChannel.trySend(NoteUiEvent.SharedTitleTooLong)
+                return
+            }
+        }
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
@@ -252,6 +277,10 @@ class NotesViewModel(
 
     /** Launcher/widget capture never discards the active unsaved editor. */
     fun requestQuickNote() {
+        if (_creating.value || _capturingShare.value) {
+            eventChannel.trySend(NoteUiEvent.QuickCaptureBusy)
+            return
+        }
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             if (!quickNoteRequestedAfterSave) {
                 quickNoteRequestedAfterSave = true
@@ -265,6 +294,10 @@ class NotesViewModel(
     fun createNote() {
         // Do not race a note created from an external share.
         if (_creating.value || _capturingShare.value) return
+        if (snapshot.value !is dev.juuri.noma.domain.NotesSnapshot.Ready) {
+            eventChannel.trySend(NoteUiEvent.StorageNotReady)
+            return
+        }
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
@@ -324,6 +357,11 @@ class NotesViewModel(
     }
 
     fun closeNote() {
+        // Keep navigation stable until external create/capture has completed.
+        if (_creating.value || _capturingShare.value) {
+            eventChannel.trySend(NoteUiEvent.CaptureInProgress)
+            return
+        }
         // If the user explicitly discards an unsaved draft, do not leave a
         // queued widget action that could unexpectedly open a note much later.
         quickNoteRequestedAfterSave = false

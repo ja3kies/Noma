@@ -115,6 +115,13 @@
     <string name="widget_style_frosted_green">Vert dépoli</string>
     <string name="widget_style_liquid_glass">Liquid Glass</string>
     <string name="widget_style_glass_note">Les styles translucides dépendent du lanceur et ne floutent pas le fond d’écran en temps réel.</string>
+    <string name="quick_capture_busy">Une note est déjà en cours de création ou de capture. Réessayez une fois l’opération terminée.</string>
+    <string name="notes_storage_not_ready">Vos notes ne sont pas encore disponibles. Réessayez après le chargement.</string>
+    <string name="share_empty_body">Le texte partagé est vide. Il n’y a rien à enregistrer.</string>
+    <string name="share_body_too_long">Le texte partagé dépasse la limite de 100 000 caractères.</string>
+    <string name="share_title_too_long">Le titre partagé dépasse la limite de 200 caractères.</string>
+    <string name="share_queue_full">La file des partages est pleine. Terminez ou ignorez un partage en attente avant de réessayer.</string>
+    <string name="capture_in_progress">Une note est encore en cours de création ou de capture. Terminez d’abord cette opération.</string>
     <string name="quick_capture_deferred">La nouvelle note s’ouvrira après l’enregistrement du brouillon actuel.</string>
     <string name="widget_style_save_error">Impossible d’enregistrer l’apparence du widget.</string>
     <string name="portable_export_unverified">Export écrit, mais le fournisseur de fichiers empêche sa vérification. Vérifiez le fichier JSON avant de compter sur cette sauvegarde.</string>
