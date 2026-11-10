@@ -414,7 +414,7 @@ class NotesViewModelTest {
     }
 
 
-    @Test fun staleListPinNeverReplacesUnsavedEditorText() = runTest {
+    @Test fun staleListPinCannotBypassUnsavedEditorProtection() = runTest {
         val original = Note("id", "Original", "Before", false, 1L, 1L)
         val repo = FakeRepository(original)
         repo.gate = CompletableDeferred()
@@ -423,12 +423,16 @@ class NotesViewModelTest {
         model.changeBody("Draft not yet on disk")
         model.togglePin(original)
         assertEquals("Draft not yet on disk", model.active.value?.body)
-        assertEquals(true, model.active.value?.isPinned)
+        assertEquals(false, model.active.value?.isPinned)
         repo.gate!!.complete(Unit)
         advanceUntilIdle()
         val persisted = (repo.notes.value as NotesSnapshot.Ready).entries.single()
         assertEquals("Draft not yet on disk", persisted.body)
-        assertEquals(true, persisted.isPinned)
+        assertEquals(false, persisted.isPinned)
+        model.togglePin(original)
+        advanceUntilIdle()
+        assertEquals(true, model.active.value?.isPinned)
+        assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
     }
 
     @Test fun archivedNotesCannotBePinnedThroughViewModel() = runTest {

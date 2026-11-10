@@ -21,6 +21,8 @@ sealed interface NoteUiEvent {
     data object SaveBeforeNavigation : NoteUiEvent
     data object QuickCaptureDeferred : NoteUiEvent
     data object SharedCaptureSaved : NoteUiEvent
+    data object CreatedWhileEditing : NoteUiEvent
+    data object SharedCaptureSavedWhileEditing : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
 
@@ -204,10 +206,18 @@ class NotesViewModel(
                 val created = service.captureText(pending.title, pending.body)
                 showNextShare()
                 clearDiscoveryFilters()
-                editorRevision++
-                _active.value = created
-                _saveState.value = EditorSaveState.Saved
-                eventChannel.send(NoteUiEvent.SharedCaptureSaved)
+                // A concurrent edit must not be replaced by an incoming share.
+                val keepEditing = _active.value != null &&
+                    _saveState.value != EditorSaveState.Saved
+                if (!keepEditing) {
+                    editorRevision++
+                    _active.value = created
+                    _saveState.value = EditorSaveState.Saved
+                }
+                eventChannel.send(
+                    if (keepEditing) NoteUiEvent.SharedCaptureSavedWhileEditing
+                    else NoteUiEvent.SharedCaptureSaved
+                )
             } catch (failure: Exception) {
                 eventChannel.send(NoteUiEvent.Failure(failure.localizedMessage ?: "Capture failed"))
                 // Keep the pending text so the user can retry without asking the sender again.
@@ -264,9 +274,16 @@ class NotesViewModel(
                 _query.value = ""
                 _archivedOnly.value = false
                 _pinnedOnly.value = false
-                editorRevision++
-                _active.value = created
-                _saveState.value = EditorSaveState.Saved
+                // A slow creation must not replace a newly edited draft.
+                val keepEditing = _active.value != null &&
+                    _saveState.value != EditorSaveState.Saved
+                if (keepEditing) {
+                    eventChannel.send(NoteUiEvent.CreatedWhileEditing)
+                } else {
+                    editorRevision++
+                    _active.value = created
+                    _saveState.value = EditorSaveState.Saved
+                }
             } catch (failure: Exception) {
                 eventChannel.send(
                     NoteUiEvent.Failure(failure.localizedMessage ?: "Cannot create note")

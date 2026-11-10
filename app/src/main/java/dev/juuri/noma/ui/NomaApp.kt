@@ -164,10 +164,13 @@ fun NomaApp(
     val failurePrefix = stringResource(R.string.error_prefix)
     val importResult = stringResource(R.string.portable_import_result)
     val sharedCaptureSaved = stringResource(R.string.incoming_share_saved)
+    val createdWhileEditing = stringResource(R.string.created_while_editing)
+    val shareSavedWhileEditing = stringResource(R.string.shared_saved_while_editing)
+    val shareNeedsSave = stringResource(R.string.incoming_share_save_current_first)
     val saveBeforeNav = stringResource(R.string.save_before_navigation)
     val deferredCaptureLabel = stringResource(R.string.quick_capture_deferred)
 
-    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, deferredCaptureLabel) {
+    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, createdWhileEditing, shareSavedWhileEditing, deferredCaptureLabel) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -183,6 +186,8 @@ fun NomaApp(
                 NoteUiEvent.SaveBeforeNavigation -> snackbar.showSnackbar(saveBeforeNav)
                 NoteUiEvent.QuickCaptureDeferred -> snackbar.showSnackbar(deferredCaptureLabel)
                 NoteUiEvent.SharedCaptureSaved -> snackbar.showSnackbar(sharedCaptureSaved)
+                NoteUiEvent.CreatedWhileEditing -> snackbar.showSnackbar(createdWhileEditing)
+                NoteUiEvent.SharedCaptureSavedWhileEditing -> snackbar.showSnackbar(shareSavedWhileEditing)
                 is NoteUiEvent.Failure ->
                     snackbar.showSnackbar(failurePrefix + event.message, withDismissAction = true)
             }
@@ -225,12 +230,22 @@ fun NomaApp(
                         stringResource(R.string.incoming_share_size, incoming.body.length),
                         style = MaterialTheme.typography.labelSmall
                     )
+                    if (active != null && saveState != EditorSaveState.Saved) {
+                        Text(
+                            shareNeedsSave,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag("noma_share_save_guidance")
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = !capturingShare && !creatingNote,
-                    onClick = viewModel::confirmSharedText
+                    enabled = !capturingShare && !creatingNote &&
+                        (active == null || saveState == EditorSaveState.Saved),
+                    onClick = viewModel::confirmSharedText,
+                    modifier = Modifier.testTag("noma_share_confirm")
                 ) { Text(stringResource(R.string.incoming_share_confirm)) }
             },
             dismissButton = {

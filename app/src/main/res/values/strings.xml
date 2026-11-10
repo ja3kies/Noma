@@ -105,6 +105,9 @@
     <string name="incoming_share_confirm">Save note</string>
     <string name="incoming_share_discard">Discard</string>
     <string name="incoming_share_saved">Shared text saved to Noma</string>
+    <string name="created_while_editing">New note created. Your unfinished draft remains open.</string>
+    <string name="shared_saved_while_editing">Shared text saved. Your unfinished draft remains open.</string>
+    <string name="incoming_share_save_current_first">Save the current note before capturing the shared text.</string>
     <string name="incoming_share_size">%1$d characters</string>
     <string name="widget_description">Quickly create a note</string>
     <string name="widget_style_settings">Widget appearance</string>

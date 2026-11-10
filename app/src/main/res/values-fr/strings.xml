@@ -105,6 +105,9 @@
     <string name="incoming_share_confirm">Enregistrer</string>
     <string name="incoming_share_discard">Ignorer</string>
     <string name="incoming_share_saved">Texte partagé enregistré dans Noma</string>
+    <string name="created_while_editing">Nouvelle note créée. Votre brouillon en cours reste ouvert.</string>
+    <string name="shared_saved_while_editing">Texte partagé enregistré. Votre brouillon en cours reste ouvert.</string>
+    <string name="incoming_share_save_current_first">Enregistrez la note actuelle avant de capturer le texte partagé.</string>
     <string name="incoming_share_size">%1$d caractères</string>
     <string name="widget_description">Créer une note rapidement</string>
     <string name="widget_style_settings">Apparence du widget</string>
