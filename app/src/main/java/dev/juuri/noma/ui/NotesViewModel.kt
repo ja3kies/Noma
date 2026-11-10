@@ -200,6 +200,8 @@ class NotesViewModel(
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
+        val originatingNoteId = _active.value?.id
+        val originatingRevision = editorRevision
         _capturingShare.value = true
         viewModelScope.launch {
             try {
@@ -207,8 +209,10 @@ class NotesViewModel(
                 showNextShare()
                 clearDiscoveryFilters()
                 // A concurrent edit must not be replaced by an incoming share.
-                val keepEditing = _active.value != null &&
-                    _saveState.value != EditorSaveState.Saved
+                val keepEditing = originatingNoteId != null &&
+                    _active.value?.id == originatingNoteId &&
+                    (editorRevision != originatingRevision ||
+                        _saveState.value != EditorSaveState.Saved)
                 if (!keepEditing) {
                     editorRevision++
                     _active.value = created
@@ -265,6 +269,8 @@ class NotesViewModel(
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
+        val originatingNoteId = _active.value?.id
+        val originatingRevision = editorRevision
         _creating.value = true
         viewModelScope.launch {
             try {
@@ -275,8 +281,10 @@ class NotesViewModel(
                 _archivedOnly.value = false
                 _pinnedOnly.value = false
                 // A slow creation must not replace a newly edited draft.
-                val keepEditing = _active.value != null &&
-                    _saveState.value != EditorSaveState.Saved
+                val keepEditing = originatingNoteId != null &&
+                    _active.value?.id == originatingNoteId &&
+                    (editorRevision != originatingRevision ||
+                        _saveState.value != EditorSaveState.Saved)
                 if (keepEditing) {
                     eventChannel.send(NoteUiEvent.CreatedWhileEditing)
                 } else {
