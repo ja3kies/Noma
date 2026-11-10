@@ -52,8 +52,10 @@ class NotesService(
         archivedOnly: Boolean = false,
         sort: NoteSort = NoteSort.RECENT
     ): List<Note> {
+        // Filtering and sorting an empty notebook should allocate nothing.
+        if (notes.isEmpty()) return emptyList()
         val words = NoteSearch.terms(query)
-        val normalizedPhrase = words.joinToString(" ")
+        val normalizedPhrase = if (words.isEmpty()) "" else words.joinToString(" ")
         // Compute expensive Unicode normalization and relevance only once per
         // matching note, not on every comparison performed by the sorter.
         data class SortEntry(val note: Note, val relevance: Int, val titleKey: String)
