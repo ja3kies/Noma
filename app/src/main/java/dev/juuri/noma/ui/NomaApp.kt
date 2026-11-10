@@ -346,10 +346,26 @@ fun NomaApp(
     }
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val expanded = maxWidth >= 840.dp
+            val expanded = shouldShowNomaTwoPane(maxWidth)
             if (expanded) {
-                val listWidth = responsiveListPaneWidth(maxWidth)
-                Row(Modifier.fillMaxSize()) {
+                val gutter = nomaPaneGutter(maxWidth)
+                val margin = nomaTabletMargin(maxWidth)
+                val cornerRadius = nomaPaneCornerRadius(maxWidth)
+                val listWidth by animateDpAsState(
+                    targetValue = responsiveListPaneWidth(maxWidth),
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+                    label = "nomaResponsiveListPaneWidth"
+                )
+                Row(
+                    Modifier.fillMaxSize().padding(margin),
+                    horizontalArrangement = Arrangement.spacedBy(gutter)
+                ) {
+                    Surface(
+                        modifier = Modifier.width(listWidth).fillMaxHeight(),
+                        shape = RoundedCornerShape(cornerRadius),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 1.dp
+                    ) {
                     NotesListScreen(
                         viewModel = viewModel,
                         snackbar = snackbar,
@@ -358,16 +374,13 @@ fun NomaApp(
                         onAppearanceChange = onAppearanceChange,
                         widgetStyle = widgetStyle,
                         onWidgetStyleChange = onWidgetStyleChange,
-                        modifier = Modifier.width(listWidth).fillMaxHeight()
+                        isTabletList = true,
+                        modifier = Modifier.fillMaxSize()
                     )
-                    Spacer(Modifier.width(NomaSpacing.small))
+                    }
                     Surface(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(
-                            top = NomaSpacing.medium,
-                            end = NomaSpacing.medium,
-                            bottom = NomaSpacing.medium
-                        ),
-                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        shape = RoundedCornerShape(cornerRadius),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         tonalElevation = 1.dp
                     ) {
@@ -415,6 +428,18 @@ fun NomaApp(
  * Keep list navigation comfortably usable while preserving writing space on
  * tablets and resizable desktop windows. Only expanded layouts use this width.
  */
+internal fun shouldShowNomaTwoPane(windowWidth: Dp): Boolean =
+    windowWidth >= 840.dp
+
+internal fun nomaPaneGutter(windowWidth: Dp): Dp =
+    if (windowWidth >= 1200.dp) 16.dp else 8.dp
+
+internal fun nomaTabletMargin(windowWidth: Dp): Dp =
+    if (windowWidth >= 1200.dp) 16.dp else 8.dp
+
+internal fun nomaPaneCornerRadius(windowWidth: Dp): Dp =
+    if (windowWidth >= 1200.dp) 28.dp else 22.dp
+
 internal fun responsiveListPaneWidth(windowWidth: Dp): Dp =
     (windowWidth * 0.36f).coerceIn(320.dp, 420.dp)
 
@@ -427,6 +452,7 @@ private fun NotesListScreen(
     onAppearanceChange: (NomaAppearance) -> Unit,
     widgetStyle: NomaWidgetStyle,
     onWidgetStyleChange: (NomaWidgetStyle) -> Unit,
+    isTabletList: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val snapshot by viewModel.snapshot.collectAsState()
@@ -517,7 +543,8 @@ private fun NotesListScreen(
     val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
     Scaffold(
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (isTabletList) MaterialTheme.colorScheme.surfaceContainerLow
+            else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbar) },
         // Like a bottom-toolbar search field on iOS, but implemented with
@@ -1452,7 +1479,8 @@ private fun NoteEditorScreen(
     val safeTitle = stringResource(R.string.editor_nav_title)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow
+            else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
         topBar = {
@@ -1699,24 +1727,39 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
 
 @Composable
 private fun EmptyEditorPane() {
-    CenterMessage {
-        Icon(
-            Icons.Outlined.EditNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(52.dp)
-        )
-        Spacer(Modifier.height(NomaSpacing.comfortable))
-        Text(
-            stringResource(R.string.select_note_title),
-            style = MaterialTheme.typography.titleLarge
-        )
-        Spacer(Modifier.height(NomaSpacing.small))
-        Text(
-            stringResource(R.string.select_note_detail),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.widthIn(max = 460.dp)
+                .fillMaxWidth()
+                .padding(NomaSpacing.page)
+                .testTag("noma_tablet_empty_pane"),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Outlined.EditNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(NomaSpacing.comfortable).size(36.dp)
+                )
+            }
+            Text(
+                stringResource(R.string.select_note_title),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                stringResource(R.string.select_note_detail),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
