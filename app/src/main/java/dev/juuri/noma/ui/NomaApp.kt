@@ -17,6 +17,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
@@ -1296,6 +1297,8 @@ private fun NoteEditorScreen(
     val titleFocus = remember(note.id) { FocusRequester() }
     val bodyFocus = remember(note.id) { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val editorScrollState = remember(note.id) { ScrollState(0) }
+    val pinStateDescription = stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)
 
     fun requestClose() {
         menuExpanded = false
@@ -1395,14 +1398,17 @@ private fun NoteEditorScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            if (expanded) stringResource(R.string.editor_title) else safeTitle,
-                            style = MaterialTheme.typography.titleMedium
+                            if (expanded) note.displayTitle.ifBlank { stringResource(R.string.untitled) } else safeTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
                         IconButton(
                             onClick = ::requestClose,
-                            modifier = Modifier.testTag("noma_editor_back")
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .testTag("noma_editor_back")
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -1418,7 +1424,9 @@ private fun NoteEditorScreen(
                         IconButton(
                             onClick = { viewModel.togglePin(note) },
                             enabled = saveState == EditorSaveState.Saved && !note.isArchived,
-                            modifier = Modifier.testTag("noma_editor_pin")
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .semantics { stateDescription = pinStateDescription }
+                                .testTag("noma_editor_pin")
                         ) {
                             Icon(
                                 Icons.Outlined.PushPin,
@@ -1432,7 +1440,8 @@ private fun NoteEditorScreen(
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
-                                modifier = Modifier.testTag("noma_editor_actions")
+                                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                    .testTag("noma_editor_actions")
                             ) {
                                 Icon(
                                     Icons.Outlined.MoreHoriz,
@@ -1474,14 +1483,15 @@ private fun NoteEditorScreen(
             modifier = Modifier.fillMaxSize().padding(insets).imePadding(),
             contentAlignment = Alignment.TopCenter
         ) {
-            val width = if (maxWidth > NomaSpacing.editorMaxWidth)
-                NomaSpacing.editorMaxWidth else maxWidth
+            val maxReadingWidth = 700.dp
+            val width = if (maxWidth > maxReadingWidth) maxReadingWidth else maxWidth
             Column(
                 modifier = Modifier
                     .width(width)
                     .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 16.dp, bottom = 64.dp)
+                    .verticalScroll(editorScrollState)
+                    .padding(start = NomaSpacing.page, end = NomaSpacing.page,
+                        top = NomaSpacing.comfortable, bottom = 80.dp)
             ) {
                 if (saveState is EditorSaveState.Failed) {
                     Text(
@@ -1508,7 +1518,8 @@ private fun NoteEditorScreen(
                     },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.headlineLarge.copy(
-                        color = MaterialTheme.colorScheme.onBackground
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -1537,19 +1548,19 @@ private fun NoteEditorScreen(
                         viewModel.changeBody(it)
                     },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onBackground,
-                        lineHeight = 26.sp
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 27.sp
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
-                        .defaultMinSize(minHeight = 300.dp)
+                        .defaultMinSize(minHeight = 360.dp)
                         .focusRequester(bodyFocus).testTag("noma_body_input"),
                     decorationBox = { input ->
                         Box {
                             if (note.body.isEmpty()) {
                                 Text(
                                     stringResource(R.string.body_hint),
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -1606,7 +1617,8 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onRetry, modifier = Modifier.testTag("noma_retry_save")) {
+                TextButton(onClick = onRetry,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_retry_save")) {
                     Text(stringResource(R.string.retry))
                 }
             }
