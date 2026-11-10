@@ -38,6 +38,51 @@ class NoteSearchPerformanceTest {
         assertFalse(preview.contains("another unimportant"))
     }
 
+    @Test fun rankedSearchKeepsStableTieBreakerAndPinnedOrder() {
+        val entries = listOf(
+            Note("z", "Café notes", "Body", false, 1L, 8L),
+            Note("a", "Café notes", "Body", false, 1L, 8L),
+            Note("pin", "Café notes", "Body", true, 1L, 3L),
+            Note("exact", "cafe", "Body", false, 1L, 1L)
+        )
+        val repo = object : NotesRepository {
+            override val notes = kotlinx.coroutines.flow.MutableStateFlow<NotesSnapshot>(
+                NotesSnapshot.Ready(entries)
+            )
+            override suspend fun refresh() = Unit
+            override suspend fun save(note: Note) = Unit
+            override suspend fun delete(id: String) = Unit
+            override suspend fun importMissing(notes: List<Note>): Int = 0
+        }
+        val service = NotesService(repo)
+        assertEquals(
+            listOf("exact", "pin", "a", "z"),
+            service.visible(entries, "cafe", false, sort = NoteSort.RECENT).map { it.id }
+        )
+    }
+
+    @Test fun titleSortNormalizesAccentsAndPreservesRecentTieBreaker() {
+        val entries = listOf(
+            Note("z", "Éclair", "Body", false, 1L, 10L),
+            Note("a", "eclair", "Body", false, 1L, 20L),
+            Note("b", "Banane", "Body", false, 1L, 30L)
+        )
+        val repo = object : NotesRepository {
+            override val notes = kotlinx.coroutines.flow.MutableStateFlow<NotesSnapshot>(
+                NotesSnapshot.Ready(entries)
+            )
+            override suspend fun refresh() = Unit
+            override suspend fun save(note: Note) = Unit
+            override suspend fun delete(id: String) = Unit
+            override suspend fun importMissing(notes: List<Note>): Int = 0
+        }
+        val service = NotesService(repo)
+        assertEquals(
+            listOf("b", "a", "z"),
+            service.visible(entries, "", false, sort = NoteSort.TITLE).map { it.id }
+        )
+    }
+
     @Test fun matchedPreviewReturnsFallbackWhenNoBodyLineMatches() {
         val entry = note("A short body", title = "Café")
         assertEquals("A short body", NoteSearch.matchingPreview(entry, "cafe"))
