@@ -9,6 +9,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
@@ -17,12 +19,14 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -120,6 +124,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
@@ -249,12 +254,20 @@ fun NomaApp(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        incoming.body.take(500),
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().testTag("noma_share_preview"),
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainer
+                    ) {
+                        Text(
+                            incoming.body.take(500),
+                            modifier = Modifier.padding(NomaSpacing.comfortable),
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 23.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     if (incoming.body.length > 500) {
                         Text(
                             stringResource(
@@ -268,14 +281,25 @@ fun NomaApp(
                     }
                     Text(
                         stringResource(R.string.incoming_share_size, incoming.body.length),
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (storageState !is NotesSnapshot.Ready) {
+                        Text(
+                            stringResource(R.string.notes_storage_not_ready),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.testTag("noma_share_storage_guidance")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
+                        )
+                    }
                     if (invalidShareReason != null) {
                         Text(
                             invalidShareReason,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.testTag("noma_share_validation_error")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
                         )
                     }
                     if (active != null && saveState != EditorSaveState.Saved) {
@@ -284,6 +308,7 @@ fun NomaApp(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.testTag("noma_share_save_guidance")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
                         )
                     }
                 }
@@ -294,41 +319,68 @@ fun NomaApp(
                         storageState is NotesSnapshot.Ready && invalidShareReason == null &&
                         (active == null || saveState == EditorSaveState.Saved),
                     onClick = viewModel::confirmSharedText,
-                    modifier = Modifier.testTag("noma_share_confirm")
-                ) { Text(stringResource(R.string.incoming_share_confirm)) }
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        .testTag("noma_share_confirm")
+                ) {
+                    if (capturingShare) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp).testTag("noma_share_progress"),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(NomaSpacing.small))
+                        Text(stringResource(R.string.incoming_share_saving))
+                    } else {
+                        Text(stringResource(R.string.incoming_share_confirm))
+                    }
+                }
             },
             dismissButton = {
                 TextButton(
                     enabled = !capturingShare,
-                    onClick = viewModel::dismissSharedText
+                    onClick = viewModel::dismissSharedText,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        .testTag("noma_share_discard")
                 ) { Text(stringResource(R.string.incoming_share_discard)) }
             }
         )
     }
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val expanded = maxWidth >= 840.dp
+            val expanded = shouldShowNomaTwoPane(maxWidth)
             if (expanded) {
-                val listWidth = responsiveListPaneWidth(maxWidth)
-                Row(Modifier.fillMaxSize()) {
-                    NotesListScreen(
-                        viewModel = viewModel,
-                        snackbar = snackbar,
-                        selectedId = active?.id,
-                        appearance = appearance,
-                        onAppearanceChange = onAppearanceChange,
-                        widgetStyle = widgetStyle,
-                        onWidgetStyleChange = onWidgetStyleChange,
-                        modifier = Modifier.width(listWidth).fillMaxHeight()
-                    )
-                    Spacer(Modifier.width(NomaSpacing.small))
+                val gutter = nomaPaneGutter(maxWidth)
+                val margin = nomaTabletMargin(maxWidth)
+                val cornerRadius = nomaPaneCornerRadius(maxWidth)
+                val listWidth by animateDpAsState(
+                    targetValue = responsiveListPaneWidth(maxWidth),
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+                    label = "nomaResponsiveListPaneWidth"
+                )
+                Row(
+                    Modifier.fillMaxSize().padding(margin),
+                    horizontalArrangement = Arrangement.spacedBy(gutter)
+                ) {
                     Surface(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(
-                            top = NomaSpacing.medium,
-                            end = NomaSpacing.medium,
-                            bottom = NomaSpacing.medium
-                        ),
-                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.width(listWidth).fillMaxHeight(),
+                        shape = RoundedCornerShape(cornerRadius),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 1.dp
+                    ) {
+                        NotesListScreen(
+                            viewModel = viewModel,
+                            snackbar = snackbar,
+                            selectedId = active?.id,
+                            appearance = appearance,
+                            onAppearanceChange = onAppearanceChange,
+                            widgetStyle = widgetStyle,
+                            onWidgetStyleChange = onWidgetStyleChange,
+                            isTabletList = true,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        shape = RoundedCornerShape(cornerRadius),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         tonalElevation = 1.dp
                     ) {
@@ -376,6 +428,18 @@ fun NomaApp(
  * Keep list navigation comfortably usable while preserving writing space on
  * tablets and resizable desktop windows. Only expanded layouts use this width.
  */
+internal fun shouldShowNomaTwoPane(windowWidth: Dp): Boolean =
+    windowWidth >= 840.dp
+
+internal fun nomaPaneGutter(windowWidth: Dp): Dp =
+    if (windowWidth >= 1200.dp) 16.dp else 8.dp
+
+internal fun nomaTabletMargin(windowWidth: Dp): Dp =
+    if (windowWidth >= 1200.dp) 16.dp else 8.dp
+
+internal fun nomaPaneCornerRadius(windowWidth: Dp): Dp =
+    if (windowWidth >= 1200.dp) 28.dp else 22.dp
+
 internal fun responsiveListPaneWidth(windowWidth: Dp): Dp =
     (windowWidth * 0.36f).coerceIn(320.dp, 420.dp)
 
@@ -388,6 +452,7 @@ private fun NotesListScreen(
     onAppearanceChange: (NomaAppearance) -> Unit,
     widgetStyle: NomaWidgetStyle,
     onWidgetStyleChange: (NomaWidgetStyle) -> Unit,
+    isTabletList: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val snapshot by viewModel.snapshot.collectAsState()
@@ -478,7 +543,8 @@ private fun NotesListScreen(
     val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
     Scaffold(
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (isTabletList) MaterialTheme.colorScheme.surfaceContainerLow
+            else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbar) },
         // Like a bottom-toolbar search field on iOS, but implemented with
@@ -805,13 +871,17 @@ private fun NotesListScreen(
                             contentPadding = PaddingValues(
                                 start = NomaSpacing.comfortable,
                                 end = NomaSpacing.comfortable,
-                                bottom = 108.dp
+                                bottom = 96.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             if (pinned.isNotEmpty()) {
                                 item(key = "pinned_section") {
-                                    SectionHeader(stringResource(R.string.pinned_section))
+                                    SectionHeader(
+                                        title = stringResource(R.string.pinned_section),
+                                        count = pinned.size,
+                                        icon = Icons.Outlined.PushPin
+                                    )
                                 }
                                 items(pinned, key = { it.id }) { note ->
                                     NoteCard(
@@ -840,14 +910,20 @@ private fun NotesListScreen(
                             if (others.isNotEmpty()) {
                                 item(key = "recent_section") {
                                     SectionHeader(
-                                        stringResource(
+                                        title = stringResource(
                                             when {
                                                 archivedOnly -> R.string.archived_section
                                                 query.isNotBlank() -> R.string.search_section
                                                 sort == NoteSort.TITLE -> R.string.alphabetical_section
                                                 else -> R.string.recent_section
                                             }
-                                        )
+                                        ),
+                                        count = others.size,
+                                        icon = when {
+                                            archivedOnly -> Icons.Outlined.Archive
+                                            query.isNotBlank() -> Icons.Outlined.Search
+                                            else -> Icons.Outlined.EditNote
+                                        }
                                     )
                                 }
                                 items(others, key = { it.id }) { note ->
@@ -1000,13 +1076,40 @@ private fun BottomSearchPill(
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        modifier = Modifier.padding(start = NomaSpacing.small, top = NomaSpacing.medium, bottom = 2.dp),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .padding(start = NomaSpacing.small, top = NomaSpacing.comfortable, bottom = NomaSpacing.small)
+            .testTag("noma_section_header"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Text(
+                text = count.toString(),
+                modifier = Modifier.padding(horizontal = NomaSpacing.medium, vertical = NomaSpacing.tiny)
+                    .semantics { contentDescription = title + ": " + count },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
@@ -1049,8 +1152,28 @@ private fun NoteCard(
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
     }
-    val cardColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh
-        else MaterialTheme.colorScheme.surfaceContainerLow
+    val cardColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaCardSelectedSurface"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaCardSelectionBorder"
+    )
+    val cornerRadius by animateDpAsState(
+        targetValue = if (selected) 28.dp else 22.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "nomaCardCornerRadius"
+    )
+    val cardElevation by animateDpAsState(
+        targetValue = if (selected) 0.dp else 1.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "nomaCardElevation"
+    )
     Card(
         onClick = onOpen,
         enabled = navigationEnabled,
@@ -1058,17 +1181,15 @@ private fun NoteCard(
             .testTag("noma_note_${note.id}")
             .semantics { this.selected = selected }
             .animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy)),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 0.dp else 1.dp),
-        border = if (selected) BorderStroke(
-            1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-        ) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        border = BorderStroke(if (selected) 1.5.dp else 1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .defaultMinSize(minHeight = 88.dp)
-                .padding(start = 20.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
+                .defaultMinSize(minHeight = 96.dp)
+                .padding(start = 20.dp, top = 18.dp, end = 8.dp, bottom = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
@@ -1077,6 +1198,7 @@ private fun NoteCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (relevantPreview.isNotEmpty() &&
@@ -1086,23 +1208,42 @@ private fun NoteCard(
                         text = highlightMatches(relevantPreview, query),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(NomaSpacing.small))
                 Text(
                     text = formatEdited(note.updatedAt),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (note.isPinned && !note.isArchived) {
+            AnimatedVisibility(
+                visible = note.isPinned && !note.isArchived,
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally()
+            ) {
+                Surface(
+                    modifier = Modifier.testTag("noma_card_pinned_badge"),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Icon(
+                        Icons.Outlined.PushPin,
+                        contentDescription = stringResource(R.string.pinned_note_indicator),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(8.dp).size(16.dp)
+                    )
+                }
+            }
+            if (note.isArchived) {
                 Icon(
-                    Icons.Outlined.PushPin,
-                    contentDescription = stringResource(R.string.pinned_note_indicator),
+                    Icons.Outlined.Archive,
+                    contentDescription = stringResource(R.string.archived_section),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 3.dp).size(18.dp)
+                    modifier = Modifier.testTag("noma_card_archived_badge")
+                        .padding(start = NomaSpacing.small).size(18.dp)
                 )
             }
             Box {
@@ -1112,7 +1253,8 @@ private fun NoteCard(
                         menuExpanded = true
                     },
                     enabled = navigationEnabled,
-                    modifier = Modifier.testTag("noma_note_actions_${note.id}")
+                    modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        .testTag("noma_note_actions_${note.id}")
                 ) {
                     Icon(
                         Icons.Outlined.MoreHoriz,
@@ -1151,28 +1293,46 @@ private fun NoteActionsMenu(
         // a pin action that appears to have no visible effect.
         if (showPinAction && !note.isArchived) {
             DropdownMenuItem(
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_menu_pin"),
                 text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
                 enabled = destructiveEnabled,
                 onClick = { onDismiss(); onPin() },
-                leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.PushPin,
+                        contentDescription = null,
+                        tint = if (note.isPinned && destructiveEnabled) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = if (note.isPinned && destructiveEnabled) {
+                    { Icon(Icons.Outlined.Check, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary) }
+                } else null
             )
         }
         DropdownMenuItem(
+            modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_menu_archive"),
             text = { Text(stringResource(if (note.isArchived) R.string.unarchive_note else R.string.archive_note)) },
             enabled = destructiveEnabled,
             onClick = { onDismiss(); onArchive() },
             leadingIcon = {
                 Icon(
                     if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                    contentDescription = null
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         )
         DropdownMenuItem(
+            modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_menu_share"),
             text = { Text(stringResource(R.string.share_note)) },
             enabled = destructiveEnabled && (note.title.isNotBlank() || note.body.isNotBlank()),
             onClick = { onDismiss(); onShare() },
-            leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
+            leadingIcon = {
+                Icon(Icons.Outlined.Share, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         )
         // Give the destructive action its own group without a loud accent color.
         HorizontalDivider(
@@ -1180,7 +1340,8 @@ private fun NoteActionsMenu(
             color = MaterialTheme.colorScheme.outlineVariant
         )
         DropdownMenuItem(
-            modifier = Modifier.testTag("noma_delete_action"),
+            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                .testTag("noma_delete_action"),
             text = {
                 Text(
                     stringResource(R.string.delete_note),
@@ -1219,6 +1380,14 @@ private fun NoteEditorScreen(
     val titleFocus = remember(note.id) { FocusRequester() }
     val bodyFocus = remember(note.id) { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val saveBarColor by animateColorAsState(
+        targetValue = if (saveState is EditorSaveState.Failed) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaEditorSaveStatusSurface"
+    )
+    val editorScrollState = remember(note.id) { ScrollState(0) }
+    val pinStateDescription = stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)
 
     fun requestClose() {
         menuExpanded = false
@@ -1310,7 +1479,8 @@ private fun NoteEditorScreen(
     val safeTitle = stringResource(R.string.editor_nav_title)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow
+            else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
         topBar = {
@@ -1318,14 +1488,17 @@ private fun NoteEditorScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            if (expanded) stringResource(R.string.editor_title) else safeTitle,
-                            style = MaterialTheme.typography.titleMedium
+                            if (expanded) note.displayTitle.ifBlank { stringResource(R.string.untitled) } else safeTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
                         IconButton(
                             onClick = ::requestClose,
-                            modifier = Modifier.testTag("noma_editor_back")
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .testTag("noma_editor_back")
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -1341,7 +1514,9 @@ private fun NoteEditorScreen(
                         IconButton(
                             onClick = { viewModel.togglePin(note) },
                             enabled = saveState == EditorSaveState.Saved && !note.isArchived,
-                            modifier = Modifier.testTag("noma_editor_pin")
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .semantics { stateDescription = pinStateDescription }
+                                .testTag("noma_editor_pin")
                         ) {
                             Icon(
                                 Icons.Outlined.PushPin,
@@ -1355,7 +1530,8 @@ private fun NoteEditorScreen(
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
-                                modifier = Modifier.testTag("noma_editor_actions")
+                                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                    .testTag("noma_editor_actions")
                             ) {
                                 Icon(
                                     Icons.Outlined.MoreHoriz,
@@ -1379,7 +1555,7 @@ private fun NoteEditorScreen(
                 // A save failure must stay actionable even while the editor has
                 // scrolled and the IME is visible; never bury Retry in the document.
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = saveBarColor,
                     tonalElevation = 1.dp
                 ) {
                     Box(
@@ -1390,28 +1566,19 @@ private fun NoteEditorScreen(
                         EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
                     }
                 }
-            }
-        }
-    ) { insets ->
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(insets).imePadding(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            val width = if (maxWidth > NomaSpacing.editorMaxWidth)
-                NomaSpacing.editorMaxWidth else maxWidth
-            Column(
-                modifier = Modifier
-                    .width(width)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 16.dp, bottom = 64.dp)
-            ) {
-                if (saveState is EditorSaveState.Failed) {
+                AnimatedVisibility(
+                    visible = saveState is EditorSaveState.Failed,
+                    enter = fadeIn(tween(NomaMotion.quick)) + expandVertically(),
+                    exit = fadeOut(tween(NomaMotion.quick)) + shrinkVertically()
+                ) {
                     Text(
                         stringResource(R.string.save_failure_guidance),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("noma_save_failure_guidance")
+                        modifier = Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
+                            .testTag("noma_save_failure_guidance")
                     )
                 }
                 if (closeWhenSaved && saveState == EditorSaveState.Saving) {
@@ -1419,10 +1586,29 @@ private fun NoteEditorScreen(
                         stringResource(R.string.wait_for_save_before_exit),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag("noma_pending_exit")
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
+                            .testTag("noma_pending_exit")
                     )
                 }
-                Spacer(Modifier.height(24.dp))
+            }
+        }
+    ) { insets ->
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().padding(insets).imePadding(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            val maxReadingWidth = 700.dp
+            val width = if (maxWidth > maxReadingWidth) maxReadingWidth else maxWidth
+            Column(
+                modifier = Modifier
+                    .width(width)
+                    .fillMaxHeight()
+                    .verticalScroll(editorScrollState)
+                    .padding(start = NomaSpacing.page, end = NomaSpacing.page,
+                        top = NomaSpacing.comfortable, bottom = 80.dp)
+            ) {
+                Spacer(Modifier.height(NomaSpacing.section))
                 BasicTextField(
                     value = note.title,
                     onValueChange = {
@@ -1431,7 +1617,8 @@ private fun NoteEditorScreen(
                     },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.headlineLarge.copy(
-                        color = MaterialTheme.colorScheme.onBackground
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -1460,19 +1647,19 @@ private fun NoteEditorScreen(
                         viewModel.changeBody(it)
                     },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onBackground,
-                        lineHeight = 26.sp
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 27.sp
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
-                        .defaultMinSize(minHeight = 300.dp)
+                        .defaultMinSize(minHeight = 360.dp)
                         .focusRequester(bodyFocus).testTag("noma_body_input"),
                     decorationBox = { input ->
                         Box {
                             if (note.body.isEmpty()) {
                                 Text(
                                     stringResource(R.string.body_hint),
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -1529,7 +1716,8 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onRetry, modifier = Modifier.testTag("noma_retry_save")) {
+                TextButton(onClick = onRetry,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_retry_save")) {
                     Text(stringResource(R.string.retry))
                 }
             }
@@ -1539,24 +1727,39 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
 
 @Composable
 private fun EmptyEditorPane() {
-    CenterMessage {
-        Icon(
-            Icons.Outlined.EditNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(52.dp)
-        )
-        Spacer(Modifier.height(NomaSpacing.comfortable))
-        Text(
-            stringResource(R.string.select_note_title),
-            style = MaterialTheme.typography.titleLarge
-        )
-        Spacer(Modifier.height(NomaSpacing.small))
-        Text(
-            stringResource(R.string.select_note_detail),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.widthIn(max = 460.dp)
+                .fillMaxWidth()
+                .padding(NomaSpacing.page)
+                .testTag("noma_tablet_empty_pane"),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Outlined.EditNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(NomaSpacing.comfortable).size(36.dp)
+                )
+            }
+            Text(
+                stringResource(R.string.select_note_title),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                stringResource(R.string.select_note_detail),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -1569,9 +1772,13 @@ private fun AppearanceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text(stringResource(R.string.appearance)) },
         text = {
-            Column(Modifier.selectableGroup().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.selectableGroup().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+            ) {
                 val options = listOf(
                     NomaAppearance.SYSTEM to R.string.appearance_system,
                     NomaAppearance.LIGHT to R.string.appearance_light,
@@ -1579,15 +1786,35 @@ private fun AppearanceDialog(
                 )
                 options.forEach { (mode, label) ->
                     val isSelected = mode == selected
+                    val choiceColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerLow,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaThemeChoiceBackground"
+                    )
+                    val choiceOutline by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaThemeChoiceStroke"
+                    )
+                    val preview = when (mode) {
+                        NomaAppearance.SYSTEM -> Brush.horizontalGradient(
+                            listOf(Color(0xFFF9F8F5), Color(0xFF14191E))
+                        )
+                        NomaAppearance.LIGHT -> Brush.linearGradient(
+                            listOf(Color(0xFFF9F8F5), Color(0xFFDCE7F4))
+                        )
+                        NomaAppearance.DARK -> Brush.linearGradient(
+                            listOf(Color(0xFF14191E), Color(0xFF2E4865))
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .padding(vertical = NomaSpacing.tiny)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerLow,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .defaultMinSize(minHeight = 64.dp)
+                            .background(choiceColor, RoundedCornerShape(20.dp))
+                            .border(1.dp, choiceOutline, RoundedCornerShape(20.dp))
+                            .defaultMinSize(minHeight = 76.dp)
                             .selectable(
                                 selected = isSelected,
                                 role = Role.RadioButton,
@@ -1596,29 +1823,44 @@ private fun AppearanceDialog(
                             .padding(horizontal = NomaSpacing.comfortable),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = when (mode) {
-                                NomaAppearance.SYSTEM -> Icons.Outlined.BrightnessAuto
-                                NomaAppearance.LIGHT -> Icons.Outlined.LightMode
-                                NomaAppearance.DARK -> Icons.Outlined.DarkMode
-                            },
-                            contentDescription = null,
-                            tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant
+                        Box(
+                            modifier = Modifier.size(width = 58.dp, height = 38.dp)
+                                .background(preview, RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp, MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .testTag("noma_theme_preview_${mode.name}")
                         )
-                        Spacer(Modifier.width(NomaSpacing.comfortable))
-                        Text(
-                            stringResource(label),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Spacer(Modifier.width(NomaSpacing.medium))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(label),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                            )
+                            Text(
+                                stringResource(
+                                    when (mode) {
+                                        NomaAppearance.SYSTEM -> R.string.appearance_system_detail
+                                        NomaAppearance.LIGHT -> R.string.appearance_light_detail
+                                        NomaAppearance.DARK -> R.string.appearance_dark_detail
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         RadioButton(selected = isSelected, onClick = null)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.close)) }
         },
         dismissButton = {
             TextButton(onClick = onWidgetStyles) {
@@ -1641,20 +1883,33 @@ private fun WidgetStyleDialog(
     )
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text(stringResource(R.string.widget_style_settings)) },
         text = {
-            Column(Modifier.selectableGroup().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.selectableGroup().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+            ) {
                 styles.forEach { (style, label) ->
                     val isSelected = selected == style
+                    val choiceColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerLow,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaWidgetChoiceBackground"
+                    )
+                    val choiceOutline by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaWidgetChoiceStroke"
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .padding(vertical = NomaSpacing.tiny)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerLow,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .defaultMinSize(minHeight = 64.dp)
+                            .background(choiceColor, RoundedCornerShape(20.dp))
+                            .border(1.dp, choiceOutline, RoundedCornerShape(20.dp))
+                            .defaultMinSize(minHeight = 76.dp)
                             .selectable(
                                 selected = isSelected,
                                 role = Role.RadioButton,
@@ -1676,17 +1931,39 @@ private fun WidgetStyleDialog(
                             )
                         }
                         Box(
-                            modifier = Modifier.size(width = 60.dp, height = 36.dp)
+                            modifier = Modifier.size(width = 64.dp, height = 42.dp)
                                 .background(previewBrush, RoundedCornerShape(12.dp))
-                                .padding(2.dp)
-                                .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
-                        )
+                                .border(1.dp, choiceOutline, RoundedCornerShape(12.dp))
+                                .testTag("noma_widget_preview_${style.name}"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.EditNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = if (style == NomaWidgetStyle.LIQUID_GLASS)
+                                    Color(0xFF263944) else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         Spacer(Modifier.width(NomaSpacing.comfortable))
-                        Text(
-                            stringResource(label),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(label),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                            )
+                            Text(
+                                stringResource(
+                                    when (style) {
+                                        NomaWidgetStyle.MATERIAL_YOU -> R.string.widget_style_material_you_detail
+                                        NomaWidgetStyle.FROSTED_GREEN -> R.string.widget_style_frosted_green_detail
+                                        NomaWidgetStyle.LIQUID_GLASS -> R.string.widget_style_liquid_glass_detail
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         RadioButton(selected = isSelected, onClick = null)
                     }
                 }
@@ -1699,7 +1976,10 @@ private fun WidgetStyleDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.close)) }
         }
     )
 }
@@ -1712,7 +1992,11 @@ private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfir
         title = { Text(stringResource(R.string.delete_confirm_title)) },
         text = { Text(stringResource(R.string.delete_confirm_body_named, noteTitle.take(80))) },
         confirmButton = {
-            TextButton(onClick = onConfirm, modifier = Modifier.testTag("noma_confirm_delete")) {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    .testTag("noma_confirm_delete")
+            ) {
                 Text(
                     stringResource(R.string.delete_note),
                     color = MaterialTheme.colorScheme.error
@@ -1720,7 +2004,11 @@ private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfir
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    .testTag("noma_cancel_delete")
+            ) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
