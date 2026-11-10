@@ -436,14 +436,33 @@ private fun NotesListScreen(
         // Compose insets and native Material colors. The Scaffold reserves
         // room for this bar and positions its FAB above it automatically.
         bottomBar = {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .imePadding()
                     .navigationBarsPadding()
+                    .animateContentSize(
+                        spring(dampingRatio = Spring.DampingRatioNoBouncy)
+                    )
                     .padding(horizontal = NomaSpacing.comfortable, vertical = NomaSpacing.small),
-                contentAlignment = Alignment.Center
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Keep recovery reachable even while the keyboard obscures the list.
+                if (snapshot is NotesSnapshot.Ready &&
+                    filteredNotes.isNullOrEmpty() &&
+                    (query.isNotBlank() || pinnedOnly || archivedOnly)
+                ) {
+                    TextButton(
+                        modifier = Modifier.testTag("noma_clear_filters"),
+                        onClick = {
+                            focusManager.clearFocus()
+                            searchKeyboard?.hide()
+                            viewModel.clearDiscoveryFilters()
+                        }
+                    ) {
+                        Text(stringResource(R.string.clear_all_filters))
+                    }
+                }
                 BottomSearchPill(
                     query = query,
                     onQueryChange = viewModel::onQueryChange,
@@ -631,18 +650,6 @@ private fun NotesListScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     )
-                    // Keep reset near the search controls so the IME cannot obscure it.
-                    if (filteredCount == 0 && (query.isNotBlank() || pinnedOnly || archivedOnly)) {
-                        Spacer(Modifier.height(NomaSpacing.small))
-                        OutlinedButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                searchKeyboard?.hide()
-                                viewModel.clearDiscoveryFilters()
-                            },
-                            modifier = Modifier.testTag("noma_clear_filters")
-                        ) { Text(stringResource(R.string.clear_all_filters)) }
-                    }
                 }
             }
 
