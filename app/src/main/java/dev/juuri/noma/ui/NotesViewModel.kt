@@ -20,7 +20,16 @@ sealed interface NoteUiEvent {
     data class Imported(val added: Int, val skipped: Int) : NoteUiEvent
     data object SaveBeforeNavigation : NoteUiEvent
     data object QuickCaptureDeferred : NoteUiEvent
+    data object QuickCaptureBusy : NoteUiEvent
+    data object StorageNotReady : NoteUiEvent
+    data object SharedTextEmpty : NoteUiEvent
+    data object SharedTextTooLong : NoteUiEvent
+    data object SharedTitleTooLong : NoteUiEvent
+    data object ShareQueueFull : NoteUiEvent
+    data object CaptureInProgress : NoteUiEvent
     data object SharedCaptureSaved : NoteUiEvent
+    data object CreatedWhileEditing : NoteUiEvent
+    data object SharedCaptureSavedWhileEditing : NoteUiEvent
     data class Failure(val message: String) : NoteUiEvent
 }
 
@@ -30,6 +39,12 @@ sealed interface EditorSaveState {
     data object Saving : EditorSaveState
     data class Failed(val message: String) : EditorSaveState
 }
+
+/** Prevents a stale export from appearing complete while the editor has unsaved changes. */
+class UnsavedEditorChangesException : IllegalStateException("The current note has unsaved changes")
+
+/** Creation and share capture write outside the serial editor queue. */
+class CaptureStillSavingException : IllegalStateException("A note is still being created or captured")
 
 private sealed interface WriteOperation {
     data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
@@ -91,6 +106,11 @@ class NotesViewModel(
                 try {
                     when (operation) {
                         is WriteOperation.Save -> {
+                            // Ignore superseded queued revisions. The final editor revision
+                            // persists the complete buffer, avoiding unnecessary disk writes
+                            // and post-discard writes that have not started.
+                            if (operation.editorRevision != null &&
+                                operation.editorRevision != editorRevision) continue
                             service.save(operation.note)
                             if (operation.editorRevision != null &&
                                 operation.editorRevision == editorRevision) {
@@ -107,6 +127,16 @@ class NotesViewModel(
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
                         is WriteOperation.ExportSnapshot -> {
+                            // Creation/share capture do not use the editor operations queue.
+                            // An export must not silently omit a concurrently created note.
+                            if (_creating.value || _capturingShare.value) {
+                                throw CaptureStillSavingException()
+                            }
+                            // Export is ordered behind queued saves. Refuse a stale backup
+                            // if the final editor write still has no disk acknowledgement.
+                            if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
+                                throw UnsavedEditorChangesException()
+                            }
                             val current = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
                                 ?: error("Notes not ready")
                             operation.result.complete(current.entries.toList())
@@ -131,12 +161,18 @@ class NotesViewModel(
                         operation.result?.completeExceptionally(failure)
                     }
                     val message = failure.localizedMessage ?: "Storage unavailable"
-                    if (operation is WriteOperation.Save &&
+                    val currentEditorWrite = operation is WriteOperation.Save &&
                         operation.editorRevision != null &&
-                        operation.editorRevision == editorRevision) {
+                        operation.editorRevision == editorRevision
+                    if (currentEditorWrite) {
                         _saveState.value = EditorSaveState.Failed(message)
                     }
-                    if (operation !is WriteOperation.Import || operation.result == null) {
+                    // Superseded autosaves can fail while a newer revision is queued.
+                    // Only the newest editor failure should interrupt the user.
+                    val relevantFailure = operation !is WriteOperation.Save ||
+                        operation.editorRevision == null || currentEditorWrite
+                    if (relevantFailure && operation !is WriteOperation.ExportSnapshot &&
+                        (operation !is WriteOperation.Import || operation.result == null)) {
                         eventChannel.send(NoteUiEvent.Failure(message))
                     }
                 }
@@ -151,7 +187,7 @@ class NotesViewModel(
         } else if (queuedIncomingShares.size < 16) {
             queuedIncomingShares.addLast(request)
         } else {
-            eventChannel.trySend(NoteUiEvent.Failure("Too many incoming notes; finish current captures first"))
+            eventChannel.trySend(NoteUiEvent.ShareQueueFull)
         }
     }
 
@@ -166,21 +202,51 @@ class NotesViewModel(
 
     fun confirmSharedText() {
         val pending = _pendingShare.value ?: return
-        if (_capturingShare.value) return
+        if (_capturingShare.value || _creating.value) return
+        if (snapshot.value !is dev.juuri.noma.domain.NotesSnapshot.Ready) {
+            eventChannel.trySend(NoteUiEvent.StorageNotReady)
+            return
+        }
+        when {
+            pending.body.isBlank() -> {
+                eventChannel.trySend(NoteUiEvent.SharedTextEmpty)
+                return
+            }
+            pending.body.length > 100_000 -> {
+                eventChannel.trySend(NoteUiEvent.SharedTextTooLong)
+                return
+            }
+            pending.title.length > 200 -> {
+                eventChannel.trySend(NoteUiEvent.SharedTitleTooLong)
+                return
+            }
+        }
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
+        val originatingNoteId = _active.value?.id
+        val originatingRevision = editorRevision
         _capturingShare.value = true
         viewModelScope.launch {
             try {
                 val created = service.captureText(pending.title, pending.body)
                 showNextShare()
                 clearDiscoveryFilters()
-                editorRevision++
-                _active.value = created
-                _saveState.value = EditorSaveState.Saved
-                eventChannel.send(NoteUiEvent.SharedCaptureSaved)
+                // A concurrent edit must not be replaced by an incoming share.
+                val keepEditing = originatingNoteId != null &&
+                    _active.value?.id == originatingNoteId &&
+                    (editorRevision != originatingRevision ||
+                        _saveState.value != EditorSaveState.Saved)
+                if (!keepEditing) {
+                    editorRevision++
+                    _active.value = created
+                    _saveState.value = EditorSaveState.Saved
+                }
+                eventChannel.send(
+                    if (keepEditing) NoteUiEvent.SharedCaptureSavedWhileEditing
+                    else NoteUiEvent.SharedCaptureSaved
+                )
             } catch (failure: Exception) {
                 eventChannel.send(NoteUiEvent.Failure(failure.localizedMessage ?: "Capture failed"))
                 // Keep the pending text so the user can retry without asking the sender again.
@@ -211,20 +277,33 @@ class NotesViewModel(
 
     /** Launcher/widget capture never discards the active unsaved editor. */
     fun requestQuickNote() {
+        if (_creating.value || _capturingShare.value) {
+            eventChannel.trySend(NoteUiEvent.QuickCaptureBusy)
+            return
+        }
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
-            quickNoteRequestedAfterSave = true
-            eventChannel.trySend(NoteUiEvent.QuickCaptureDeferred)
+            if (!quickNoteRequestedAfterSave) {
+                quickNoteRequestedAfterSave = true
+                eventChannel.trySend(NoteUiEvent.QuickCaptureDeferred)
+            }
         } else {
             createNote()
         }
     }
 
     fun createNote() {
-        if (_creating.value) return
+        // Do not race a note created from an external share.
+        if (_creating.value || _capturingShare.value) return
+        if (snapshot.value !is dev.juuri.noma.domain.NotesSnapshot.Ready) {
+            eventChannel.trySend(NoteUiEvent.StorageNotReady)
+            return
+        }
         if (_active.value != null && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
+        val originatingNoteId = _active.value?.id
+        val originatingRevision = editorRevision
         _creating.value = true
         viewModelScope.launch {
             try {
@@ -234,9 +313,18 @@ class NotesViewModel(
                 _query.value = ""
                 _archivedOnly.value = false
                 _pinnedOnly.value = false
-                editorRevision++
-                _active.value = created
-                _saveState.value = EditorSaveState.Saved
+                // A slow creation must not replace a newly edited draft.
+                val keepEditing = originatingNoteId != null &&
+                    _active.value?.id == originatingNoteId &&
+                    (editorRevision != originatingRevision ||
+                        _saveState.value != EditorSaveState.Saved)
+                if (keepEditing) {
+                    eventChannel.send(NoteUiEvent.CreatedWhileEditing)
+                } else {
+                    editorRevision++
+                    _active.value = created
+                    _saveState.value = EditorSaveState.Saved
+                }
             } catch (failure: Exception) {
                 eventChannel.send(
                     NoteUiEvent.Failure(failure.localizedMessage ?: "Cannot create note")
@@ -248,6 +336,9 @@ class NotesViewModel(
     }
 
     fun openNote(note: Note) {
+        // Otherwise a completed creation/capture could unexpectedly replace
+        // the note selected while that operation was in progress.
+        if (_creating.value || _capturingShare.value) return
         // Selecting the same card on a tablet must not mark an in-flight save
         // as completed or replace its unsaved editor buffer.
         if (_active.value?.id == note.id) return
@@ -261,7 +352,16 @@ class NotesViewModel(
         _saveState.value = EditorSaveState.Saved
     }
 
+    fun cancelDeferredQuickNote() {
+        quickNoteRequestedAfterSave = false
+    }
+
     fun closeNote() {
+        // Keep navigation stable until external create/capture has completed.
+        if (_creating.value || _capturingShare.value) {
+            eventChannel.trySend(NoteUiEvent.CaptureInProgress)
+            return
+        }
         // If the user explicitly discards an unsaved draft, do not leave a
         // queued widget action that could unexpectedly open a note much later.
         quickNoteRequestedAfterSave = false
@@ -279,7 +379,18 @@ class NotesViewModel(
     }
 
     fun togglePin(note: Note) {
-        val changed = note.copy(isPinned = !note.isPinned)
+        // A stale card or external caller must not bypass the UI's disabled actions.
+        if (_creating.value || _capturingShare.value) return
+        if (_active.value?.id == note.id &&
+            _saveState.value != EditorSaveState.Saved) {
+            eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
+            return
+        }
+        // List cards can lag behind unsaved editor changes on wide screens.
+        // Never replace the editor text with a stale list snapshot.
+        val current = _active.value?.takeIf { it.id == note.id } ?: note
+        if (current.isArchived) return
+        val changed = current.copy(isPinned = !current.isPinned)
         if (_active.value?.id == note.id) {
             updateActive(changed)
         } else {
@@ -296,16 +407,19 @@ class NotesViewModel(
     }
 
     fun retrySave() {
+        if (_saveState.value !is EditorSaveState.Failed) return
         _active.value?.let(::updateActive)
     }
 
     fun deleteNote(note: Note) {
+        if (_creating.value || _capturingShare.value) return
+        val current = _active.value?.takeIf { it.id == note.id } ?: note
         if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
         if (_active.value?.id == note.id) closeNote()
-        operations.trySend(WriteOperation.Delete(note))
+        operations.trySend(WriteOperation.Delete(current))
     }
 
     fun undoDelete(note: Note) {
@@ -313,12 +427,14 @@ class NotesViewModel(
     }
 
     fun toggleArchive(note: Note) {
+        if (_creating.value || _capturingShare.value) return
+        val current = _active.value?.takeIf { it.id == note.id } ?: note
         if (_active.value?.id == note.id && _saveState.value != EditorSaveState.Saved) {
             eventChannel.trySend(NoteUiEvent.SaveBeforeNavigation)
             return
         }
         if (_active.value?.id == note.id) closeNote()
-        operations.trySend(WriteOperation.Archive(note))
+        operations.trySend(WriteOperation.Archive(current))
     }
 
     fun undoArchive(note: Note) {

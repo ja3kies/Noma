@@ -13,6 +13,7 @@
     <string name="no_results_detail">Essayez une autre recherche ou un autre filtre.</string>
     <string name="empty_title">Un espace pour commencer</string>
     <string name="empty_detail">Vos pensées, listes et idées prendront place ici.</string>
+    <string name="pinned_note_indicator">Note épinglée</string>
     <string name="pinned_section">Épinglées</string>
     <string name="recent_section">Récentes</string>
     <string name="untitled">Note sans titre</string>
@@ -58,8 +59,11 @@
     <string name="save_failed_status">Non enregistré</string>
     <string name="unsaved_title">Modifications non enregistrées</string>
     <string name="unsaved_body">Les dernières modifications n’ont pas pu être sauvegardées. Réessayez ou quittez en perdant ces modifications.</string>
+    <string name="keep_editing">Continuer à modifier</string>
+    <string name="wait_for_save_before_exit">Enregistrement des modifications avant de quitter…</string>
     <string name="leave_unsaved">Quitter quand même</string>
-    <string name="error_recovery">Vos notes sont conservées sur cet appareil. Essayez de les rouvrir.</string>
+    <string name="error_recovery">Noma ne parvient pas à lire vos notes. Réessayez. Si le problème persiste, vérifiez une sauvegarde avant toute modification.</string>
+    <string name="save_failure_guidance">Ces modifications ne sont pas encore enregistrées. Réessayez avant de quitter l’éditeur.</string>
     <plurals name="note_total">
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>
@@ -72,6 +76,10 @@
     <string name="portable_export_result">%1$d notes exportées</string>
     <string name="portable_import_result">%1$d notes importées ; %2$d notes existantes ignorées</string>
     <string name="portable_export_failed">Échec de l’export : %1$s</string>
+    <string name="portable_export_unsaved_edits">Une note contient des modifications non enregistrées. Réessayez l’enregistrement ou abandonnez-les explicitement avant l’export.</string>
+    <string name="portable_export_wait">Terminez l’enregistrement ou la capture avant d’exporter</string>
+    <string name="portable_export_pending_message">Cet export ne peut pas continuer tant que des enregistrements ou captures sont en cours, ou que des modifications restent non enregistrées.</string>
+    <string name="portable_export_active_capture">Une note est encore en cours de création ou de capture. Terminez cette opération avant d’exporter.</string>
     <string name="portable_import_failed">Échec de l’import : %1$s</string>
     <string name="portable_not_ready">Chargement des notes en cours</string>
     <string name="portable_read_failed">Lecture du fichier impossible</string>
@@ -97,6 +105,9 @@
     <string name="incoming_share_confirm">Enregistrer</string>
     <string name="incoming_share_discard">Ignorer</string>
     <string name="incoming_share_saved">Texte partagé enregistré dans Noma</string>
+    <string name="created_while_editing">Nouvelle note créée. Votre brouillon en cours reste ouvert.</string>
+    <string name="shared_saved_while_editing">Texte partagé enregistré. Votre brouillon en cours reste ouvert.</string>
+    <string name="incoming_share_save_current_first">Enregistrez la note actuelle avant de capturer le texte partagé.</string>
     <string name="incoming_share_size">%1$d caractères</string>
     <string name="widget_description">Créer une note rapidement</string>
     <string name="widget_style_settings">Apparence du widget</string>
@@ -104,6 +115,13 @@
     <string name="widget_style_frosted_green">Vert dépoli</string>
     <string name="widget_style_liquid_glass">Liquid Glass</string>
     <string name="widget_style_glass_note">Les styles translucides dépendent du lanceur et ne floutent pas le fond d’écran en temps réel.</string>
+    <string name="quick_capture_busy">Une note est déjà en cours de création ou de capture. Réessayez une fois l’opération terminée.</string>
+    <string name="notes_storage_not_ready">Vos notes ne sont pas encore disponibles. Réessayez après le chargement.</string>
+    <string name="share_empty_body">Le texte partagé est vide. Il n’y a rien à enregistrer.</string>
+    <string name="share_body_too_long">Le texte partagé dépasse la limite de 100 000 caractères.</string>
+    <string name="share_title_too_long">Le titre partagé dépasse la limite de 200 caractères.</string>
+    <string name="share_queue_full">La file des partages est pleine. Terminez ou ignorez un partage en attente avant de réessayer.</string>
+    <string name="capture_in_progress">Une note est encore en cours de création ou de capture. Terminez d’abord cette opération.</string>
     <string name="quick_capture_deferred">La nouvelle note s’ouvrira après l’enregistrement du brouillon actuel.</string>
     <string name="widget_style_save_error">Impossible d’enregistrer l’apparence du widget.</string>
     <string name="portable_export_unverified">Export écrit, mais le fournisseur de fichiers empêche sa vérification. Vérifiez le fichier JSON avant de compter sur cette sauvegarde.</string>

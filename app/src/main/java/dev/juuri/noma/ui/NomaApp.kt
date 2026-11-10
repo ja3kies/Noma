@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -57,7 +58,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -112,8 +113,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -152,6 +155,8 @@ fun NomaApp(
     val saveState by viewModel.saveState.collectAsState()
     val pendingShare by viewModel.pendingShare.collectAsState()
     val capturingShare by viewModel.capturingShare.collectAsState()
+    val creatingNote by viewModel.creating.collectAsState()
+    val storageState by viewModel.snapshot.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val deleted = stringResource(R.string.deleted_message)
     val archived = stringResource(R.string.archived_message)
@@ -160,10 +165,20 @@ fun NomaApp(
     val failurePrefix = stringResource(R.string.error_prefix)
     val importResult = stringResource(R.string.portable_import_result)
     val sharedCaptureSaved = stringResource(R.string.incoming_share_saved)
+    val createdWhileEditing = stringResource(R.string.created_while_editing)
+    val shareSavedWhileEditing = stringResource(R.string.shared_saved_while_editing)
+    val shareNeedsSave = stringResource(R.string.incoming_share_save_current_first)
     val saveBeforeNav = stringResource(R.string.save_before_navigation)
     val deferredCaptureLabel = stringResource(R.string.quick_capture_deferred)
+    val busyCaptureLabel = stringResource(R.string.quick_capture_busy)
+    val unavailableStorageLabel = stringResource(R.string.notes_storage_not_ready)
+    val sharedEmptyLabel = stringResource(R.string.share_empty_body)
+    val sharedLongLabel = stringResource(R.string.share_body_too_long)
+    val sharedTitleLabel = stringResource(R.string.share_title_too_long)
+    val shareQueueFullLabel = stringResource(R.string.share_queue_full)
+    val captureInProgressLabel = stringResource(R.string.capture_in_progress)
 
-    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, deferredCaptureLabel) {
+    LaunchedEffect(viewModel, deleted, archived, restored, undo, failurePrefix, importResult, saveBeforeNav, sharedCaptureSaved, createdWhileEditing, shareSavedWhileEditing, deferredCaptureLabel, busyCaptureLabel, unavailableStorageLabel, sharedEmptyLabel, sharedLongLabel, sharedTitleLabel, shareQueueFullLabel, captureInProgressLabel) {
         viewModel.events.collect { event ->
             when (event) {
                 is NoteUiEvent.Deleted -> {
@@ -178,7 +193,16 @@ fun NomaApp(
                 is NoteUiEvent.Imported -> snackbar.showSnackbar(importResult.format(event.added, event.skipped))
                 NoteUiEvent.SaveBeforeNavigation -> snackbar.showSnackbar(saveBeforeNav)
                 NoteUiEvent.QuickCaptureDeferred -> snackbar.showSnackbar(deferredCaptureLabel)
+                NoteUiEvent.QuickCaptureBusy -> snackbar.showSnackbar(busyCaptureLabel)
+                NoteUiEvent.StorageNotReady -> snackbar.showSnackbar(unavailableStorageLabel)
+                NoteUiEvent.SharedTextEmpty -> snackbar.showSnackbar(sharedEmptyLabel)
+                NoteUiEvent.SharedTextTooLong -> snackbar.showSnackbar(sharedLongLabel)
+                NoteUiEvent.SharedTitleTooLong -> snackbar.showSnackbar(sharedTitleLabel)
+                NoteUiEvent.ShareQueueFull -> snackbar.showSnackbar(shareQueueFullLabel)
+                NoteUiEvent.CaptureInProgress -> snackbar.showSnackbar(captureInProgressLabel)
                 NoteUiEvent.SharedCaptureSaved -> snackbar.showSnackbar(sharedCaptureSaved)
+                NoteUiEvent.CreatedWhileEditing -> snackbar.showSnackbar(createdWhileEditing)
+                NoteUiEvent.SharedCaptureSavedWhileEditing -> snackbar.showSnackbar(shareSavedWhileEditing)
                 is NoteUiEvent.Failure ->
                     snackbar.showSnackbar(failurePrefix + event.message, withDismissAction = true)
             }
@@ -186,6 +210,12 @@ fun NomaApp(
     }
 
     pendingShare?.let { incoming ->
+        val invalidShareReason = when {
+            incoming.body.isBlank() -> stringResource(R.string.share_empty_body)
+            incoming.body.length > 100_000 -> stringResource(R.string.share_body_too_long)
+            incoming.title.length > 200 -> stringResource(R.string.share_title_too_long)
+            else -> null
+        }
         AlertDialog(
             onDismissRequest = viewModel::dismissSharedText,
             title = { Text(stringResource(R.string.incoming_share_title)) },
@@ -221,12 +251,31 @@ fun NomaApp(
                         stringResource(R.string.incoming_share_size, incoming.body.length),
                         style = MaterialTheme.typography.labelSmall
                     )
+                    if (invalidShareReason != null) {
+                        Text(
+                            invalidShareReason,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag("noma_share_validation_error")
+                        )
+                    }
+                    if (active != null && saveState != EditorSaveState.Saved) {
+                        Text(
+                            shareNeedsSave,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag("noma_share_save_guidance")
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = !capturingShare,
-                    onClick = viewModel::confirmSharedText
+                    enabled = !capturingShare && !creatingNote &&
+                        storageState is NotesSnapshot.Ready && invalidShareReason == null &&
+                        (active == null || saveState == EditorSaveState.Saved),
+                    onClick = viewModel::confirmSharedText,
+                    modifier = Modifier.testTag("noma_share_confirm")
                 ) { Text(stringResource(R.string.incoming_share_confirm)) }
             },
             dismissButton = {
@@ -309,12 +358,19 @@ private fun NotesListScreen(
     val pinnedOnly by viewModel.pinnedOnly.collectAsState()
     val archivedOnly by viewModel.archivedOnly.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val creating by viewModel.creating.collectAsState()
+    val editorSaveState by viewModel.saveState.collectAsState()
+    val capturingShare by viewModel.capturingShare.collectAsState()
+    val navigationEnabled = !creating && !capturingShare
     val filteredNotes = remember(snapshot, query, pinnedOnly, archivedOnly, sort) {
         (snapshot as? NotesSnapshot.Ready)?.let { state ->
             viewModel.visible(state.entries, query, pinnedOnly, archivedOnly, sort)
         }
     }
-    val creating by viewModel.creating.collectAsState()
+    val listState = rememberLazyListState()
+    LaunchedEffect(query, pinnedOnly, archivedOnly, sort) {
+        if (!filteredNotes.isNullOrEmpty()) listState.scrollToItem(0)
+    }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val searchKeyboard = LocalSoftwareKeyboardController.current
@@ -362,24 +418,30 @@ private fun NotesListScreen(
     }
 
     val newNoteLabel = stringResource(R.string.new_note)
+    val creatingNoteLabel = stringResource(R.string.creating_note)
+    val creatingOrCapturing = creating || capturingShare
+    val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            // Do not offer creation while the repository is loading or unavailable.
-            // Recovery and backup inspection remain discoverable in the header.
-            if (snapshot is NotesSnapshot.Ready &&
-                (snapshot as NotesSnapshot.Ready).entries.isNotEmpty()) {
+            // Offer the same creation action in empty, filtered and populated libraries.
+            // Keep it hidden while storage is loading or unavailable.
+            if (snapshot is NotesSnapshot.Ready) {
                 ExtendedFloatingActionButton(
-                    onClick = { if (!creating) viewModel.createNote() },
+                    onClick = {
+                        focusManager.clearFocus()
+                        searchKeyboard?.hide()
+                        if (!creatingOrCapturing) viewModel.createNote()
+                    },
                     expanded = true,
                     icon = {
-                        if (creating) {
+                        if (creatingOrCapturing) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp).testTag("noma_creation_spinner"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 strokeWidth = 2.dp
                             )
                         } else {
@@ -387,12 +449,17 @@ private fun NotesListScreen(
                         }
                     },
                     text = {
-                        Text(if (creating) stringResource(R.string.creating_note) else newNoteLabel)
+                        Text(if (creatingOrCapturing) stringResource(R.string.creating_note) else newNoteLabel)
                     },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = if (creatingOrCapturing) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                    contentColor = if (creatingOrCapturing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                    modifier = Modifier.testTag("noma_new_note")
+                    modifier = Modifier.testTag("noma_new_note").semantics {
+                        if (creatingOrCapturing) {
+                            disabled()
+                            contentDescription = creatingNoteLabel
+                        }
+                    }
                 )
             }
         }
@@ -423,6 +490,7 @@ private fun NotesListScreen(
                         snapshot = snapshot,
                         onImport = viewModel::importNotesAwait,
                         snapshotForExport = viewModel::snapshotForExport,
+                        canExport = editorSaveState == EditorSaveState.Saved && navigationEnabled,
                         onMessage = { message ->
                             portableScope.launch { snackbar.showSnackbar(message) }
                         }
@@ -444,13 +512,20 @@ private fun NotesListScreen(
                     },
                     trailingIcon = if (query.isNotEmpty()) {
                         {
-                            IconButton(onClick = { viewModel.onQueryChange("") }) {
+                            IconButton(onClick = {
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                                viewModel.onQueryChange("")
+                            }) {
                                 Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.clear_search))
                             }
                         }
                     } else null,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        focusManager.clearFocus()
+                        searchKeyboard?.hide()
+                    }),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -467,7 +542,11 @@ private fun NotesListScreen(
                     ) {
                         FilterChip(
                             selected = archivedOnly,
-                            onClick = viewModel::toggleArchiveView,
+                            onClick = {
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                                viewModel.toggleArchiveView()
+                            },
                             enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier.testTag("noma_archive_filter"),
                             label = { Text(stringResource(R.string.archive_view)) },
@@ -481,7 +560,11 @@ private fun NotesListScreen(
                         if (!archivedOnly) {
                             FilterChip(
                                 selected = pinnedOnly,
-                                onClick = viewModel::togglePinnedOnly,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
+                                    viewModel.togglePinnedOnly()
+                                },
                                 enabled = snapshot is NotesSnapshot.Ready,
                                 label = { Text(stringResource(R.string.pinned_filter)) },
                                 leadingIcon = {
@@ -496,9 +579,12 @@ private fun NotesListScreen(
                     Box {
                         IconButton(
                             onClick = { sortMenuExpanded = true },
-                            enabled = snapshot is NotesSnapshot.Ready
+                            enabled = snapshot is NotesSnapshot.Ready,
+                            modifier = Modifier.testTag("noma_sort_button").semantics {
+                                stateDescription = currentSortLabel
+                            }
                         ) {
-                            Icon(Icons.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
+                            Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
                         }
                         DropdownMenu(
                             expanded = sortMenuExpanded,
@@ -506,7 +592,10 @@ private fun NotesListScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.sort_recent)) },
+                                modifier = Modifier.semantics { selected = sort == NoteSort.RECENT },
                                 onClick = {
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
                                     viewModel.selectSort(NoteSort.RECENT)
                                     sortMenuExpanded = false
                                 },
@@ -516,7 +605,10 @@ private fun NotesListScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.sort_title)) },
+                                modifier = Modifier.semantics { selected = sort == NoteSort.TITLE },
                                 onClick = {
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
                                     viewModel.selectSort(NoteSort.TITLE)
                                     sortMenuExpanded = false
                                 },
@@ -540,6 +632,18 @@ private fun NotesListScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     )
+                    // Keep reset near the search controls so the IME cannot obscure it.
+                    if (filteredCount == 0 && (query.isNotBlank() || pinnedOnly || archivedOnly)) {
+                        Spacer(Modifier.height(NomaSpacing.small))
+                        OutlinedButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                                viewModel.clearDiscoveryFilters()
+                            },
+                            modifier = Modifier.testTag("noma_clear_filters")
+                        ) { Text(stringResource(R.string.clear_all_filters)) }
+                    }
                 }
             }
 
@@ -602,41 +706,13 @@ private fun NotesListScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (state.entries.isNotEmpty() &&
-                                (query.isNotBlank() || pinnedOnly || archivedOnly)) {
-                                Spacer(Modifier.height(NomaSpacing.section))
-                                OutlinedButton(
-                                    onClick = viewModel::clearDiscoveryFilters,
-                                    modifier = Modifier.testTag("noma_clear_filters")
-                                ) { Text(stringResource(R.string.clear_all_filters)) }
-                            }
-                            if (state.entries.isEmpty()) {
-                                Spacer(Modifier.height(NomaSpacing.section))
-                                Button(
-                                    onClick = viewModel::createNote,
-                                    enabled = !creating
-                                ) {
-                                    if (creating) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    } else {
-                                        Icon(Icons.Outlined.Add, contentDescription = null)
-                                    }
-                                    Spacer(Modifier.width(NomaSpacing.small))
-                                    Text(stringResource(
-                                        if (creating) R.string.creating_note else R.string.new_note
-                                    ))
-                                }
-                            }
                         }
                     } else {
                         val pinned = if (archivedOnly) emptyList() else visible.filter { it.isPinned }
                         val others = if (archivedOnly) visible else visible.filterNot { it.isPinned }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize().testTag("noma_note_list"),
+                            state = listState,
                             contentPadding = PaddingValues(
                                 start = NomaSpacing.comfortable,
                                 end = NomaSpacing.comfortable,
@@ -661,7 +737,13 @@ private fun NotesListScreen(
                                         onPin = { viewModel.togglePin(note) },
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
-                                        onShare = { shareNote(context, note) }
+                                        onShare = { shareNote(context, note) },
+                                        actionsEnabled = note.id != selectedId || editorSaveState == EditorSaveState.Saved,
+                                        navigationEnabled = navigationEnabled,
+                                        onMenuOpen = {
+                                            focusManager.clearFocus()
+                                            searchKeyboard?.hide()
+                                        }
                                     )
                                 }
                             }
@@ -691,7 +773,13 @@ private fun NotesListScreen(
                                         onPin = { viewModel.togglePin(note) },
                                         onArchive = { viewModel.toggleArchive(note) },
                                         onDelete = { deleting = note },
-                                        onShare = { shareNote(context, note) }
+                                        onShare = { shareNote(context, note) },
+                                        actionsEnabled = note.id != selectedId || editorSaveState == EditorSaveState.Saved,
+                                        navigationEnabled = navigationEnabled,
+                                        onMenuOpen = {
+                                            focusManager.clearFocus()
+                                            searchKeyboard?.hide()
+                                        }
                                     )
                                 }
                             }
@@ -739,9 +827,15 @@ private fun NoteCard(
     onPin: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    actionsEnabled: Boolean,
+    navigationEnabled: Boolean,
+    onMenuOpen: () -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember(note.id) { mutableStateOf(false) }
+    LaunchedEffect(navigationEnabled) {
+        if (!navigationEnabled) menuExpanded = false
+    }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
@@ -750,7 +844,9 @@ private fun NoteCard(
         else MaterialTheme.colorScheme.surface
     Card(
         onClick = onOpen,
+        enabled = navigationEnabled,
         modifier = Modifier.fillMaxWidth()
+            .testTag("noma_note_${note.id}")
             .semantics { this.selected = selected }
             .animateContentSize(tween(NomaMotion.quick)),
         shape = MaterialTheme.shapes.large,
@@ -765,7 +861,7 @@ private fun NoteCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = highlightMatches(title, query),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
@@ -791,13 +887,20 @@ private fun NoteCard(
             if (note.isPinned && !note.isArchived) {
                 Icon(
                     Icons.Outlined.PushPin,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    contentDescription = stringResource(R.string.pinned_note_indicator),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 3.dp).size(18.dp)
                 )
             }
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(
+                    onClick = {
+                        onMenuOpen()
+                        menuExpanded = true
+                    },
+                    enabled = navigationEnabled,
+                    modifier = Modifier.testTag("noma_note_actions_${note.id}")
+                ) {
                     Icon(
                         Icons.Outlined.MoreHoriz,
                         contentDescription = stringResource(R.string.note_actions_for, title)
@@ -810,7 +913,8 @@ private fun NoteCard(
                     onPin = onPin,
                     onArchive = onArchive,
                     onDelete = onDelete,
-                    onShare = onShare
+                    onShare = onShare,
+                    destructiveEnabled = actionsEnabled && navigationEnabled
                 )
             }
         }
@@ -835,6 +939,7 @@ private fun NoteActionsMenu(
         if (showPinAction && !note.isArchived) {
             DropdownMenuItem(
                 text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
+                enabled = destructiveEnabled,
                 onClick = { onDismiss(); onPin() },
                 leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
             )
@@ -852,6 +957,7 @@ private fun NoteActionsMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.share_note)) },
+            enabled = destructiveEnabled && (note.title.isNotBlank() || note.body.isNotBlank()),
             onClick = { onDismiss(); onShare() },
             leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
         )
@@ -874,15 +980,16 @@ private fun NoteEditorScreen(
     expanded: Boolean
 ) {
     var confirmDelete by rememberSaveable(note.id) { mutableStateOf(false) }
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember(note.id) { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     val context = LocalContext.current
-    val titleFocus = remember { FocusRequester() }
-    val bodyFocus = remember { FocusRequester() }
+    val titleFocus = remember(note.id) { FocusRequester() }
+    val bodyFocus = remember(note.id) { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     fun requestClose() {
+        menuExpanded = false
         when (saveState) {
             EditorSaveState.Saved -> viewModel.closeNote()
             EditorSaveState.Saving -> closeWhenSaved = true
@@ -937,13 +1044,33 @@ private fun NoteEditorScreen(
                 TextButton(onClick = {
                     confirmDiscard = false
                     viewModel.retrySave()
-                }) { Text(stringResource(R.string.retry)) }
+                }, modifier = Modifier.testTag("noma_dialog_retry_save")) {
+                    Text(stringResource(R.string.retry))
+                }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    confirmDiscard = false
-                    viewModel.closeNote()
-                }) { Text(stringResource(R.string.leave_unsaved)) }
+                Row {
+                    TextButton(
+                        onClick = {
+                            confirmDiscard = false
+                            closeWhenSaved = false
+                            viewModel.cancelDeferredQuickNote()
+                        },
+                        modifier = Modifier.testTag("noma_keep_editing")
+                    ) { Text(stringResource(R.string.keep_editing)) }
+                    TextButton(
+                        onClick = {
+                            confirmDiscard = false
+                            viewModel.closeNote()
+                        },
+                        modifier = Modifier.testTag("noma_discard_unsaved")
+                    ) {
+                        Text(
+                            stringResource(R.string.leave_unsaved),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         )
     }
@@ -977,7 +1104,11 @@ private fun NoteEditorScreen(
                     PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
                         portableScope.launch { snackbar.showSnackbar(message) }
                     })
-                    IconButton(onClick = { viewModel.togglePin(note) }) {
+                    IconButton(
+                        onClick = { viewModel.togglePin(note) },
+                        enabled = saveState == EditorSaveState.Saved && !note.isArchived,
+                        modifier = Modifier.testTag("noma_editor_pin")
+                    ) {
                         Icon(
                             Icons.Outlined.PushPin,
                             contentDescription = stringResource(
@@ -988,7 +1119,10 @@ private fun NoteEditorScreen(
                         )
                     }
                     Box {
-                        IconButton(onClick = { menuExpanded = true }) {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.testTag("noma_editor_actions")
+                        ) {
                             Icon(
                                 Icons.Outlined.MoreHoriz,
                                 contentDescription = stringResource(R.string.note_actions)
@@ -1024,10 +1158,29 @@ private fun NoteEditorScreen(
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 16.dp, bottom = 64.dp)
             ) {
                 EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
+                if (saveState is EditorSaveState.Failed) {
+                    Text(
+                        stringResource(R.string.save_failure_guidance),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("noma_save_failure_guidance")
+                    )
+                }
+                if (closeWhenSaved && saveState == EditorSaveState.Saving) {
+                    Text(
+                        stringResource(R.string.wait_for_save_before_exit),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("noma_pending_exit")
+                    )
+                }
                 Spacer(Modifier.height(24.dp))
                 BasicTextField(
                     value = note.title,
-                    onValueChange = viewModel::changeTitle,
+                    onValueChange = {
+                        closeWhenSaved = false
+                        viewModel.changeTitle(it)
+                    },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.headlineLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground
@@ -1055,7 +1208,10 @@ private fun NoteEditorScreen(
                 Spacer(Modifier.height(20.dp))
                 BasicTextField(
                     value = note.body,
-                    onValueChange = viewModel::changeBody,
+                    onValueChange = {
+                        closeWhenSaved = false
+                        viewModel.changeBody(it)
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground
                     ),
@@ -1125,7 +1281,9 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                TextButton(onClick = onRetry, modifier = Modifier.testTag("noma_retry_save")) {
+                    Text(stringResource(R.string.retry))
+                }
             }
         }
     }

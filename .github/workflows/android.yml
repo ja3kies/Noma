@@ -2,9 +2,9 @@ name: Android validation
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "feature/**", "fix/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "feature/**"]
   workflow_dispatch:
 
 concurrency:
@@ -35,6 +35,17 @@ jobs:
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Run JVM tests, lint, and compile
         run: gradle --no-daemon :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleDebug
+      - name: Upload JVM and lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noma-build-test-reports
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
@@ -46,7 +57,7 @@ jobs:
 
   instrumentation:
     needs: build-and-test
-    if: startsWith(github.ref, 'refs/heads/feature/') || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/fix/') || startsWith(github.head_ref, 'feature/') || startsWith(github.head_ref, 'fix/')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -73,3 +84,13 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: gradle --no-daemon :app:connectedDebugAndroidTest
+      - name: Upload instrumentation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noma-emulator-test-reports
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          if-no-files-found: warn
+          retention-days: 7

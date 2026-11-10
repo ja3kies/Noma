@@ -13,6 +13,7 @@
     <string name="no_results_detail">Try a different search or filter.</string>
     <string name="empty_title">A little space to begin</string>
     <string name="empty_detail">Your thoughts, lists and ideas will live here.</string>
+    <string name="pinned_note_indicator">Pinned note</string>
     <string name="pinned_section">Pinned</string>
     <string name="recent_section">Recent</string>
     <string name="untitled">Untitled note</string>
@@ -58,8 +59,11 @@
     <string name="save_failed_status">Not saved</string>
     <string name="unsaved_title">Changes not saved</string>
     <string name="unsaved_body">The latest changes could not be stored. Retry saving or leave without those changes.</string>
+    <string name="keep_editing">Keep editing</string>
+    <string name="wait_for_save_before_exit">Saving your changes before leaving…</string>
     <string name="leave_unsaved">Leave anyway</string>
-    <string name="error_recovery">Your notes are still on this device. Try reopening them.</string>
+    <string name="error_recovery">Noma could not read your notes. Try again. If the problem persists, verify a backup before making changes.</string>
+    <string name="save_failure_guidance">These changes are not stored yet. Retry saving before leaving the editor.</string>
     <plurals name="note_total">
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>
@@ -72,6 +76,10 @@
     <string name="portable_export_result">Exported %1$d notes</string>
     <string name="portable_import_result">Imported %1$d notes; skipped %2$d existing</string>
     <string name="portable_export_failed">Export failed: %1$s</string>
+    <string name="portable_export_unsaved_edits">A note has unsaved changes. Retry saving or explicitly discard them before exporting.</string>
+    <string name="portable_export_wait">Finish saving or capturing before exporting</string>
+    <string name="portable_export_pending_message">This export cannot continue until note saves or captures finish, and any unsaved changes are resolved.</string>
+    <string name="portable_export_active_capture">A note is still being created or captured. Finish that operation before exporting.</string>
     <string name="portable_import_failed">Import failed: %1$s</string>
     <string name="portable_not_ready">Notes are still loading</string>
     <string name="portable_read_failed">Unable to read this file</string>
@@ -97,6 +105,9 @@
     <string name="incoming_share_confirm">Save note</string>
     <string name="incoming_share_discard">Discard</string>
     <string name="incoming_share_saved">Shared text saved to Noma</string>
+    <string name="created_while_editing">New note created. Your unfinished draft remains open.</string>
+    <string name="shared_saved_while_editing">Shared text saved. Your unfinished draft remains open.</string>
+    <string name="incoming_share_save_current_first">Save the current note before capturing the shared text.</string>
     <string name="incoming_share_size">%1$d characters</string>
     <string name="widget_description">Quickly create a note</string>
     <string name="widget_style_settings">Widget appearance</string>
@@ -104,6 +115,13 @@
     <string name="widget_style_frosted_green">Frosted green</string>
     <string name="widget_style_liquid_glass">Liquid Glass</string>
     <string name="widget_style_glass_note">Translucent glass styles depend on the launcher and do not blur the live wallpaper.</string>
+    <string name="quick_capture_busy">A note is already being created or captured. Try again when it finishes.</string>
+    <string name="notes_storage_not_ready">Your notes are not ready. Try again after storage has loaded.</string>
+    <string name="share_empty_body">The shared text is empty. There is nothing to save.</string>
+    <string name="share_body_too_long">Shared text exceeds the 100,000-character limit.</string>
+    <string name="share_title_too_long">Shared title exceeds the 200-character limit.</string>
+    <string name="share_queue_full">The sharing queue is full. Finish or discard a pending share before trying again.</string>
+    <string name="capture_in_progress">A note is still being created or captured. Finish that operation first.</string>
     <string name="quick_capture_deferred">Your new note will open after the current draft is saved.</string>
     <string name="widget_style_save_error">Widget appearance could not be saved.</string>
     <string name="portable_export_unverified">Export written, but the file provider does not allow verification. Check the JSON file before relying on this backup.</string>

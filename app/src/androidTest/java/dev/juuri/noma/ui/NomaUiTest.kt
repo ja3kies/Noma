@@ -4,6 +4,12 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -39,9 +45,14 @@ class NomaUiTest {
     ) : NotesRepository {
         private val state = MutableStateFlow<NotesSnapshot>(initialState)
         override val notes: StateFlow<NotesSnapshot> = state
+        fun updateSnapshot(snapshot: NotesSnapshot) { state.value = snapshot }
         var saveGate: CompletableDeferred<Unit>? = null
+        @Volatile var failWrites = false
+        @Volatile var saveAttempts = 0
         override suspend fun save(note: Note) {
+            saveAttempts++
             saveGate?.await()
+            if (failWrites) throw IllegalStateException("Simulated disk failure")
             val old = (state.value as NotesSnapshot.Ready).entries
             state.value = NotesSnapshot.Ready(old.filterNot { it.id == note.id } + note)
         }
@@ -81,6 +92,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
         compose.onNodeWithTag("noma_search").assertIsNotEnabled()
         compose.onNodeWithText("Try again").assertExists()
+        compose.onNodeWithText("Noma could not read your notes. Try again. If the problem persists, verify a backup before making changes.").assertExists()
         compose.onNodeWithContentDescription("Import and export notes").assertExists()
     }
 
@@ -135,9 +147,8 @@ class NomaUiTest {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(viewModel) } }
-        // Empty notebook offers the centered action, not a duplicate FAB.
-        compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
-        compose.onNodeWithText("New note").performClick()
+        // One persistent creation action serves empty and populated notebooks.
+        compose.onNodeWithTag("noma_new_note").assertExists().performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
         compose.onNodeWithTag("noma_title_input").performTextInput("Weekend plan")
         compose.onNodeWithTag("noma_editor_back").performClick()
@@ -152,9 +163,17 @@ class NomaUiTest {
         repo.saveGate = gate
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
-        compose.onNodeWithText("New note").performClick()
-        compose.onNodeWithText("Creating note…").assertExists().assertIsNotEnabled()
-        compose.runOnIdle { assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty()) }
+        compose.onNodeWithTag("noma_new_note").performClick()
+        compose.waitUntil(5_000) { model.creating.value }
+        compose.onNodeWithTag("noma_creation_spinner", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("noma_new_note").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Creating note…").assertExists()
+        // A repeated request while the first insert is blocked must be ignored.
+        compose.runOnIdle {
+            model.createNote()
+            assertTrue(model.creating.value)
+            assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.isEmpty())
+        }
         compose.runOnIdle { gate.complete(Unit) }
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
         compose.runOnIdle {
@@ -185,6 +204,20 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_search").performTextInput("Cafe")
         compose.onNodeWithText("Search results").assertExists()
         compose.onNodeWithText("Café").assertExists()
+    }
+
+    @Test fun sortButtonAnnouncesTheActualSortMode() {
+        val repo = FakeRepository(listOf(Note("sort", "One", "Body", false, 1L, 1L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_sort_button").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Recently edited")
+        )
+        compose.onNodeWithTag("noma_sort_button").performClick()
+        compose.onNodeWithText("Title (A–Z)").performClick()
+        compose.onNodeWithTag("noma_sort_button").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Title (A–Z)")
+        )
     }
 
     @Test fun deleteDialogNamesTheExactNoteAndCancelPreservesIt() {
@@ -318,6 +351,485 @@ class NomaUiTest {
         compose.onNodeWithText("Frosted green").assertExists()
         compose.onNodeWithText("Liquid Glass").performClick()
         compose.runOnIdle { org.junit.Assert.assertEquals(NomaWidgetStyle.LIQUID_GLASS, chosen) }
+    }
+
+
+    @Test fun cardActionsOpenWithoutSelectingTheNote() {
+        val note = Note("menu-card", "Menu note", "Safe contents", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_actions_menu-card").performClick()
+        compose.onNodeWithText("Archive note").assertExists()
+        compose.runOnIdle { assertEquals(null, model.active.value) }
+    }
+
+    @Test fun emptyNotebookOffersSingleActionEvenWithActiveSearchFilter() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("nothing matches")
+        compose.onNodeWithTag("noma_new_note").assertExists()
+        compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithTag("noma_clear_filters").assertDoesNotExist()
+        compose.onNodeWithTag("noma_new_note").assertExists()
+    }
+
+    @Test fun sharingAnEmptyNoteIsDisabledInEditor() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_new_note").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_editor_actions"))
+        compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithText("Share note").assertExists().assertIsNotEnabled()
+    }
+
+
+    @Test fun sharedCaptureExplainsWhyCurrentSavingDraftMustFinish() {
+        val old = Note("share-wait", "Existing thought", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Existing thought").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" new draft")
+        compose.waitUntil(5_000) { model.saveState.value == EditorSaveState.Saving }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("A link", "https://example.org"))
+        }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_save_guidance").assertExists()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(5_000) { model.saveState.value == EditorSaveState.Saved }
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled()
+        compose.onNodeWithTag("noma_share_save_guidance").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals("share-wait", model.active.value?.id)
+        }
+    }
+
+    @Test fun sharedCaptureCannotBeConfirmedAfterFailedEditorWrite() {
+        val old = Note("share-failed", "Not saved note", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Not saved note").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" new draft")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("A link", "https://example.org"))
+        }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_save_guidance").assertExists()
+        compose.runOnIdle {
+            assertEquals("share-failed", model.active.value?.id)
+            assertEquals("https://example.org", model.pendingShare.value?.body)
+            assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+    @Test fun sharedCaptureCanBeConfirmedForAlreadySavedEditor() {
+        val old = Note("share-ready", "Saved note", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Saved note").performClick()
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("A link", "https://example.org"))
+        }
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { model.pendingShare.value == null }
+        compose.runOnIdle {
+            assertEquals("https://example.org", model.active.value?.body)
+            assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+    @Test fun sharedCaptureCancelLeavesCurrentFailedDraftUntouched() {
+        val old = Note("share-cancel", "Draft in progress", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Draft in progress").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" failed")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("Temporary", "Do not save"))
+        }
+        compose.onNodeWithText("Discard").performClick()
+        compose.runOnIdle {
+            assertEquals(null, model.pendingShare.value)
+            assertEquals("share-cancel", model.active.value?.id)
+            assertTrue(model.active.value?.body?.contains("failed") == true)
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
+            assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+    @Test fun archivedNoteCannotBePinnedFromEditorToolbar() {
+        val note = Note("archive", "Archived text", "Saved", false, 1L, 1L, true)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithText("Archived text").performClick()
+        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+    }
+
+    @Test fun savingNoteDisablesEditorPinArchiveDeleteAndShare() {
+        val note = Note("pending", "Working draft", "Initial", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Working draft").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" pending")
+        compose.runOnIdle { assertEquals(EditorSaveState.Saving, model.saveState.value) }
+        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithText("Archive note").assertIsNotEnabled()
+        compose.onNodeWithText("Delete").assertIsNotEnabled()
+        compose.onNodeWithText("Share note").assertIsNotEnabled()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(5_000) { model.saveState.value == EditorSaveState.Saved }
+    }
+
+    @Test fun failedSaveKeepsEditorTextAndSupportsRetry() {
+        val note = Note("failed", "Original", "First draft", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Original").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" updated")
+        try {
+            compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Initial write failure not shown: state=${model.saveState.value}, attempts=${repo.saveAttempts}",
+                failure
+            )
+        }
+        compose.onNodeWithTag("noma_retry_save").assertExists().assertIsDisplayed()
+        compose.onNodeWithTag("noma_save_failure_guidance").assertExists()
+        val attemptsBeforeRetry = repo.saveAttempts
+        compose.runOnIdle {
+            assertTrue(model.active.value?.body?.contains("updated") == true)
+            repo.failWrites = false
+        }
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        try {
+            compose.waitUntil(10_000) {
+                repo.saveAttempts > attemptsBeforeRetry &&
+                    model.saveState.value == EditorSaveState.Saved
+            }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Retry did not confirm persistence: state=${model.saveState.value}, " +
+                    "attempts=${repo.saveAttempts}, prior=$attemptsBeforeRetry, " +
+                    "body=${(repo.notes.value as NotesSnapshot.Ready).entries.singleOrNull()?.body}",
+                failure
+            )
+        }
+        compose.runOnIdle {
+            assertTrue(
+                (repo.notes.value as NotesSnapshot.Ready).entries.single().body.contains("updated")
+            )
+        }
+    }
+
+
+    @Test fun failedRetryKeepsDraftAndAllowsAnotherAttempt() {
+        val note = Note("retry-again", "Retry note", "Before", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Retry note").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" added")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        val before = repo.saveAttempts
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        compose.waitUntil(10_000) {
+            repo.saveAttempts > before && model.saveState.value is EditorSaveState.Failed
+        }
+        compose.waitForIdle() // The same failure text can be conflated across rapid retries.
+        compose.onNodeWithTag("noma_retry_save").assertExists().assertIsDisplayed()
+        val secondBefore = repo.saveAttempts
+        compose.runOnIdle {
+            assertTrue(model.active.value?.body?.contains("added") == true)
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
+            repo.failWrites = false
+        }
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        try {
+            compose.waitUntil(10_000) { repo.saveAttempts > secondBefore }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Second Retry click did not start a write; attempts=${repo.saveAttempts}, " +
+                    "before=$secondBefore, state=${model.saveState.value}", failure
+            )
+        }
+        try {
+            compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+        } catch (failure: Throwable) {
+            throw AssertionError(
+                "Second Retry write did not commit; attempts=${repo.saveAttempts}, " +
+                    "state=${model.saveState.value}, disk=${(repo.notes.value as NotesSnapshot.Ready).entries.single().body}",
+                failure
+            )
+        }
+        compose.runOnIdle {
+            assertTrue((repo.notes.value as NotesSnapshot.Ready).entries.single().body.contains("added"))
+        }
+    }
+
+    @Test fun failedSaveBackDialogKeepEditingPreservesDraft() {
+        val note = Note("keep", "Keep editor", "Before", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Keep editor").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" preserved")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_editor_back").performClick()
+        compose.onNodeWithText("Changes not saved").assertExists()
+        compose.onNodeWithTag("noma_keep_editing").performClick()
+        compose.runOnIdle {
+            assertEquals("keep", model.active.value?.id)
+            assertTrue(model.active.value?.body?.contains("preserved") == true)
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
+        }
+    }
+
+    @Test fun explicitDiscardAfterFailedSaveLeavesPersistedVersionIntact() {
+        val note = Note("discard", "Discard draft", "Persisted body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Discard draft").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" unsaved")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_editor_back").performClick()
+        compose.onNodeWithTag("noma_discard_unsaved").performClick()
+        compose.runOnIdle {
+            assertEquals(null, model.active.value)
+            assertEquals(note, (repo.notes.value as NotesSnapshot.Ready).entries.single())
+        }
+    }
+
+    @Test fun retryWithSlowDiskDisablesConflictingActionsUntilCommit() {
+        val note = Note("blocked", "Retry pending", "Old", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Retry pending").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" new")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        val gate = CompletableDeferred<Unit>()
+        compose.runOnIdle {
+            repo.failWrites = false
+            repo.saveGate = gate
+        }
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saving }
+        compose.onNodeWithTag("noma_retry_save").assertDoesNotExist()
+        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+    }
+
+    @Test fun pinnedCardExposesItsStatusToScreenReader() {
+        val note = Note("pinned", "Favorite", "Content", true, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Pinned note").assertExists()
+    }
+
+
+    @Test fun clearSearchControlReallyRemovesQueryWithKeyboardFocused() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("draft query")
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithContentDescription("Clear search").assertDoesNotExist()
+        compose.onNodeWithTag("noma_new_note").assertExists()
+    }
+
+    @Test fun emptyArchiveOffersVisibleResetWithoutHidingCreate() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithText("Your archive is empty").assertExists()
+        compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
+        compose.waitUntil(5_000) { !model.archivedOnly.value }
+        compose.onNodeWithTag("noma_new_note").assertExists()
+    }
+
+
+    @Test fun pendingExportMenuExplainsWhyBackupIsDisabled() {
+        val repo = FakeRepository()
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = NotesSnapshot.Ready(emptyList()),
+                    onImport = { 0 },
+                    snapshotForExport = { emptyList() },
+                    onMessage = {},
+                    canExport = false
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Finish saving or capturing before exporting").assertIsNotEnabled()
+        compose.onNodeWithText("Check backup file").assertExists()
+        compose.onNodeWithText("Import JSON").assertExists()
+    }
+
+    @Test fun confirmationDisablesExportIfNoteBecomesDirtyBeforeFinalConsent() {
+        val ready = mutableStateOf(true)
+        val repo = FakeRepository()
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = NotesSnapshot.Ready(emptyList()),
+                    onImport = { 0 },
+                    snapshotForExport = { emptyList() },
+                    onMessage = {},
+                    canExport = ready.value
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Export JSON").performClick()
+        compose.onNodeWithText("Unencrypted export").assertExists()
+        compose.runOnIdle { ready.value = false }
+        compose.onNodeWithText("Export JSON").assertIsNotEnabled()
+        compose.onNodeWithText("This export cannot continue until note saves or captures finish, and any unsaved changes are resolved.").assertExists()
+    }
+
+    @Test fun existingNoteCardCannotInterruptSlowCreation() {
+        val existing = Note("existing", "Existing note", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(existing))
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_new_note").performClick()
+        compose.waitUntil(5_000) { model.creating.value }
+        compose.onNodeWithTag("noma_note_existing").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_note_actions_existing").assertIsNotEnabled()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntilAtLeastOneExists(hasTestTag("noma_title_input"))
+        compose.runOnIdle {
+            assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+
+    @Test fun exportReturnsToAvailableAfterSaveFinishes() {
+        val ready = mutableStateOf(false)
+        compose.setContent {
+            NomaTheme {
+                PortableDocuments(
+                    snapshot = NotesSnapshot.Ready(emptyList()),
+                    onImport = { 0 },
+                    snapshotForExport = { emptyList() },
+                    onMessage = {},
+                    canExport = ready.value
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Import and export notes").performClick()
+        compose.onNodeWithText("Finish saving or capturing before exporting").assertIsNotEnabled()
+        compose.runOnIdle { ready.value = true }
+        compose.onNodeWithText("Export JSON").assertExists()
+    }
+
+
+    @Test fun blankSharedBodyDisablesConfirmationWithAnExplanation() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Browser", ""))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_validation_error").assertExists()
+        compose.onNodeWithText("The shared text is empty. There is nothing to save.").assertExists()
+        compose.runOnIdle { assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size) }
+    }
+
+    @Test fun whitespaceOnlySharedBodyIsRejectedBeforeAnyWrite() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Browser", "   \n  "))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_validation_error").assertExists()
+        compose.runOnIdle { assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size) }
+    }
+
+    @Test fun oversizedIncomingShareBodyExplainsCharacterLimit() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Website", "a".repeat(100_001)))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithText("Shared text exceeds the 100,000-character limit.").assertExists()
+    }
+
+    @Test fun oversizedIncomingShareTitleExplainsCharacterLimit() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("a".repeat(201), "Valid body"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithText("Shared title exceeds the 200-character limit.").assertExists()
+    }
+
+    @Test fun storageLoadingMakesIncomingShareConfirmationUnavailable() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Loading)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Website", "Valid body"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { assertEquals("Valid body", model.pendingShare.value?.body) }
+    }
+
+    @Test fun storageErrorMakesIncomingShareConfirmationUnavailable() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("disk unavailable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Website", "Valid body"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { assertEquals("Valid body", model.pendingShare.value?.body) }
+    }
+
+    @Test fun pendingShareCanBeSavedAfterStorageBecomesReady() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("temporarily unavailable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Recovered", "Captured text"))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.runOnIdle { repo.updateSnapshot(NotesSnapshot.Ready(emptyList())) }
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { model.pendingShare.value == null }
+        compose.runOnIdle {
+            assertEquals("Captured text", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
+            assertEquals("Captured text", model.active.value?.body)
+        }
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
