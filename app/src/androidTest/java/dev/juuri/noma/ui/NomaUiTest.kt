@@ -1061,6 +1061,40 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_pinned_filter").assertExists()
     }
 
+
+    @Test fun noteSectionsShowCountsAndDistinctIcons() {
+        val pinned = Note("pinned-a", "Pinned idea", "One", true, 1L, 1L)
+        val other = Note("regular-b", "Normal idea", "Two", false, 1L, 1L)
+        val repo = FakeRepository(listOf(pinned, other))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Pinned").assertExists()
+        compose.onNodeWithText("Recent").assertExists()
+        compose.onAllNodesWithTag("noma_section_header").assertCountEquals(2)
+        compose.onNodeWithTag("noma_card_pinned_badge").assertExists()
+    }
+
+    @Test fun archivedCardHasAnArchivedBadgeButNoPinBadge() {
+        val archived = Note("archived-a", "Old idea", "Stored", false, 1L, 1L, isArchived = true)
+        val repo = FakeRepository(listOf(archived))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithTag("noma_card_archived_badge").assertExists()
+        compose.onNodeWithTag("noma_card_pinned_badge").assertDoesNotExist()
+        compose.onNodeWithText("Archived notes").assertExists()
+    }
+
+    @Test fun cardMenuActionDoesNotOpenEditorAfterCardVisualUpdate() {
+        val note = Note("actions-test", "Menu note", "Contents", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_note_actions_actions-test").performClick()
+        compose.onNodeWithText("Archive note").assertExists()
+        compose.runOnIdle { assertEquals(null, model.active.value) }
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
