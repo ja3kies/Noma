@@ -33,9 +33,12 @@ import org.junit.runner.Description
 class NotesViewModelTest {
     @get:Rule val dispatcher = MainDispatcherRule()
 
-    private class FakeRepository(initial: Note) : NotesRepository {
+    private class FakeRepository(
+        initial: Note,
+        initialState: NotesSnapshot = NotesSnapshot.Ready(listOf(initial))
+    ) : NotesRepository {
         private val originalId = initial.id
-        private val state = MutableStateFlow<NotesSnapshot>(NotesSnapshot.Ready(listOf(initial)))
+        private val state = MutableStateFlow(initialState)
         override val notes: StateFlow<NotesSnapshot> = state
         var gate: CompletableDeferred<Unit>? = null
         var newNoteGate: CompletableDeferred<Unit>? = null
@@ -1311,6 +1314,204 @@ class NotesViewModelTest {
         assertEquals(NoteUiEvent.SharedCaptureSavedWhileEditing, message.await())
         assertEquals("id", model.active.value?.id)
         assertEquals("Still editing", model.active.value?.body)
+    }
+
+
+    @Test fun quickCaptureDuringNoteCreationExplainsBusyAndDoesNotDuplicate() = runTest {
+        val old = Note("id", "Old", "Body", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.newNoteGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        runCurrent()
+        model.requestQuickNote()
+        assertEquals(NoteUiEvent.QuickCaptureBusy, model.events.first())
+        repo.newNoteGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals(1, repo.saveCallCount)
+    }
+
+    @Test fun quickCaptureDuringExternalShareDoesNotDuplicateTheSharedNote() = runTest {
+        val old = Note("id", "Old", "Body", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.newNoteGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Web", "https://example.org"))
+        model.confirmSharedText()
+        runCurrent()
+        model.requestQuickNote()
+        assertEquals(NoteUiEvent.QuickCaptureBusy, model.events.first())
+        repo.newNoteGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        assertEquals("https://example.org", model.active.value?.body)
+    }
+
+    @Test fun newNoteRefusesLoadingStorageWithoutAttemptingAnyWrite() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old, NotesSnapshot.Loading)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        advanceUntilIdle()
+        assertEquals(NoteUiEvent.StorageNotReady, model.events.first())
+        assertEquals(false, model.creating.value)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun newNoteRefusesStorageErrorWithoutReplacingErrorState() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old, NotesSnapshot.Error("unreadable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.createNote()
+        assertEquals(NoteUiEvent.StorageNotReady, model.events.first())
+        assertTrue(repo.notes.value is NotesSnapshot.Error)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun sharedTextWaitsForStorageRecoveryFromLoading() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old, NotesSnapshot.Loading)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Shared", "Body"))
+        model.confirmSharedText()
+        assertEquals(NoteUiEvent.StorageNotReady, model.events.first())
+        assertEquals("Body", model.pendingShare.value?.body)
+        assertEquals(false, model.capturingShare.value)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun sharedTextWaitsForStorageRecoveryFromError() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old, NotesSnapshot.Error("cannot read database"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Shared", "Body"))
+        model.confirmSharedText()
+        assertEquals(NoteUiEvent.StorageNotReady, model.events.first())
+        assertEquals("Shared", model.pendingShare.value?.title)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun emptyIncomingShareIsRejectedBeforeDiskWrite() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Shared", "  \n  "))
+        model.confirmSharedText()
+        assertEquals(NoteUiEvent.SharedTextEmpty, model.events.first())
+        assertEquals("Shared", model.pendingShare.value?.title)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun overlyLongIncomingShareBodyDoesNotStartSave() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        val body = "x".repeat(100_001)
+        model.receiveSharedText(CaptureRequest.SharedText("Shared", body))
+        model.confirmSharedText()
+        assertEquals(NoteUiEvent.SharedTextTooLong, model.events.first())
+        assertEquals(body, model.pendingShare.value?.body)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun overlyLongSharedTitleDoesNotStartSave() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        val title = "T".repeat(201)
+        model.receiveSharedText(CaptureRequest.SharedText(title, "Body"))
+        model.confirmSharedText()
+        assertEquals(NoteUiEvent.SharedTitleTooLong, model.events.first())
+        assertEquals(title, model.pendingShare.value?.title)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun exactShareLengthLimitsAreAcceptedWithoutTruncation() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        val title = "T".repeat(200)
+        val body = "B".repeat(100_000)
+        model.receiveSharedText(CaptureRequest.SharedText(title, body))
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals(title, model.active.value?.title)
+        assertEquals(body, model.active.value?.body)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun overflowOfIncomingSharesIsReportedWithoutDroppingTheActiveOne() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("First", "First body"))
+        repeat(16) { model.receiveSharedText(CaptureRequest.SharedText("Queued", "Queue " + it)) }
+        model.receiveSharedText(CaptureRequest.SharedText("Overflow", "Must not overwrite"))
+        assertEquals(NoteUiEvent.ShareQueueFull, model.events.first())
+        assertEquals("First body", model.pendingShare.value?.body)
+        model.dismissSharedText()
+        assertEquals("Queue 0", model.pendingShare.value?.body)
+        assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun dismissingInvalidIncomingShareAllowsNextValidOneToSave() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.receiveSharedText(CaptureRequest.SharedText("Empty", ""))
+        model.receiveSharedText(CaptureRequest.SharedText("Next", "Valid text"))
+        model.confirmSharedText()
+        assertEquals(NoteUiEvent.SharedTextEmpty, model.events.first())
+        model.dismissSharedText()
+        assertEquals("Valid text", model.pendingShare.value?.body)
+        model.confirmSharedText()
+        advanceUntilIdle()
+        assertEquals(null, model.pendingShare.value)
+        assertEquals("Valid text", model.active.value?.body)
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun closeActionDuringNewNoteCreationCannotLoseTheSelectedNote() = runTest {
+        val old = Note("id", "Old", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.newNoteGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.createNote()
+        runCurrent()
+        model.closeNote()
+        assertEquals(NoteUiEvent.CaptureInProgress, model.events.first())
+        assertEquals("id", model.active.value?.id)
+        repo.newNoteGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun closeActionDuringSharedCaptureCannotLoseTheSelectedNote() = runTest {
+        val old = Note("id", "Old", "Saved", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.newNoteGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.receiveSharedText(CaptureRequest.SharedText("Shared", "Body"))
+        model.confirmSharedText()
+        runCurrent()
+        model.closeNote()
+        assertEquals(NoteUiEvent.CaptureInProgress, model.events.first())
+        assertEquals("id", model.active.value?.id)
+        repo.newNoteGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
+    @Test fun requestQuickNoteWhileStorageFailedNeverStartsBlindWrite() = runTest {
+        val old = Note("id", "Old", "", false, 1L, 1L)
+        val repo = FakeRepository(old, NotesSnapshot.Error("damaged database"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.requestQuickNote()
+        assertEquals(NoteUiEvent.StorageNotReady, model.events.first())
+        assertEquals(0, repo.saveCallCount)
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {
