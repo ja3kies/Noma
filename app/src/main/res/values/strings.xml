@@ -150,5 +150,5 @@
     <string name="widget_style_liquid_glass_detail">Light glass-inspired visual style</string>
     <string name="body_accessibility_label">Note content</string>
     <string name="scroll_to_top">Back to top</string>
-    <string name="section_count_description">%1$s: %2$d notes</string>
+    <string name="section_count_description">%1$s: %2$s</string>
 </resources>

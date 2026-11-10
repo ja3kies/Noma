@@ -1155,7 +1155,10 @@ private fun BottomSearchPill(
 
 @Composable
 private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
-    val accessibleCount = stringResource(R.string.section_count_description, title, count)
+    val accessibleCount = stringResource(
+        R.string.section_count_description, title,
+        pluralStringResource(R.plurals.note_total, count, count)
+    )
     Row(
         modifier = Modifier.fillMaxWidth()
             .padding(start = NomaSpacing.small, top = NomaSpacing.comfortable, bottom = NomaSpacing.small)
