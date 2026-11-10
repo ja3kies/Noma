@@ -60,6 +60,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.EditNote
@@ -467,6 +468,13 @@ private fun NotesListScreen(
     val newNoteLabel = stringResource(R.string.new_note)
     val creatingNoteLabel = stringResource(R.string.creating_note)
     val creatingOrCapturing = creating || capturingShare
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val sortButtonBackground by animateColorAsState(
+        targetValue = if (sort == NoteSort.RECENT) Color.Transparent
+            else MaterialTheme.colorScheme.secondaryContainer,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaSortButtonSurface"
+    )
     val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
     Scaffold(
         modifier = modifier,
@@ -494,13 +502,16 @@ private fun NotesListScreen(
                     (query.isNotBlank() || pinnedOnly || archivedOnly)
                 ) {
                     TextButton(
-                        modifier = Modifier.testTag("noma_clear_filters"),
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                            .testTag("noma_clear_filters"),
                         onClick = {
                             focusManager.clearFocus()
                             searchKeyboard?.hide()
                             viewModel.clearDiscoveryFilters()
                         }
                     ) {
+                        Icon(Icons.Outlined.Close, contentDescription = null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(NomaSpacing.small))
                         Text(stringResource(R.string.clear_all_filters))
                     }
                 }
@@ -548,7 +559,7 @@ private fun NotesListScreen(
                         searchKeyboard?.hide()
                         if (!creatingOrCapturing) viewModel.createNote()
                     },
-                    expanded = true,
+                    expanded = !imeVisible || creatingOrCapturing,
                     icon = {
                         if (creatingOrCapturing) {
                             CircularProgressIndicator(
@@ -567,10 +578,9 @@ private fun NotesListScreen(
                     contentColor = if (creatingOrCapturing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
                     modifier = Modifier.testTag("noma_new_note").semantics {
-                        if (creatingOrCapturing) {
-                            disabled()
-                            contentDescription = creatingNoteLabel
-                        }
+                        contentDescription = if (creatingOrCapturing) creatingNoteLabel
+                            else newNoteLabel
+                        if (creatingOrCapturing) disabled()
                     }
                 )
             }
@@ -620,14 +630,17 @@ private fun NotesListScreen(
                             onClick = {
                                 focusManager.clearFocus()
                                 searchKeyboard?.hide()
+                                sortMenuExpanded = false
                                 viewModel.toggleArchiveView()
                             },
                             enabled = snapshot is NotesSnapshot.Ready,
-                            modifier = Modifier.testTag("noma_archive_filter"),
+                            modifier = Modifier.testTag("noma_archive_filter")
+                                .defaultMinSize(minHeight = 48.dp),
                             label = { Text(stringResource(R.string.archive_view)) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Outlined.Archive, contentDescription = null,
+                                    if (archivedOnly) Icons.Outlined.Check else Icons.Outlined.Archive,
+                                    contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -638,13 +651,17 @@ private fun NotesListScreen(
                                 onClick = {
                                     focusManager.clearFocus()
                                     searchKeyboard?.hide()
+                                    sortMenuExpanded = false
                                     viewModel.togglePinnedOnly()
                                 },
                                 enabled = snapshot is NotesSnapshot.Ready,
+                                modifier = Modifier.testTag("noma_pinned_filter")
+                                    .defaultMinSize(minHeight = 48.dp),
                                 label = { Text(stringResource(R.string.pinned_filter)) },
                                 leadingIcon = {
                                     Icon(
-                                        Icons.Outlined.PushPin, contentDescription = null,
+                                        if (pinnedOnly) Icons.Outlined.Check else Icons.Outlined.PushPin,
+                                        contentDescription = null,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -655,11 +672,18 @@ private fun NotesListScreen(
                         IconButton(
                             onClick = { sortMenuExpanded = true },
                             enabled = snapshot is NotesSnapshot.Ready,
-                            modifier = Modifier.testTag("noma_sort_button").semantics {
-                                stateDescription = currentSortLabel
-                            }
+                            modifier = Modifier
+                                .background(sortButtonBackground, CircleShape)
+                                .testTag("noma_sort_button")
+                                .semantics { stateDescription = currentSortLabel }
                         ) {
-                            Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = stringResource(R.string.sort_notes))
+                            Icon(
+                                Icons.AutoMirrored.Outlined.Sort,
+                                contentDescription = stringResource(R.string.sort_notes),
+                                tint = if (sort == NoteSort.RECENT)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
                         DropdownMenu(
                             expanded = sortMenuExpanded,
@@ -948,7 +972,7 @@ private fun BottomSearchPill(
                     }
                 } else null,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = onSearchDone),
+                keyboardActions = KeyboardActions(onSearch = { onSearchDone() }),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
