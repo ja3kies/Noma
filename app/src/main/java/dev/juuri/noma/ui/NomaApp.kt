@@ -225,6 +225,7 @@ fun NomaApp(
         }
         AlertDialog(
             onDismissRequest = viewModel::dismissSharedText,
+            shape = MaterialTheme.shapes.extraLarge,
             title = { Text(stringResource(R.string.incoming_share_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
@@ -1049,11 +1050,28 @@ private fun NoteActionsMenu(
             onClick = { onDismiss(); onShare() },
             leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
         )
+        // Give the destructive action its own group without a loud accent color.
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = NomaSpacing.medium, vertical = NomaSpacing.tiny),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
         DropdownMenuItem(
-            text = { Text(stringResource(R.string.delete_note)) },
+            modifier = Modifier.testTag("noma_delete_action"),
+            text = {
+                Text(
+                    stringResource(R.string.delete_note),
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
             enabled = destructiveEnabled,
             onClick = { onDismiss(); onDelete() },
-            leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null) }
+            leadingIcon = {
+                Icon(
+                    Icons.Outlined.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         )
     }
 }
@@ -1126,6 +1144,7 @@ private fun NoteEditorScreen(
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
+            shape = MaterialTheme.shapes.extraLarge,
             title = { Text(stringResource(R.string.unsaved_title)) },
             text = { Text(stringResource(R.string.unsaved_body)) },
             confirmButton = {
@@ -1529,10 +1548,11 @@ private fun WidgetStyleDialog(
 private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text(stringResource(R.string.delete_confirm_title)) },
         text = { Text(stringResource(R.string.delete_confirm_body_named, noteTitle.take(80))) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = onConfirm, modifier = Modifier.testTag("noma_confirm_delete")) {
                 Text(
                     stringResource(R.string.delete_note),
                     color = MaterialTheme.colorScheme.error
