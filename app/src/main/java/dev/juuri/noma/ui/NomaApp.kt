@@ -157,6 +157,7 @@ import dev.juuri.noma.capture.NomaWidgetStyle
 import dev.juuri.noma.domain.Note
 import dev.juuri.noma.domain.NoteSort
 import dev.juuri.noma.domain.NoteSearch
+import dev.juuri.noma.domain.NoteFindReplace
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaMotion
@@ -1507,6 +1508,9 @@ private fun NoteEditorScreen(
     var confirmDelete by rememberSaveable(note.id) { mutableStateOf(false) }
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
+    var findReplaceOpen by rememberSaveable(note.id) { mutableStateOf(false) }
+    var findQuery by rememberSaveable(note.id) { mutableStateOf("") }
+    var replaceWith by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
     val context = LocalContext.current
     val titleFocus = remember(note.id) { FocusRequester() }
@@ -1610,6 +1614,74 @@ private fun NoteEditorScreen(
             }
         )
     }
+    if (findReplaceOpen) {
+        val matches = remember(note.body, findQuery) {
+            NoteFindReplace.count(note.body, findQuery)
+        }
+        AlertDialog(
+            onDismissRequest = { findReplaceOpen = false },
+            title = { Text(stringResource(R.string.find_replace)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                    TextField(
+                        value = findQuery,
+                        onValueChange = { findQuery = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.find_text)) },
+                        modifier = Modifier.fillMaxWidth().testTag("noma_find_input")
+                    )
+                    TextField(
+                        value = replaceWith,
+                        onValueChange = { replaceWith = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.replacement_text)) },
+                        modifier = Modifier.fillMaxWidth().testTag("noma_replace_input")
+                    )
+                    Text(
+                        text = if (matches > 0) stringResource(R.string.matches_found, matches)
+                            else stringResource(R.string.no_search_matches),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.testTag("noma_find_result_count")
+                            .semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)) {
+                    TextButton(
+                        enabled = matches > 0,
+                        onClick = {
+                            closeWhenSaved = false
+                            viewModel.changeBody(
+                                NoteFindReplace.replaceFirst(note.body, findQuery, replaceWith)
+                            )
+                        },
+                        modifier = Modifier.testTag("noma_replace_first")
+                            .defaultMinSize(minHeight = 48.dp)
+                    ) { Text(stringResource(R.string.replace_first)) }
+                    TextButton(
+                        enabled = matches > 0,
+                        onClick = {
+                            closeWhenSaved = false
+                            viewModel.changeBody(
+                                NoteFindReplace.replaceAll(note.body, findQuery, replaceWith)
+                            )
+                        },
+                        modifier = Modifier.testTag("noma_replace_all")
+                            .defaultMinSize(minHeight = 48.dp)
+                    ) { Text(stringResource(R.string.replace_all)) }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { findReplaceOpen = false },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        .testTag("noma_find_replace_close")
+                ) { Text(stringResource(R.string.find_replace_close)) }
+            }
+        )
+    }
     val safeTitle = stringResource(R.string.editor_nav_title)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -1642,6 +1714,19 @@ private fun NoteEditorScreen(
                     },
                     actions = {
                         val portableScope = rememberCoroutineScope()
+                        IconButton(
+                            onClick = {
+                                menuExpanded = false
+                                findReplaceOpen = true
+                            },
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .testTag("noma_editor_find_replace")
+                        ) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = stringResource(R.string.find_replace)
+                            )
+                        }
                         PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
                             portableScope.launch { snackbar.showSnackbar(message) }
                         })
