@@ -1273,6 +1273,45 @@ class NotesViewModelTest {
         assertEquals(null, model.pendingShare.value)
     }
 
+
+    @Test fun slowCreationProvidesFeedbackIfAnotherDraftWasUpdated() = runTest {
+        val old = Note("id", "Original", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.newNoteGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.createNote()
+        runCurrent()
+        model.changeBody("Kept")
+        runCurrent()
+        val message = async { model.events.first() }
+        runCurrent()
+        repo.newNoteGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(NoteUiEvent.CreatedWhileEditing, message.await())
+        assertEquals("id", model.active.value?.id)
+    }
+
+    @Test fun sharedCaptureProvidesFeedbackIfAnotherDraftWasUpdated() = runTest {
+        val old = Note("id", "Original", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(old)
+        repo.newNoteGate = CompletableDeferred()
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(old)
+        model.receiveSharedText(CaptureRequest.SharedText("From app", "Imported snippet"))
+        model.confirmSharedText()
+        runCurrent()
+        model.changeBody("Still editing")
+        runCurrent()
+        val message = async { model.events.first() }
+        runCurrent()
+        repo.newNoteGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(NoteUiEvent.SharedCaptureSavedWhileEditing, message.await())
+        assertEquals("id", model.active.value?.id)
+        assertEquals("Still editing", model.active.value?.body)
+    }
+
     @Test fun diskFailureNeverShowsSaved() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)

@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
@@ -382,6 +383,91 @@ class NomaUiTest {
         compose.waitUntilAtLeastOneExists(hasTestTag("noma_editor_actions"))
         compose.onNodeWithTag("noma_editor_actions").performClick()
         compose.onNodeWithText("Share note").assertExists().assertIsNotEnabled()
+    }
+
+
+    @Test fun sharedCaptureExplainsWhyCurrentSavingDraftMustFinish() {
+        val old = Note("share-wait", "Existing thought", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        val gate = CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Existing thought").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" new draft")
+        compose.waitUntil(5_000) { model.saveState.value == EditorSaveState.Saving }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("A link", "https://example.org"))
+        }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_save_guidance").assertExists()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(5_000) { model.saveState.value == EditorSaveState.Saved }
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled()
+        compose.onNodeWithTag("noma_share_save_guidance").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals("share-wait", model.active.value?.id)
+        }
+    }
+
+    @Test fun sharedCaptureCannotBeConfirmedAfterFailedEditorWrite() {
+        val old = Note("share-failed", "Not saved note", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Not saved note").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" new draft")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("A link", "https://example.org"))
+        }
+        compose.onNodeWithTag("noma_share_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_share_save_guidance").assertExists()
+        compose.runOnIdle {
+            assertEquals("share-failed", model.active.value?.id)
+            assertEquals("https://example.org", model.pendingShare.value?.body)
+            assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+    @Test fun sharedCaptureCanBeConfirmedForAlreadySavedEditor() {
+        val old = Note("share-ready", "Saved note", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Saved note").performClick()
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("A link", "https://example.org"))
+        }
+        compose.onNodeWithTag("noma_share_confirm").assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { model.pendingShare.value == null }
+        compose.runOnIdle {
+            assertEquals("https://example.org", model.active.value?.body)
+            assertEquals(2, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
+    }
+
+    @Test fun sharedCaptureCancelLeavesCurrentFailedDraftUntouched() {
+        val old = Note("share-cancel", "Draft in progress", "Stored", false, 1L, 1L)
+        val repo = FakeRepository(listOf(old))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Draft in progress").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" failed")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.runOnIdle {
+            model.receiveSharedText(CaptureRequest.SharedText("Temporary", "Do not save"))
+        }
+        compose.onNodeWithText("Discard").performClick()
+        compose.runOnIdle {
+            assertEquals(null, model.pendingShare.value)
+            assertEquals("share-cancel", model.active.value?.id)
+            assertTrue(model.active.value?.body?.contains("failed") == true)
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
+            assertEquals(1, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        }
     }
 
     @Test fun archivedNoteCannotBePinnedFromEditorToolbar() {
