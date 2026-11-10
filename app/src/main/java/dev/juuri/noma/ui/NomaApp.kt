@@ -132,6 +132,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
@@ -301,6 +302,7 @@ fun NomaApp(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= 840.dp
             if (expanded) {
+                val listWidth = responsiveListPaneWidth(maxWidth)
                 Row(Modifier.fillMaxSize()) {
                     NotesListScreen(
                         viewModel = viewModel,
@@ -310,10 +312,19 @@ fun NomaApp(
                         onAppearanceChange = onAppearanceChange,
                         widgetStyle = widgetStyle,
                         onWidgetStyleChange = onWidgetStyleChange,
-                        modifier = Modifier.width(NomaSpacing.listPaneWidth).fillMaxHeight()
+                        modifier = Modifier.width(listWidth).fillMaxHeight()
                     )
-                    VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    Spacer(Modifier.width(NomaSpacing.small))
+                    Surface(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(
+                            top = NomaSpacing.medium,
+                            end = NomaSpacing.medium,
+                            bottom = NomaSpacing.medium
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 1.dp
+                    ) {
                         if (active == null) {
                             EmptyEditorPane()
                         } else {
@@ -352,6 +363,14 @@ fun NomaApp(
         }
     }
 }
+
+
+/**
+ * Keep list navigation comfortably usable while preserving writing space on
+ * tablets and resizable desktop windows. Only expanded layouts use this width.
+ */
+internal fun responsiveListPaneWidth(windowWidth: Dp): Dp =
+    (windowWidth * 0.36f).coerceIn(320.dp, 420.dp)
 
 @Composable
 private fun NotesListScreen(
