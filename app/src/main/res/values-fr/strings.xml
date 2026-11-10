@@ -3,6 +3,8 @@
     <string name="app_name">Noma</string>
     <string name="tagline">Un espace tranquille pour vos idées.</string>
     <string name="search_hint">Rechercher dans les notes</string>
+    <string name="search_archived_hint">Rechercher dans les archives</string>
+    <string name="search_pinned_hint">Rechercher dans les notes épinglées</string>
     <string name="clear_search">Effacer la recherche</string>
     <string name="pinned_filter">Épinglées seulement</string>
     <string name="note_total">%1$d notes</string>

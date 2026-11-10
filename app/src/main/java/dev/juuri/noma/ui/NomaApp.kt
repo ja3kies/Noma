@@ -5,7 +5,13 @@ import android.content.Intent
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
@@ -406,6 +412,17 @@ private fun NotesListScreen(
     val searchKeyboard = LocalSoftwareKeyboardController.current
     val portableScope = rememberCoroutineScope()
     val searchAccessibilityLabel = stringResource(R.string.search_hint)
+    val contextualSearchHint = stringResource(
+        when {
+            archivedOnly -> R.string.search_archived_hint
+            pinnedOnly -> R.string.search_pinned_hint
+            else -> R.string.search_hint
+        }
+    )
+    val resultCountLabel = if (snapshot is NotesSnapshot.Ready && query.isNotBlank()) {
+        val count = filteredNotes?.size ?: 0
+        pluralStringResource(R.plurals.search_results_total, count, count)
+    } else null
 
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -487,20 +504,36 @@ private fun NotesListScreen(
                         Text(stringResource(R.string.clear_all_filters))
                     }
                 }
+                if (resultCountLabel != null) {
+                    Text(
+                        resultCountLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.widthIn(max = 600.dp)
+                            .fillMaxWidth()
+                            .padding(start = NomaSpacing.medium, bottom = NomaSpacing.small)
+                            .semantics { liveRegion = LiveRegionMode.Polite }
+                            .testTag("noma_search_result_count")
+                    )
+                }
                 BottomSearchPill(
                     query = query,
                     onQueryChange = viewModel::onQueryChange,
                     enabled = snapshot is NotesSnapshot.Ready,
                     accessibilityLabel = searchAccessibilityLabel,
+                    hint = contextualSearchHint,
+                    onSearchFocus = { sortMenuExpanded = false },
                     onSearchDone = {
                         focusManager.clearFocus()
                         searchKeyboard?.hide()
                     },
-                    onClear = {
+                    onDismiss = {
                         focusManager.clearFocus()
                         searchKeyboard?.hide()
-                        viewModel.onQueryChange("")
                     },
+                    // Clearing keeps the search field focused so another query
+                    // can be typed without dismissing and reopening the IME.
+                    onClear = { viewModel.onQueryChange("") },
                     modifier = Modifier.widthIn(max = 600.dp)
                 )
             }
@@ -666,14 +699,16 @@ private fun NotesListScreen(
                         it.isArchived == archivedOnly
                     }
                     val filteredCount = filteredNotes?.size ?: 0
-                    Text(
-                        text = if (query.isNotBlank() || pinnedOnly)
-                            pluralStringResource(R.plurals.search_results_total, filteredCount, filteredCount)
-                        else pluralStringResource(R.plurals.note_total, count, count),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                    )
+                    if (query.isBlank()) {
+                        Text(
+                            text = if (pinnedOnly)
+                                pluralStringResource(R.plurals.search_results_total, filteredCount, filteredCount)
+                            else pluralStringResource(R.plurals.note_total, count, count),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                        )
+                    }
                 }
             }
 
@@ -835,65 +870,108 @@ private fun BottomSearchPill(
     onQueryChange: (String) -> Unit,
     enabled: Boolean,
     accessibilityLabel: String,
+    hint: String,
+    onSearchFocus: () -> Unit,
     onSearchDone: () -> Unit,
+    onDismiss: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
     val elevation by animateDpAsState(
-        targetValue = if (focused) 8.dp else 3.dp,
+        targetValue = if (focused) 9.dp else 3.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
         ),
         label = "nomaBottomSearchElevation"
     )
-    Surface(
-        modifier = modifier.fillMaxWidth().testTag("noma_search_pill"),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp,
-        shadowElevation = elevation,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    val pillColor by animateColorAsState(
+        targetValue = if (focused) MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaBottomSearchSurface"
+    )
+    val strokeColor by animateColorAsState(
+        targetValue = if (focused) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaBottomSearchStroke"
+    )
+    Row(
+        modifier = modifier.fillMaxWidth().animateContentSize(
+            spring(dampingRatio = Spring.DampingRatioNoBouncy)
+        ),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            enabled = enabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(58.dp)
-                .onFocusChanged { focused = it.isFocused }
-                .semantics { contentDescription = accessibilityLabel }
-                .testTag("noma_search"),
-            singleLine = true,
+        Surface(
+            modifier = Modifier.weight(1f).testTag("noma_search_pill"),
             shape = CircleShape,
-            textStyle = MaterialTheme.typography.bodyLarge,
-            placeholder = { Text(stringResource(R.string.search_hint)) },
-            leadingIcon = {
-                Icon(Icons.Outlined.Search, contentDescription = null)
-            },
-            trailingIcon = if (query.isNotEmpty()) {
-                {
-                    IconButton(onClick = onClear, enabled = enabled) {
-                        Icon(
-                            Icons.Outlined.Close,
-                            contentDescription = stringResource(R.string.clear_search)
-                        )
+            color = pillColor,
+            tonalElevation = if (focused) 3.dp else 2.dp,
+            shadowElevation = elevation,
+            border = BorderStroke(1.dp, strokeColor)
+        ) {
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                enabled = enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .onFocusChanged {
+                        if (it.isFocused && !focused) onSearchFocus()
+                        focused = it.isFocused
                     }
-                }
-            } else null,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearchDone() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
+                    .semantics { contentDescription = accessibilityLabel }
+                    .testTag("noma_search"),
+                singleLine = true,
+                shape = CircleShape,
+                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = { Text(hint) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = if (focused) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = if (query.isNotEmpty()) {
+                    {
+                        IconButton(onClick = onClear, enabled = enabled) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = stringResource(R.string.clear_search)
+                            )
+                        }
+                    }
+                } else null,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = onSearchDone),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent
+                )
             )
-        )
+        }
+        AnimatedVisibility(
+            visible = focused && enabled,
+            enter = expandHorizontally() + fadeIn(),
+            exit = shrinkHorizontally() + fadeOut()
+        ) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    .testTag("noma_search_dismiss")
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
     }
 }
 
