@@ -133,6 +133,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -144,6 +145,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -571,9 +573,11 @@ private fun NotesListScreen(
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                             .testTag("noma_clear_filters"),
                         onClick = {
+                            // Commit clear before releasing IME focus to avoid
+                            // a late composing-text callback restoring the query.
+                            viewModel.clearDiscoveryFilters()
                             focusManager.clearFocus()
                             searchKeyboard?.hide()
-                            viewModel.clearDiscoveryFilters()
                         }
                     ) {
                         Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -663,7 +667,10 @@ private fun NotesListScreen(
                         Text(
                             stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() }
                         )
                         Text(
                             stringResource(R.string.tagline),
@@ -815,14 +822,23 @@ private fun NotesListScreen(
                         tint = MaterialTheme.colorScheme.error
                     )
                     Spacer(Modifier.height(NomaSpacing.medium))
-                    Text(stringResource(R.string.unavailable), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        stringResource(R.string.unavailable),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() },
+                        textAlign = TextAlign.Center
+                    )
                     Spacer(Modifier.height(NomaSpacing.small))
                     Text(
                         stringResource(R.string.error_recovery),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NomaSpacing.comfortable))
-                    OutlinedButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
+                    OutlinedButton(
+                        onClick = viewModel::retry,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                            .testTag("noma_storage_retry")
+                    ) { Text(stringResource(R.string.retry)) }
                 }
                 is NotesSnapshot.Ready -> {
                     val visible = filteredNotes.orEmpty()
@@ -847,7 +863,9 @@ private fun NotesListScreen(
                                         else -> R.string.empty_title
                                     }
                                 ),
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.semantics { heading() },
+                                textAlign = TextAlign.Center
                             )
                             Spacer(Modifier.height(NomaSpacing.small))
                             Text(
@@ -859,7 +877,8 @@ private fun NotesListScreen(
                                     }
                                 ),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
                             )
                         }
                     } else {
@@ -876,14 +895,14 @@ private fun NotesListScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             if (pinned.isNotEmpty()) {
-                                item(key = "pinned_section") {
+                                item(key = "pinned_section", contentType = "section_heading") {
                                     SectionHeader(
                                         title = stringResource(R.string.pinned_section),
                                         count = pinned.size,
                                         icon = Icons.Outlined.PushPin
                                     )
                                 }
-                                items(pinned, key = { it.id }) { note ->
+                                items(pinned, key = { it.id }, contentType = { "note_card" }) { note ->
                                     NoteCard(
                                         note = note,
                                         query = query,
@@ -908,7 +927,7 @@ private fun NotesListScreen(
                                 }
                             }
                             if (others.isNotEmpty()) {
-                                item(key = "recent_section") {
+                                item(key = "recent_section", contentType = "section_heading") {
                                     SectionHeader(
                                         title = stringResource(
                                             when {
@@ -926,7 +945,7 @@ private fun NotesListScreen(
                                         }
                                     )
                                 }
-                                items(others, key = { it.id }) { note ->
+                                items(others, key = { it.id }, contentType = { "note_card" }) { note ->
                                     NoteCard(
                                         note = note,
                                         query = query,
@@ -1018,7 +1037,7 @@ private fun BottomSearchPill(
                 enabled = enabled,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
+                    .defaultMinSize(minHeight = 58.dp)
                     .onFocusChanged {
                         if (it.isFocused && !focused) onSearchFocus()
                         focused = it.isFocused
@@ -1080,7 +1099,8 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
     Row(
         modifier = Modifier.fillMaxWidth()
             .padding(start = NomaSpacing.small, top = NomaSpacing.comfortable, bottom = NomaSpacing.small)
-            .testTag("noma_section_header"),
+            .testTag("noma_section_header")
+            .semantics { heading() },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)
     ) {
@@ -1149,6 +1169,7 @@ private fun NoteCard(
         if (!navigationEnabled) menuExpanded = false
     }
     val title = note.displayTitle.ifBlank { stringResource(R.string.untitled) }
+    val editedTimestamp = remember(note.updatedAt) { formatEdited(note.updatedAt) }
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
     }
@@ -1214,7 +1235,7 @@ private fun NoteCard(
                 }
                 Spacer(Modifier.height(NomaSpacing.small))
                 Text(
-                    text = formatEdited(note.updatedAt),
+                    text = editedTimestamp,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1388,6 +1409,8 @@ private fun NoteEditorScreen(
     )
     val editorScrollState = remember(note.id) { ScrollState(0) }
     val pinStateDescription = stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)
+    val titleFieldLabel = stringResource(R.string.title_hint)
+    val bodyFieldLabel = stringResource(R.string.body_accessibility_label)
 
     fun requestClose() {
         menuExpanded = false
@@ -1579,6 +1602,7 @@ private fun NoteEditorScreen(
                             .background(MaterialTheme.colorScheme.errorContainer)
                             .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
                             .testTag("noma_save_failure_guidance")
+                            .semantics { liveRegion = LiveRegionMode.Polite }
                     )
                 }
                 if (closeWhenSaved && saveState == EditorSaveState.Saving) {
@@ -1589,6 +1613,7 @@ private fun NoteEditorScreen(
                         modifier = Modifier.fillMaxWidth()
                             .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
                             .testTag("noma_pending_exit")
+                            .semantics { liveRegion = LiveRegionMode.Polite }
                     )
                 }
             }
@@ -1624,7 +1649,9 @@ private fun NoteEditorScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { bodyFocus.requestFocus() }),
                     modifier = Modifier.fillMaxWidth()
-                        .focusRequester(titleFocus).testTag("noma_title_input"),
+                        .focusRequester(titleFocus)
+                        .semantics { contentDescription = titleFieldLabel }
+                        .testTag("noma_title_input"),
                     decorationBox = { input ->
                         Box {
                             if (note.title.isEmpty()) {
@@ -1653,7 +1680,9 @@ private fun NoteEditorScreen(
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                         .defaultMinSize(minHeight = 360.dp)
-                        .focusRequester(bodyFocus).testTag("noma_body_input"),
+                        .focusRequester(bodyFocus)
+                        .semantics { contentDescription = bodyFieldLabel }
+                        .testTag("noma_body_input"),
                     decorationBox = { input ->
                         Box {
                             if (note.body.isEmpty()) {
