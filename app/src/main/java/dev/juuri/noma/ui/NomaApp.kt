@@ -1231,28 +1231,46 @@ private fun NoteActionsMenu(
         // a pin action that appears to have no visible effect.
         if (showPinAction && !note.isArchived) {
             DropdownMenuItem(
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_menu_pin"),
                 text = { Text(stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)) },
                 enabled = destructiveEnabled,
                 onClick = { onDismiss(); onPin() },
-                leadingIcon = { Icon(Icons.Outlined.PushPin, contentDescription = null) }
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.PushPin,
+                        contentDescription = null,
+                        tint = if (note.isPinned && destructiveEnabled) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = if (note.isPinned && destructiveEnabled) {
+                    { Icon(Icons.Outlined.Check, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary) }
+                } else null
             )
         }
         DropdownMenuItem(
+            modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_menu_archive"),
             text = { Text(stringResource(if (note.isArchived) R.string.unarchive_note else R.string.archive_note)) },
             enabled = destructiveEnabled,
             onClick = { onDismiss(); onArchive() },
             leadingIcon = {
                 Icon(
                     if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                    contentDescription = null
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         )
         DropdownMenuItem(
+            modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_menu_share"),
             text = { Text(stringResource(R.string.share_note)) },
             enabled = destructiveEnabled && (note.title.isNotBlank() || note.body.isNotBlank()),
             onClick = { onDismiss(); onShare() },
-            leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) }
+            leadingIcon = {
+                Icon(Icons.Outlined.Share, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         )
         // Give the destructive action its own group without a loud accent color.
         HorizontalDivider(
@@ -1260,7 +1278,8 @@ private fun NoteActionsMenu(
             color = MaterialTheme.colorScheme.outlineVariant
         )
         DropdownMenuItem(
-            modifier = Modifier.testTag("noma_delete_action"),
+            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                .testTag("noma_delete_action"),
             text = {
                 Text(
                     stringResource(R.string.delete_note),
