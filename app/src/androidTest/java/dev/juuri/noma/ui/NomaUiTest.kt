@@ -1307,6 +1307,22 @@ class NomaUiTest {
         }
     }
 
+
+    @Test fun sectionCountsUseSingularAndPluralAccessiblePhrases() {
+        val notes = listOf(
+            Note("pin1", "Pinned A", "Body", true, 1L, 2L),
+            Note("pin2", "Pinned B", "Body", true, 1L, 3L),
+            Note("normal", "Other note", "Body", false, 1L, 4L)
+        )
+        val repo = FakeRepository(notes)
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Pinned: 2 notes", useUnmergedTree = true)
+            .assertExists()
+        compose.onNodeWithContentDescription("Recent: 1 note", useUnmergedTree = true)
+            .assertExists()
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
