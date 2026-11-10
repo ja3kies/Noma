@@ -25,6 +25,7 @@ import dev.juuri.noma.capture.NomaWidgetStyle
 import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
+import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
