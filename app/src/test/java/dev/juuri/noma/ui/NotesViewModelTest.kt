@@ -34,6 +34,7 @@ class NotesViewModelTest {
     @get:Rule val dispatcher = MainDispatcherRule()
 
     private class FakeRepository(initial: Note) : NotesRepository {
+        private val originalId = initial.id
         private val state = MutableStateFlow<NotesSnapshot>(NotesSnapshot.Ready(listOf(initial)))
         override val notes: StateFlow<NotesSnapshot> = state
         var gate: CompletableDeferred<Unit>? = null
@@ -47,7 +48,7 @@ class NotesViewModelTest {
 
         override suspend fun save(note: Note) {
             saveCallCount++
-            if (note.id != initial.id) newNoteGate?.await()
+            if (note.id != originalId) newNoteGate?.await()
             gate?.await()
             if (note.id == failForId) throw IllegalStateException("Simulated editor-only failure")
             if (failNextWrites > 0) {
