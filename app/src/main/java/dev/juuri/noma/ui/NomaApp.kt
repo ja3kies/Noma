@@ -130,6 +130,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
 import dev.juuri.noma.R
 import dev.juuri.noma.capture.NomaWidgetStyle
@@ -1168,7 +1169,8 @@ private fun NoteEditorScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
         topBar = {
-            TopAppBar(
+            Column(Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy))) {
+                TopAppBar(
                 title = {
                     Text(
                         if (expanded) stringResource(R.string.editor_title) else safeTitle,
@@ -1228,7 +1230,22 @@ private fun NoteEditorScreen(
                         )
                     }
                 }
-            )
+                )
+                // A save failure must stay actionable even while the editor has
+                // scrolled and the IME is visible; never bury Retry in the document.
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 1.dp
+                ) {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.tiny)
+                            .testTag("noma_editor_save_bar")
+                    ) {
+                        EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
+                    }
+                }
+            }
         }
     ) { insets ->
         BoxWithConstraints(
@@ -1244,7 +1261,6 @@ private fun NoteEditorScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 16.dp, bottom = 64.dp)
             ) {
-                EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
                 if (saveState is EditorSaveState.Failed) {
                     Text(
                         stringResource(R.string.save_failure_guidance),
@@ -1290,9 +1306,8 @@ private fun NoteEditorScreen(
                         }
                     }
                 )
+                // The document is one continuous writing surface, not two forms.
                 Spacer(Modifier.height(24.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(Modifier.height(20.dp))
                 BasicTextField(
                     value = note.body,
                     onValueChange = {
@@ -1300,7 +1315,8 @@ private fun NoteEditorScreen(
                         viewModel.changeBody(it)
                     },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onBackground,
+                        lineHeight = 26.sp
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
