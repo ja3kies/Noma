@@ -142,4 +142,10 @@
     <string name="delete_confirm_body_named">Supprimer « %1$s » ? Vous pourrez annuler cette action pendant un instant.</string>
     <string name="share_unavailable">Aucune application compatible n’est disponible pour le partage.</string>
     <string name="creating_note">Création de la note…</string>
+    <string name="appearance_system_detail">Suit le mode clair ou sombre d’Android</string>
+    <string name="appearance_light_detail">Fond papier chaleureux et texte net</string>
+    <string name="appearance_dark_detail">Surfaces sombres pour écrire le soir</string>
+    <string name="widget_style_material_you_detail">Suit la palette de couleurs Noma</string>
+    <string name="widget_style_frosted_green_detail">Aspect vert translucide discret</string>
+    <string name="widget_style_liquid_glass_detail">Style visuel inspiré du verre</string>
 </resources>

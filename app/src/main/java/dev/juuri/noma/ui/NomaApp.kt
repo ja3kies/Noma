@@ -26,6 +26,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1728,9 +1729,13 @@ private fun AppearanceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text(stringResource(R.string.appearance)) },
         text = {
-            Column(Modifier.selectableGroup().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.selectableGroup().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+            ) {
                 val options = listOf(
                     NomaAppearance.SYSTEM to R.string.appearance_system,
                     NomaAppearance.LIGHT to R.string.appearance_light,
@@ -1738,15 +1743,35 @@ private fun AppearanceDialog(
                 )
                 options.forEach { (mode, label) ->
                     val isSelected = mode == selected
+                    val choiceColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerLow,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaThemeChoiceBackground"
+                    )
+                    val choiceOutline by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaThemeChoiceStroke"
+                    )
+                    val preview = when (mode) {
+                        NomaAppearance.SYSTEM -> Brush.horizontalGradient(
+                            listOf(Color(0xFFF9F8F5), Color(0xFF14191E))
+                        )
+                        NomaAppearance.LIGHT -> Brush.linearGradient(
+                            listOf(Color(0xFFF9F8F5), Color(0xFFDCE7F4))
+                        )
+                        NomaAppearance.DARK -> Brush.linearGradient(
+                            listOf(Color(0xFF14191E), Color(0xFF2E4865))
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .padding(vertical = NomaSpacing.tiny)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerLow,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .defaultMinSize(minHeight = 64.dp)
+                            .background(choiceColor, RoundedCornerShape(20.dp))
+                            .border(1.dp, choiceOutline, RoundedCornerShape(20.dp))
+                            .defaultMinSize(minHeight = 76.dp)
                             .selectable(
                                 selected = isSelected,
                                 role = Role.RadioButton,
@@ -1765,19 +1790,45 @@ private fun AppearanceDialog(
                             tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.width(NomaSpacing.comfortable))
-                        Text(
-                            stringResource(label),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                        Spacer(Modifier.width(NomaSpacing.medium))
+                        Box(
+                            modifier = Modifier.size(width = 58.dp, height = 38.dp)
+                                .background(preview, RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp, MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .testTag("noma_theme_preview_${mode.name}")
                         )
+                        Spacer(Modifier.width(NomaSpacing.medium))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(label),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                            )
+                            Text(
+                                stringResource(
+                                    when (mode) {
+                                        NomaAppearance.SYSTEM -> R.string.appearance_system_detail
+                                        NomaAppearance.LIGHT -> R.string.appearance_light_detail
+                                        NomaAppearance.DARK -> R.string.appearance_dark_detail
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         RadioButton(selected = isSelected, onClick = null)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.close)) }
         },
         dismissButton = {
             TextButton(onClick = onWidgetStyles) {
@@ -1800,20 +1851,33 @@ private fun WidgetStyleDialog(
     )
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text(stringResource(R.string.widget_style_settings)) },
         text = {
-            Column(Modifier.selectableGroup().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.selectableGroup().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+            ) {
                 styles.forEach { (style, label) ->
                     val isSelected = selected == style
+                    val choiceColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerLow,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaWidgetChoiceBackground"
+                    )
+                    val choiceOutline by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                        animationSpec = tween(NomaMotion.standard),
+                        label = "nomaWidgetChoiceStroke"
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .padding(vertical = NomaSpacing.tiny)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerLow,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .defaultMinSize(minHeight = 64.dp)
+                            .background(choiceColor, RoundedCornerShape(20.dp))
+                            .border(1.dp, choiceOutline, RoundedCornerShape(20.dp))
+                            .defaultMinSize(minHeight = 76.dp)
                             .selectable(
                                 selected = isSelected,
                                 role = Role.RadioButton,
@@ -1835,17 +1899,39 @@ private fun WidgetStyleDialog(
                             )
                         }
                         Box(
-                            modifier = Modifier.size(width = 60.dp, height = 36.dp)
+                            modifier = Modifier.size(width = 64.dp, height = 42.dp)
                                 .background(previewBrush, RoundedCornerShape(12.dp))
-                                .padding(2.dp)
-                                .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
-                        )
+                                .border(1.dp, choiceOutline, RoundedCornerShape(12.dp))
+                                .testTag("noma_widget_preview_${style.name}"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.EditNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = if (style == NomaWidgetStyle.LIQUID_GLASS)
+                                    Color(0xFF263944) else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         Spacer(Modifier.width(NomaSpacing.comfortable))
-                        Text(
-                            stringResource(label),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(label),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                            )
+                            Text(
+                                stringResource(
+                                    when (style) {
+                                        NomaWidgetStyle.MATERIAL_YOU -> R.string.widget_style_material_you_detail
+                                        NomaWidgetStyle.FROSTED_GREEN -> R.string.widget_style_frosted_green_detail
+                                        NomaWidgetStyle.LIQUID_GLASS -> R.string.widget_style_liquid_glass_detail
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         RadioButton(selected = isSelected, onClick = null)
                     }
                 }
@@ -1858,7 +1944,10 @@ private fun WidgetStyleDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.close)) }
         }
     )
 }
