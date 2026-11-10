@@ -1648,7 +1648,11 @@ private fun NoteEditorScreen(
                 }
             },
             confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+                ) {
                     TextButton(
                         enabled = matches > 0,
                         onClick = {
@@ -1657,7 +1661,7 @@ private fun NoteEditorScreen(
                                 NoteFindReplace.replaceFirst(note.body, findQuery, replaceWith)
                             )
                         },
-                        modifier = Modifier.testTag("noma_replace_first")
+                        modifier = Modifier.fillMaxWidth().testTag("noma_replace_first")
                             .defaultMinSize(minHeight = 48.dp)
                     ) { Text(stringResource(R.string.replace_first)) }
                     TextButton(
@@ -1668,7 +1672,7 @@ private fun NoteEditorScreen(
                                 NoteFindReplace.replaceAll(note.body, findQuery, replaceWith)
                             )
                         },
-                        modifier = Modifier.testTag("noma_replace_all")
+                        modifier = Modifier.fillMaxWidth().testTag("noma_replace_all")
                             .defaultMinSize(minHeight = 48.dp)
                     ) { Text(stringResource(R.string.replace_all)) }
                 }
