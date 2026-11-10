@@ -1,0 +1,38 @@
+feature,area,priority,original,clone,notes
+local_plain_text_notes,editor,must,yes,yes,Existing Noma note model and autosave
+offline_library,library,must,yes,yes,Existing local SQLite repository
+create_edit_delete,editor,must,yes,partial,No 30-day trash yet
+pinned_notes,library,must,yes,yes,Existing pinned sections
+sort_by_title_date,library,must,yes,yes,Existing sort choices
+search_notes,library,must,yes,yes,Existing Unicode matching
+editor_find_replace,editor,must,yes,no,First vertical slice candidate
+checkbox_lists,editor,must,yes,no,Needs structured checklist model and editing
+folder_hierarchy,organization,must,yes,no,Needs additive SQLite schema
+subfolder_colors_icons,organization,should,yes,no,Custom metadata
+note_autosave_recovery,editor,must,yes,yes,Existing write revision recovery
+recently_deleted_30_days,recovery,must,yes,no,Existing delete is immediate
+offline_backup,recovery,must,yes,partial,Existing portable backup and verification
+google_drive_backup,sync,should,yes,no,Authorization and account binding required
+cross_device_sync,sync,should,yes,no,Needs conflict-safe sync design
+app_lock,privacy,should,yes,no,Needs secure auth and encrypted storage
+note_lock,privacy,should,yes,no,Needs individual note protection
+biometric_unlock,privacy,should,yes,no,Depends on secure storage
+voice_recording,attachments,should,yes,no,Requires permission and playback
+audio_transcription,attachments,could,yes,no,Requires privacy-safe offline strategy
+photo_attachment,attachments,should,yes,no,URI persistence and media storage
+document_scanning,attachments,could,yes,no,Camera and export
+pdf_attachments,attachments,should,yes,no,Viewer and extraction
+markdown_import_export,portability,should,yes,partial,Current Noma formats need verification
+pdf_html_export,portability,should,yes,no,Preserve current export flows
+rich_text,editor,should,yes,no,Structured spans and serialization
+math_inline,editor,could,yes,no,Safe expression grammar
+note_backlinks,editor,should,yes,no,Typed internal references
+tags,organization,should,yes,no,Inline tags and search facets
+tables,editor,could,yes,no,Accessible table editing
+theme_mode,appearance,must,yes,yes,Existing system light dark
+custom_fonts,appearance,could,yes,no,Licensing and scaling concerns
+quick_note_widget,capture,should,yes,yes,Existing widget
+quick_settings_tile,capture,could,yes,no,Review Android tile integration
+share_intent_text,capture,must,yes,yes,Existing intent cycle
+rtl_localization,accessibility,should,yes,no,Requires RTL testing
+large_font_accessibility,accessibility,must,yes,partial,Existing work requires device checks
