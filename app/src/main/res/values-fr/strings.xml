@@ -148,4 +148,5 @@
     <string name="widget_style_material_you_detail">Suit la palette de couleurs Noma</string>
     <string name="widget_style_frosted_green_detail">Aspect vert translucide discret</string>
     <string name="widget_style_liquid_glass_detail">Style visuel inspiré du verre</string>
+    <string name="body_accessibility_label">Contenu de la note</string>
 </resources>
