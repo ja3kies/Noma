@@ -886,6 +886,58 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
     }
 
+
+    @Test fun clearFiltersRemainsDirectlyAboveBottomSearchWhenKeyboardOpen() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("missing note")
+        compose.waitUntil(5_000) { model.query.value == "missing note" }
+        val reset = compose.onNodeWithTag("noma_clear_filters")
+        reset.assertIsDisplayed()
+        val resetBounds = reset.fetchSemanticsNode().boundsInRoot
+        val pillBounds = compose.onNodeWithTag("noma_search_pill")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Reset action must be above the bottom pill", resetBounds.bottom <= pillBounds.top)
+        reset.performClick()
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
+    @Test fun failedSaveRetryIsPinnedAboveScrollWhileKeyboardIsOpen() {
+        val note = Note("save-bar", "Draft title", "Persisted", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Draft title").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" changed")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_editor_save_bar").assertIsDisplayed()
+        compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+        compose.runOnIdle { assertEquals("save-bar", model.active.value?.id) }
+    }
+
+    @Test fun newAppearanceChoicesRemainAccessibleAfterTheVisualRedesign() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val chosen = mutableStateOf(NomaAppearance.SYSTEM)
+        compose.setContent {
+            NomaTheme {
+                NomaApp(
+                    viewModel = model,
+                    appearance = chosen.value,
+                    onAppearanceChange = { chosen.value = it }
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithText("Follow system").assertExists()
+        compose.onNodeWithText("Light").assertExists()
+        compose.onNodeWithText("Dark").performClick()
+        compose.runOnIdle { assertEquals(NomaAppearance.DARK, chosen.value) }
+    }
+
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
         val original = Note("one", "Archived thought", "Still here", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(original))
