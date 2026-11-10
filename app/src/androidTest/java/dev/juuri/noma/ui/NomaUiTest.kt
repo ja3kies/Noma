@@ -11,6 +11,9 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -830,6 +833,57 @@ class NomaUiTest {
             assertEquals("Captured text", (repo.notes.value as NotesSnapshot.Ready).entries.single().body)
             assertEquals("Captured text", model.active.value?.body)
         }
+    }
+
+
+    @Test fun searchPillIsTheOnlySearchFieldAndDockedBelowNotes() {
+        val saved = Note("a", "Weekend notes", "Body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(saved))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onAllNodesWithTag("noma_search").assertCountEquals(1)
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val pill = compose.onNodeWithTag("noma_search_pill").fetchSemanticsNode().boundsInRoot
+        assertTrue("Search must be in the lower half", pill.center.y > root.center.y)
+        assertTrue("Search must fit screen width", pill.left >= root.left && pill.right <= root.right)
+        compose.onNodeWithText("Weekend notes").assertExists()
+    }
+
+    @Test fun bottomPillFiltersExistingNoteWithoutChangingTheEditor() {
+        val saved = Note("a", "Weekend notes", "Draft shopping list", false, 1L, 1L)
+        val repo = FakeRepository(listOf(saved))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("shopping")
+        compose.waitUntil(5_000) { model.query.value == "shopping" }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onNodeWithText("Weekend notes").assertExists()
+        compose.runOnIdle {
+            assertEquals(saved, (repo.notes.value as NotesSnapshot.Ready).entries.single())
+            assertEquals(null, model.active.value)
+        }
+    }
+
+    @Test fun bottomPillCanClearAQueryWithoutRemovingTheSearchBar() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("no matches")
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onAllNodesWithTag("noma_search").assertCountEquals(1)
+    }
+
+    @Test fun bottomSearchDisablesInputWhenLocalStorageIsUnavailable() {
+        val repo = FakeRepository(initialState = NotesSnapshot.Error("unavailable"))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onNodeWithTag("noma_search").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_new_note").assertDoesNotExist()
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
