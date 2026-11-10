@@ -435,6 +435,10 @@ fun NomaApp(
 internal fun shouldShowNomaTwoPane(windowWidth: Dp): Boolean =
     windowWidth >= 840.dp
 
+/** Avoid costly placement animations when a filtered notebook has many cards. */
+internal fun shouldAnimateNomaListItems(noteCount: Int): Boolean =
+    noteCount in 0..80
+
 internal fun nomaPaneGutter(windowWidth: Dp): Dp =
     if (windowWidth >= 1200.dp) 16.dp else 8.dp
 
@@ -982,6 +986,7 @@ private fun NotesListScreen(
                             )
                         }
                     } else {
+                        val animateListItems = shouldAnimateNomaListItems(visible.size)
                         // The partition only changes when visible note data or archive
                         // scope changes, not on every animation frame or scroll tick.
                         val (pinned, others) = remember(visible, archivedOnly) {
@@ -1026,7 +1031,8 @@ private fun NotesListScreen(
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
                                         },
-                                        modifier = Modifier.animateItem()
+                                        modifier = if (animateListItems) Modifier.animateItem()
+                                            else Modifier
                                     )
                                 }
                             }
@@ -1070,7 +1076,8 @@ private fun NotesListScreen(
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
                                         },
-                                        modifier = Modifier.animateItem()
+                                        modifier = if (animateListItems) Modifier.animateItem()
+                                            else Modifier
                                     )
                                 }
                             }
