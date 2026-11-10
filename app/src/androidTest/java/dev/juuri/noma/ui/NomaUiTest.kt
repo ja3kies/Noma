@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
@@ -937,6 +938,126 @@ class NomaUiTest {
         compose.onNodeWithText("Light").assertExists()
         compose.onNodeWithText("Dark").performClick()
         compose.runOnIdle { assertEquals(NomaAppearance.DARK, chosen.value) }
+    }
+
+
+    @Test fun searchFocusShowsSeparateCancelAndPreservesTypedQuery() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("draft")
+        compose.onNodeWithTag("noma_search_dismiss").assertIsDisplayed().performClick()
+        compose.waitUntil(5_000) { model.query.value == "draft" }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.runOnIdle { assertEquals("draft", model.query.value) }
+    }
+
+    @Test fun clearingBottomSearchKeepsFocusForAnotherQuery() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("first")
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        compose.waitUntil(5_000) { model.query.value.isEmpty() }
+        compose.onNodeWithTag("noma_search_dismiss").assertExists()
+        compose.onNodeWithTag("noma_search").performTextInput("second")
+        compose.waitUntil(5_000) { model.query.value == "second" }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
+    @Test fun activeSearchShowsOneResultsSummaryNearBottomPill() {
+        val note = Note("one", "Travel plan", "Train tickets", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("Travel")
+        compose.waitUntil(5_000) { model.query.value == "Travel" }
+        compose.onNodeWithTag("noma_search_result_count").assertIsDisplayed()
+        compose.onAllNodesWithText("1 result").assertCountEquals(1)
+        val result = compose.onNodeWithTag("noma_search_result_count")
+            .fetchSemanticsNode().boundsInRoot
+        val search = compose.onNodeWithTag("noma_search_pill")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Result summary should be adjacent to bottom search", result.bottom <= search.top)
+    }
+
+    @Test fun emptySearchHasNoResultsSummaryUntilQueryIsEntered() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search_result_count").assertDoesNotExist()
+        compose.onNodeWithTag("noma_search").performTextInput("nothing")
+        compose.waitUntil(5_000) { model.query.value == "nothing" }
+        compose.onNodeWithText("0 results").assertExists()
+        compose.onNodeWithTag("noma_search_result_count").assertIsDisplayed()
+    }
+
+    @Test fun searchHintReflectsArchivedScopeWithoutChangingTheQuery() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithText("Search archived notes").assertExists()
+        compose.onNodeWithTag("noma_archive_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_search").performTextInput("memo")
+        compose.waitUntil(5_000) { model.query.value == "memo" && model.archivedOnly.value }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
+    @Test fun pinnedScopeIsLabeledAndItsFilterRemainsDirectlyTappable() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_pinned_filter").performClick()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsSelected()
+        compose.onNodeWithText("Search pinned notes").assertExists()
+        compose.onNodeWithTag("noma_pinned_filter").performClick()
+        compose.waitUntil(5_000) { !model.pinnedOnly.value }
+        compose.onNodeWithText("Search your notes").assertExists()
+    }
+
+    @Test fun bottomQuerySurvivesChangingSortOrder() {
+        val first = Note("one", "Zebra", "Memo", false, 1L, 1L)
+        val second = Note("two", "Apple", "Memo", false, 1L, 1L)
+        val repo = FakeRepository(listOf(first, second))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("Memo")
+        compose.onNodeWithTag("noma_sort_button").performClick()
+        compose.onNodeWithText("Title (A–Z)").performClick()
+        compose.runOnIdle {
+            assertEquals("Memo", model.query.value)
+            assertEquals(2, model.visible(
+                (repo.notes.value as NotesSnapshot.Ready).entries,
+                model.query.value, false, false, model.sort.value
+            ).size)
+        }
+        compose.onNodeWithTag("noma_search_result_count").assertIsDisplayed()
+    }
+
+    @Test fun newNoteButtonRemainsAccessibleWhileSearchIsFocused() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_search").performTextInput("draft")
+        compose.onNodeWithTag("noma_new_note").assertExists()
+        compose.onNodeWithContentDescription("New note").assertExists()
+        compose.onNodeWithTag("noma_search_dismiss").assertIsDisplayed()
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
+    @Test fun filtersAndQueryCanBeResetTogetherWithoutRemovingSearch() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_pinned_filter").performClick()
+        compose.onNodeWithTag("noma_search").performTextInput("inexistent")
+        compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
+        compose.waitUntil(5_000) {
+            model.query.value.isEmpty() && !model.pinnedOnly.value && !model.archivedOnly.value
+        }
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onNodeWithTag("noma_pinned_filter").assertExists()
     }
 
     @Test fun archiveFilterShowsArchivedNotesWithoutChangingTheirData() {
