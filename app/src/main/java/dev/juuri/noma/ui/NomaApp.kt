@@ -749,7 +749,8 @@ private fun NotesListScreen(
                                         onMenuOpen = {
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
-                                        }
+                                        },
+                                        modifier = Modifier.animateItem()
                                     )
                                 }
                             }
@@ -785,7 +786,8 @@ private fun NotesListScreen(
                                         onMenuOpen = {
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
-                                        }
+                                        },
+                                        modifier = Modifier.animateItem()
                                     )
                                 }
                             }
@@ -910,7 +912,8 @@ private fun NoteCard(
     onShare: () -> Unit,
     actionsEnabled: Boolean,
     navigationEnabled: Boolean,
-    onMenuOpen: () -> Unit
+    onMenuOpen: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
     LaunchedEffect(navigationEnabled) {
@@ -920,22 +923,26 @@ private fun NoteCard(
     val relevantPreview = remember(note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
     }
-    val cardColor = if (selected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surface
+    val cardColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh
+        else MaterialTheme.colorScheme.surfaceContainerLow
     Card(
         onClick = onOpen,
         enabled = navigationEnabled,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
             .testTag("noma_note_${note.id}")
             .semantics { this.selected = selected }
-            .animateContentSize(tween(NomaMotion.quick)),
-        shape = MaterialTheme.shapes.large,
+            .animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy)),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 0.dp else 1.dp),
-        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+        border = if (selected) BorderStroke(
+            1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+        ) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 18.dp, top = 15.dp, end = 6.dp, bottom = 15.dp),
+            modifier = Modifier.fillMaxWidth()
+                .defaultMinSize(minHeight = 88.dp)
+                .padding(start = 20.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
