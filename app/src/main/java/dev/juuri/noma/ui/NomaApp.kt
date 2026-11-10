@@ -9,6 +9,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
@@ -1297,6 +1299,12 @@ private fun NoteEditorScreen(
     val titleFocus = remember(note.id) { FocusRequester() }
     val bodyFocus = remember(note.id) { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val saveBarColor by animateColorAsState(
+        targetValue = if (saveState is EditorSaveState.Failed) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(NomaMotion.standard),
+        label = "nomaEditorSaveStatusSurface"
+    )
     val editorScrollState = remember(note.id) { ScrollState(0) }
     val pinStateDescription = stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)
 
@@ -1465,7 +1473,7 @@ private fun NoteEditorScreen(
                 // A save failure must stay actionable even while the editor has
                 // scrolled and the IME is visible; never bury Retry in the document.
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = saveBarColor,
                     tonalElevation = 1.dp
                 ) {
                     Box(
@@ -1475,6 +1483,31 @@ private fun NoteEditorScreen(
                     ) {
                         EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
                     }
+                }
+                AnimatedVisibility(
+                    visible = saveState is EditorSaveState.Failed,
+                    enter = fadeIn(tween(NomaMotion.quick)) + expandVertically(),
+                    exit = fadeOut(tween(NomaMotion.quick)) + shrinkVertically()
+                ) {
+                    Text(
+                        stringResource(R.string.save_failure_guidance),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
+                            .testTag("noma_save_failure_guidance")
+                    )
+                }
+                if (closeWhenSaved && saveState == EditorSaveState.Saving) {
+                    Text(
+                        stringResource(R.string.wait_for_save_before_exit),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
+                            .testTag("noma_pending_exit")
+                    )
                 }
             }
         }
@@ -1493,23 +1526,7 @@ private fun NoteEditorScreen(
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page,
                         top = NomaSpacing.comfortable, bottom = 80.dp)
             ) {
-                if (saveState is EditorSaveState.Failed) {
-                    Text(
-                        stringResource(R.string.save_failure_guidance),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("noma_save_failure_guidance")
-                    )
-                }
-                if (closeWhenSaved && saveState == EditorSaveState.Saving) {
-                    Text(
-                        stringResource(R.string.wait_for_save_before_exit),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag("noma_pending_exit")
-                    )
-                }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(NomaSpacing.section))
                 BasicTextField(
                     value = note.title,
                     onValueChange = {
