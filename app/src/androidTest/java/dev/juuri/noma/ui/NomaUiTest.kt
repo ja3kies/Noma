@@ -20,6 +20,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -31,6 +32,7 @@ import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
+import dev.juuri.noma.ui.theme.NomaAccent
 import dev.juuri.noma.ui.theme.NomaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -962,6 +964,25 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_editor_save_bar").assertIsDisplayed()
         compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
         compose.runOnIdle { assertEquals("save-bar", model.active.value?.id) }
+    }
+
+    @Test fun rebornAccentPickerUpdatesActualThemeSelection() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val chosen = mutableStateOf(NomaAccent.FOREST)
+        compose.setContent {
+            NomaTheme(accent = chosen.value) {
+                NomaApp(
+                    viewModel = model,
+                    accent = chosen.value,
+                    onAccentChange = { chosen.value = it }
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(NomaAccent.SAGE, chosen.value) }
+        compose.onNodeWithTag("noma_accent_SAGE").assertIsSelected()
     }
 
     @Test fun newAppearanceChoicesRemainAccessibleAfterTheVisualRedesign() {
