@@ -163,4 +163,5 @@
     <string name="library_subtitle">A quiet space for your ideas</string>
     <string name="all_notes_filter">All notes</string>
     <string name="note_preview_label">Note preview</string>
+    <string name="last_edited_at">Edited %1$s</string>
 </resources>
