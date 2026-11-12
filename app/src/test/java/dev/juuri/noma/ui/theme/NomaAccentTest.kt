@@ -35,6 +35,24 @@ class NomaAccentTest {
         }
     }
 
+    @Test fun semanticSurfacesRemainReadableForEveryThemeAndAccent() {
+        NomaAccent.entries.forEach { accent ->
+            listOf(false, true).forEach { dark ->
+                val colors = nomaColorScheme(dark, accent)
+                listOf(
+                    colors.onBackground to colors.background,
+                    colors.onSurface to colors.surfaceContainerLow,
+                    colors.onSurfaceVariant to colors.surfaceContainerHighest,
+                    colors.onPrimaryContainer to colors.primaryContainer,
+                    colors.onSecondaryContainer to colors.secondaryContainer
+                ).forEach { (ink, paper) ->
+                    assertTrue("$accent dark=$dark contrast", contrast(ink, paper) >= 4.5)
+                }
+                assertEquals(colors.primary, colors.surfaceTint)
+            }
+        }
+    }
+
     private fun contrast(first: Color, second: Color): Double {
         val a = luminance(first)
         val b = luminance(second)

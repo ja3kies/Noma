@@ -2,6 +2,8 @@ package dev.juuri.noma.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -55,9 +57,10 @@ object NomaSpacing {
     val medium = 12.dp
     val comfortable = 16.dp
     val section = 24.dp
-    val page = 24.dp
+    val page = 16.dp
     val listPaneWidth = 400.dp
-    val editorMaxWidth = 760.dp
+    val editorMaxWidth = 700.dp
+    val touchTarget = 48.dp
 }
 
 object NomaMotion {
@@ -185,31 +188,39 @@ fun isNomaDark(appearance: NomaAppearance): Boolean {
     }
 }
 
+/** Shared by the live application and appearance previews. */
+internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent): ColorScheme {
+    val base = if (dark) DarkColors else LightColors
+    val primary = if (dark) accent.darkPrimary else accent.lightPrimary
+    val container = if (dark) accent.darkContainer else accent.lightContainer
+    val ink = if (dark) Color(0xFFE5EFE6) else Color(0xFF193622)
+    return base.copy(
+        primary = primary,
+        onPrimary = if (dark) Color(0xFF17271C) else Color.White,
+        primaryContainer = container,
+        onPrimaryContainer = ink,
+        secondary = primary,
+        onSecondary = if (dark) Color(0xFF17271C) else Color.White,
+        secondaryContainer = container,
+        onSecondaryContainer = ink,
+        surfaceTint = primary,
+        inversePrimary = if (dark) accent.lightPrimary else accent.darkPrimary,
+        background = lerp(base.background, container, 0.08f),
+        surfaceContainerLow = lerp(base.surfaceContainerLow, container, 0.08f),
+        surfaceContainer = lerp(base.surfaceContainer, container, 0.12f),
+        surfaceContainerHigh = lerp(base.surfaceContainerHigh, container, 0.16f),
+        surfaceContainerHighest = lerp(base.surfaceContainerHighest, container, 0.20f)
+    )
+}
+
 @Composable
 fun NomaTheme(
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
     accent: NomaAccent = NomaAccent.FOREST,
     content: @Composable () -> Unit
 ) {
-    val dark = isNomaDark(appearance)
-    val base = if (dark) DarkColors else LightColors
-    val colors = if (dark) {
-        base.copy(
-            primary = accent.darkPrimary,
-            onPrimary = Color(0xFF17271C),
-            primaryContainer = accent.darkContainer,
-            onPrimaryContainer = Color(0xFFE5EFE6)
-        )
-    } else {
-        base.copy(
-            primary = accent.lightPrimary,
-            onPrimary = Color.White,
-            primaryContainer = accent.lightContainer,
-            onPrimaryContainer = Color(0xFF193622)
-        )
-    }
     MaterialTheme(
-        colorScheme = colors,
+        colorScheme = nomaColorScheme(isNomaDark(appearance), accent),
         typography = NomaTypography,
         shapes = NomaShapes,
         content = content

@@ -362,7 +362,7 @@ fun NomaApp(
                 val cornerRadius = nomaPaneCornerRadius(maxWidth)
                 val listWidth by animateDpAsState(
                     targetValue = responsiveListPaneWidth(maxWidth),
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
+                    animationSpec = tween(NomaMotion.quick),
                     label = "nomaResponsiveListPaneWidth"
                 )
                 Row(
@@ -593,7 +593,7 @@ private fun NotesListScreen(
                     .imePadding()
                     .navigationBarsPadding()
                     .animateContentSize(
-                        spring(dampingRatio = Spring.DampingRatioNoBouncy)
+                        tween(NomaMotion.quick)
                     )
                     .padding(horizontal = NomaSpacing.comfortable, vertical = NomaSpacing.small),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -773,7 +773,7 @@ private fun NotesListScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(
                         modifier = Modifier.weight(1f).animateContentSize(
-                            spring(dampingRatio = Spring.DampingRatioNoBouncy)
+                            tween(NomaMotion.quick)
                         )
                     ) {
                         Text(
@@ -804,7 +804,7 @@ private fun NotesListScreen(
                             searchKeyboard?.hide()
                             showAppearance = true
                         },
-                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                     ) {
                         Icon(Icons.Outlined.Palette, contentDescription = stringResource(R.string.appearance))
                     }
@@ -902,7 +902,7 @@ private fun NotesListScreen(
                             },
                             enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                                 .background(sortButtonBackground, CircleShape)
                                 .testTag("noma_sort_button")
                                 .semantics { stateDescription = currentSortLabel }
@@ -1169,10 +1169,7 @@ private fun BottomSearchPill(
     var focused by remember { mutableStateOf(false) }
     val elevation by animateDpAsState(
         targetValue = if (focused) 6.dp else 2.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = tween(NomaMotion.quick),
         label = "nomaBottomSearchElevation"
     )
     val pillColor by animateColorAsState(
@@ -1188,7 +1185,7 @@ private fun BottomSearchPill(
     )
     Row(
         modifier = modifier.fillMaxWidth().animateContentSize(
-            spring(dampingRatio = Spring.DampingRatioNoBouncy)
+            tween(NomaMotion.quick)
         ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1475,7 +1472,7 @@ private fun NoteCard(
                         }
                     },
                     enabled = navigationEnabled,
-                    modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                         .testTag("noma_note_actions_${note.id}")
                 ) {
                     Icon(
@@ -1783,7 +1780,7 @@ private fun NoteEditorScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
         topBar = {
-            Column(Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioNoBouncy))) {
+            Column(Modifier.animateContentSize(tween(NomaMotion.quick))) {
                 TopAppBar(
                     title = {
                         Text(
@@ -1796,7 +1793,7 @@ private fun NoteEditorScreen(
                     navigationIcon = {
                         IconButton(
                             onClick = ::requestClose,
-                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                                 .testTag("noma_editor_back")
                         ) {
                             Icon(
@@ -1812,7 +1809,7 @@ private fun NoteEditorScreen(
                                 menuExpanded = false
                                 findReplaceOpen = true
                             },
-                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                                 .testTag("noma_editor_find_replace")
                         ) {
                             Icon(
@@ -1826,7 +1823,7 @@ private fun NoteEditorScreen(
                         IconButton(
                             onClick = { viewModel.togglePin(note) },
                             enabled = saveState == EditorSaveState.Saved && !note.isArchived,
-                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                                 .semantics { stateDescription = pinStateDescription }
                                 .testTag("noma_editor_pin")
                         ) {
@@ -1842,7 +1839,7 @@ private fun NoteEditorScreen(
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
-                                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
                                     .testTag("noma_editor_actions")
                             ) {
                                 Icon(
