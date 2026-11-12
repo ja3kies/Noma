@@ -90,6 +90,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -558,6 +559,13 @@ private fun NotesListScreen(
         label = "nomaSortButtonSurface"
     )
     val currentSortLabel = stringResource(if (sort == NoteSort.RECENT) R.string.sort_recent else R.string.sort_title)
+    val chipColors = FilterChipDefaults.filterChipColors(
+        containerColor = MaterialTheme.colorScheme.surface,
+        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+    )
     Scaffold(
         modifier = modifier,
         containerColor = if (isTabletList) MaterialTheme.colorScheme.surfaceContainerLow
@@ -820,27 +828,9 @@ private fun NotesListScreen(
                             enabled = snapshot is NotesSnapshot.Ready,
                             modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                                 .testTag("noma_all_filter"),
-                            label = { Text(stringResource(R.string.all_notes_filter)) }
-                        )
-                        FilterChip(
-                            selected = archivedOnly,
-                            onClick = {
-                                focusManager.clearFocus()
-                                searchKeyboard?.hide()
-                                sortMenuExpanded = false
-                                viewModel.toggleArchiveView()
-                            },
-                            enabled = snapshot is NotesSnapshot.Ready,
-                            modifier = Modifier.testTag("noma_archive_filter")
-                                .defaultMinSize(minHeight = 48.dp),
-                            label = { Text(stringResource(R.string.archive_view)) },
-                            leadingIcon = {
-                                Icon(
-                                    if (archivedOnly) Icons.Outlined.Check else Icons.Outlined.Archive,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            label = { Text(stringResource(R.string.all_notes_filter)) },
+                            shape = CircleShape,
+                            colors = chipColors
                         )
                         if (!archivedOnly) {
                             FilterChip(
@@ -855,6 +845,8 @@ private fun NotesListScreen(
                                 modifier = Modifier.testTag("noma_pinned_filter")
                                     .defaultMinSize(minHeight = 48.dp),
                                 label = { Text(stringResource(R.string.pinned_filter)) },
+                                shape = CircleShape,
+                                colors = chipColors,
                                 leadingIcon = {
                                     Icon(
                                         if (pinnedOnly) Icons.Outlined.Check else Icons.Outlined.PushPin,
@@ -864,6 +856,28 @@ private fun NotesListScreen(
                                 }
                             )
                         }
+                        FilterChip(
+                            selected = archivedOnly,
+                            onClick = {
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                                sortMenuExpanded = false
+                                viewModel.toggleArchiveView()
+                            },
+                            enabled = snapshot is NotesSnapshot.Ready,
+                            modifier = Modifier.testTag("noma_archive_filter")
+                                .defaultMinSize(minHeight = 48.dp),
+                            label = { Text(stringResource(R.string.archive_view)) },
+                            shape = CircleShape,
+                            colors = chipColors,
+                            leadingIcon = {
+                                Icon(
+                                    if (archivedOnly) Icons.Outlined.Check else Icons.Outlined.Archive,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        )
                     }
                     Box {
                         IconButton(
