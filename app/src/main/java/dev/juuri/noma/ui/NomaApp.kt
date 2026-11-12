@@ -1332,11 +1332,9 @@ private fun NomaNoteGlyph(note: Note) {
         note.isPinned -> MaterialTheme.colorScheme.primaryContainer
         else -> MaterialTheme.colorScheme.secondaryContainer
     }
-    val glyph = when {
-        note.isArchived -> Icons.Outlined.Archive
-        note.isPinned -> Icons.Outlined.PushPin
-        else -> Icons.Outlined.EditNote
-    }
+    // Pinning is indicated by the existing trailing badge; keep the leading
+    // glyph focused on note type to avoid showing two pushpin icons.
+    val glyph = if (note.isArchived) Icons.Outlined.Archive else Icons.Outlined.EditNote
     Surface(
         modifier = Modifier.size(44.dp).testTag("noma_note_glyph"),
         shape = RoundedCornerShape(14.dp),
