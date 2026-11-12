@@ -81,6 +81,25 @@ class NomaUiTest {
         override suspend fun refresh() = Unit
     }
 
+    @Test fun compactLibraryKeepsEveryFilterVisibleWithLargeText() {
+        val repo = FakeRepository(listOf(Note("one", "A note", "Short", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, 1.5f)
+            ) {
+                NomaTheme { NomaApp(model) }
+            }
+        }
+        compose.onNodeWithTag("noma_all_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_archive_filter").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("noma_archive_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
     @Test fun backupCheckRemainsAvailableAfterLocalStorageFailure() {
         compose.setContent {
             NomaTheme {

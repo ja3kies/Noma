@@ -6,7 +6,7 @@
     <string name="search_archived_hint">Search archived notes</string>
     <string name="search_pinned_hint">Search pinned notes</string>
     <string name="clear_search">Clear search</string>
-    <string name="pinned_filter">Pinned only</string>
+    <string name="pinned_filter">Pinned</string>
     <string name="note_total">%1$d notes</string>
     <string name="loading_notes">Opening your notes…</string>
     <string name="unavailable">Your notes couldn’t be opened</string>

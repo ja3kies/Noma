@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -768,7 +769,7 @@ private fun NotesListScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = 20.dp, bottom = 12.dp)
+                    .padding(start = NomaSpacing.page, end = NomaSpacing.page, top = NomaSpacing.small, bottom = NomaSpacing.tiny)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(
@@ -786,7 +787,7 @@ private fun NotesListScreen(
                             modifier = Modifier.semantics { heading() }
                         )
                         AnimatedVisibility(
-                            visible = !isDeepInList,
+                            visible = !isDeepInList && !imeVisible,
                             enter = fadeIn(tween(NomaMotion.standard)) + expandVertically(),
                             exit = fadeOut(tween(NomaMotion.standard)) + shrinkVertically()
                         ) {
@@ -819,12 +820,11 @@ private fun NotesListScreen(
                     )
                 }
                 Spacer(Modifier.height(NomaSpacing.medium))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Row(
-                        modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)
-                    ) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth().selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(NomaSpacing.tiny),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
                         FilterChip(
                             selected = !archivedOnly && !pinnedOnly,
                             onClick = {
@@ -858,14 +858,7 @@ private fun NotesListScreen(
                                     .defaultMinSize(minHeight = 48.dp),
                                 label = { Text(stringResource(R.string.pinned_filter)) },
                                 shape = CircleShape,
-                                colors = chipColors,
-                                leadingIcon = {
-                                    Icon(
-                                        if (pinnedOnly) Icons.Outlined.Check else Icons.Outlined.PushPin,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                                colors = chipColors
                             )
                         }
                         FilterChip(
@@ -881,16 +874,8 @@ private fun NotesListScreen(
                                 .defaultMinSize(minHeight = 48.dp),
                             label = { Text(stringResource(R.string.archive_view)) },
                             shape = CircleShape,
-                            colors = chipColors,
-                            leadingIcon = {
-                                Icon(
-                                    if (archivedOnly) Icons.Outlined.Check else Icons.Outlined.Archive,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            colors = chipColors
                         )
-                    }
                     Box {
                         IconButton(
                             onClick = {
@@ -1057,9 +1042,9 @@ private fun NotesListScreen(
                             contentPadding = PaddingValues(
                                 start = NomaSpacing.comfortable,
                                 end = NomaSpacing.comfortable,
-                                bottom = 96.dp
+                                bottom = NomaSpacing.comfortable
                             ),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)
                         ) {
                             if (pinned.isNotEmpty()) {
                                 item(key = "pinned_section", contentType = "section_heading") {
@@ -1268,7 +1253,7 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
     )
     Row(
         modifier = Modifier.fillMaxWidth()
-            .padding(start = NomaSpacing.small, top = NomaSpacing.comfortable, bottom = NomaSpacing.small)
+            .padding(start = NomaSpacing.tiny, top = NomaSpacing.small, bottom = NomaSpacing.tiny)
             .testTag("noma_section_header")
             .semantics { heading() },
         verticalAlignment = Alignment.CenterVertically,
@@ -1319,37 +1304,6 @@ private fun highlightMatches(value: String, query: String): androidx.compose.ui.
     }
 }
 
-/**
- * Recognizable preview tile used by every note card. Text-only notes never
- * pretend to have a photo attachment; the icon is decorative to TalkBack.
- */
-@Composable
-private fun NomaNoteGlyph(note: Note) {
-    val color = when {
-        note.isArchived -> MaterialTheme.colorScheme.surfaceContainerHigh
-        note.isPinned -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.secondaryContainer
-    }
-    // Pinning is indicated by the existing trailing badge; keep the leading
-    // glyph focused on note type to avoid showing two pushpin icons.
-    val glyph = if (note.isArchived) Icons.Outlined.Archive else Icons.Outlined.EditNote
-    Surface(
-        modifier = Modifier.size(44.dp).testTag("noma_note_glyph"),
-        shape = RoundedCornerShape(14.dp),
-        color = color
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = glyph,
-                contentDescription = null,
-                modifier = Modifier.size(21.dp),
-                tint = if (note.isPinned) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
-    }
-}
-
 @Composable
 private fun NoteCard(
     note: Note,
@@ -1392,8 +1346,8 @@ private fun NoteCard(
         animationSpec = tween(NomaMotion.standard),
         label = "nomaCardSelectionBorder"
     )
-    val cornerRadius = if (selected) 24.dp else 20.dp
-    val cardElevation = if (selected) 0.dp else 1.dp
+    val cornerRadius = 16.dp
+    val cardElevation = 0.dp
     Card(
         onClick = onOpen,
         enabled = navigationEnabled,
@@ -1403,20 +1357,18 @@ private fun NoteCard(
         shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-        border = BorderStroke(if (selected) 1.5.dp else 1.dp, borderColor)
+        border = if (selected) BorderStroke(1.dp, borderColor) else null
     ) {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .defaultMinSize(minHeight = 100.dp)
-                .padding(start = NomaSpacing.medium, top = 14.dp, end = NomaSpacing.tiny, bottom = 14.dp),
+                .defaultMinSize(minHeight = 72.dp)
+                .padding(start = NomaSpacing.comfortable, top = NomaSpacing.small, end = NomaSpacing.tiny, bottom = NomaSpacing.small),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NomaNoteGlyph(note)
-            Spacer(Modifier.width(NomaSpacing.medium))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = highlightMatches(title, query),
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -1427,13 +1379,13 @@ private fun NoteCard(
                     Spacer(Modifier.height(NomaSpacing.tiny))
                     Text(
                         text = highlightMatches(relevantPreview, query),
-                        maxLines = 2,
+                        maxLines = if (query.isBlank()) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(Modifier.height(NomaSpacing.small))
+                Spacer(Modifier.height(NomaSpacing.tiny))
                 Text(
                     text = editedTimestamp,
                     style = MaterialTheme.typography.labelSmall,
