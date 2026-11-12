@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -67,6 +68,8 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.KeyboardHide
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -148,6 +151,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -1550,6 +1556,11 @@ private fun NoteEditorScreen(
     var findQuery by rememberSaveable(note.id) { mutableStateOf("") }
     var replaceWith by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
+    var bodyValue by rememberSaveable(note.id, stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(note.body))
+    }
+    // External replacements use the same document; keep the caret clamped to it.
+    val currentBody = if (bodyValue.text == note.body) bodyValue else bodyValue.copy(text = note.body)
     val context = LocalContext.current
     val titleFocus = remember(note.id) { FocusRequester() }
     val bodyFocus = remember(note.id) { FocusRequester() }
@@ -1731,6 +1742,67 @@ private fun NoteEditorScreen(
             else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
+        bottomBar = {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().imePadding().navigationBarsPadding()
+                        .padding(horizontal = NomaSpacing.small)
+                        .testTag("noma_editor_toolbar"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                        IconButton(
+                            onClick = {
+                                menuExpanded = false
+                                findReplaceOpen = true
+                            },
+                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
+                                .testTag("noma_editor_find_replace")
+                        ) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = stringResource(R.string.find_replace)
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.togglePin(note) },
+                            enabled = saveState == EditorSaveState.Saved && !note.isArchived,
+                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
+                                .semantics { stateDescription = pinStateDescription }
+                                .testTag("noma_editor_pin")
+                        ) {
+                            Icon(
+                                Icons.Outlined.PushPin,
+                                contentDescription = stringResource(
+                                    if (note.isPinned) R.string.unpin_note else R.string.pin_note
+                                ),
+                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    IconButton(
+                        onClick = {
+                            val edit = toggleBulletLine(currentBody)
+                            bodyValue = edit
+                            closeWhenSaved = false
+                            viewModel.changeBody(edit.text)
+                            bodyFocus.requestFocus()
+                        },
+                        modifier = Modifier.testTag("noma_editor_bullet")
+                    ) {
+                        Icon(Icons.AutoMirrored.Outlined.FormatListBulleted,
+                            contentDescription = stringResource(R.string.toggle_bullet))
+                    }
+                    if (keyboardVisible) {
+                        IconButton(onClick = { keyboard?.hide() },
+                            modifier = Modifier.testTag("noma_editor_hide_keyboard")) {
+                            Icon(Icons.Outlined.KeyboardHide,
+                                contentDescription = stringResource(R.string.hide_keyboard))
+                        }
+                    }
+                }
+            }
+        },
         topBar = {
             Column(Modifier.animateContentSize(tween(NomaMotion.quick))) {
                 TopAppBar(
@@ -1756,38 +1828,9 @@ private fun NoteEditorScreen(
                     },
                     actions = {
                         val portableScope = rememberCoroutineScope()
-                        IconButton(
-                            onClick = {
-                                menuExpanded = false
-                                findReplaceOpen = true
-                            },
-                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
-                                .testTag("noma_editor_find_replace")
-                        ) {
-                            Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = stringResource(R.string.find_replace)
-                            )
-                        }
                         PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
                             portableScope.launch { snackbar.showSnackbar(message) }
                         })
-                        IconButton(
-                            onClick = { viewModel.togglePin(note) },
-                            enabled = saveState == EditorSaveState.Saved && !note.isArchived,
-                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
-                                .semantics { stateDescription = pinStateDescription }
-                                .testTag("noma_editor_pin")
-                        ) {
-                            Icon(
-                                Icons.Outlined.PushPin,
-                                contentDescription = stringResource(
-                                    if (note.isPinned) R.string.unpin_note else R.string.pin_note
-                                ),
-                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
@@ -1815,7 +1858,7 @@ private fun NoteEditorScreen(
                 )
                 // A save failure must stay actionable even while the editor has
                 // scrolled and the IME is visible; never bury Retry in the document.
-                Surface(
+                if (saveState != EditorSaveState.Saved) Surface(
                     color = saveBarColor,
                     tonalElevation = 1.dp
                 ) {
@@ -1858,20 +1901,21 @@ private fun NoteEditorScreen(
         }
     ) { insets ->
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(insets).imePadding(),
+            modifier = Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets),
             contentAlignment = Alignment.TopCenter
         ) {
-            val maxReadingWidth = 700.dp
+            val maxReadingWidth = NomaSpacing.editorMaxWidth
             val width = if (maxWidth > maxReadingWidth) maxReadingWidth else maxWidth
+            val writingHeight = (maxHeight - 160.dp).coerceAtLeast(48.dp)
             Column(
                 modifier = Modifier
                     .width(width)
                     .fillMaxHeight()
                     .verticalScroll(editorScrollState)
                     .padding(start = NomaSpacing.page, end = NomaSpacing.page,
-                        top = NomaSpacing.comfortable, bottom = 80.dp)
+                        top = NomaSpacing.small, bottom = NomaSpacing.section)
             ) {
-                Spacer(Modifier.height(NomaSpacing.section))
+                Spacer(Modifier.height(NomaSpacing.small))
                 BasicTextField(
                     value = note.title,
                     onValueChange = {
@@ -1884,7 +1928,8 @@ private fun NoteEditorScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { bodyFocus.requestFocus() }),
                     modifier = Modifier.fillMaxWidth()
                         .focusRequester(titleFocus)
@@ -1905,7 +1950,7 @@ private fun NoteEditorScreen(
                 )
                 // Preserve a continuous writing surface. Metadata is read-only
                 // and never participates in the editable or exported note text.
-                if (note.title.isNotBlank() || note.body.isNotBlank()) {
+                if (!keyboardVisible && (note.title.isNotBlank() || note.body.isNotBlank())) {
                     Spacer(Modifier.height(NomaSpacing.small))
                     Text(
                         text = stringResource(
@@ -1919,18 +1964,22 @@ private fun NoteEditorScreen(
                 }
                 Spacer(Modifier.height(NomaSpacing.section))
                 BasicTextField(
-                    value = note.body,
+                    value = currentBody,
                     onValueChange = {
-                        closeWhenSaved = false
-                        viewModel.changeBody(it)
+                        bodyValue = it
+                        if (it.text != note.body) {
+                            closeWhenSaved = false
+                            viewModel.changeBody(it.text)
+                        }
                     },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 27.sp
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
-                        .defaultMinSize(minHeight = 360.dp)
+                        .defaultMinSize(minHeight = writingHeight)
                         .focusRequester(bodyFocus)
                         .semantics { contentDescription = bodyFieldLabel }
                         .testTag("noma_body_input"),

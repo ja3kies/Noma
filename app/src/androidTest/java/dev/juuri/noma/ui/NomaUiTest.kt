@@ -100,6 +100,23 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
     }
 
+    @Test fun editorBulletToolUsesAutosaveAndCanBeReversed() {
+        val repo = FakeRepository(listOf(Note("list", "Groceries", "Bread", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Groceries").performClick()
+        compose.onNodeWithTag("noma_editor_save_bar").assertDoesNotExist()
+        compose.onNodeWithTag("noma_editor_toolbar").assertIsDisplayed()
+        compose.onNodeWithTag("noma_editor_bullet").performClick()
+        compose.waitUntil(5_000) {
+            (repo.notes.value as NotesSnapshot.Ready).entries.single().body == "- Bread"
+        }
+        compose.onNodeWithTag("noma_editor_bullet").performClick()
+        compose.waitUntil(5_000) {
+            (repo.notes.value as NotesSnapshot.Ready).entries.single().body == "Bread"
+        }
+    }
+
     @Test fun backupCheckRemainsAvailableAfterLocalStorageFailure() {
         compose.setContent {
             NomaTheme {
