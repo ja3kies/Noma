@@ -744,7 +744,8 @@ private fun NotesListScreen(
                         )
                     ) {
                         Text(
-                            stringResource(R.string.app_name),
+                            if (archivedOnly) stringResource(R.string.archived_section)
+                            else stringResource(R.string.library_title),
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                             maxLines = 1,
@@ -757,7 +758,7 @@ private fun NotesListScreen(
                             exit = fadeOut(tween(NomaMotion.standard)) + shrinkVertically()
                         ) {
                             Text(
-                                stringResource(R.string.tagline),
+                                stringResource(R.string.library_subtitle),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -791,6 +792,23 @@ private fun NotesListScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)
                     ) {
+                        FilterChip(
+                            selected = !archivedOnly && !pinnedOnly,
+                            onClick = {
+                                focusManager.clearFocus()
+                                searchKeyboard?.hide()
+                                sortMenuExpanded = false
+                                // Restore the main library while preserving the typed query.
+                                when {
+                                    archivedOnly -> viewModel.toggleArchiveView()
+                                    pinnedOnly -> viewModel.togglePinnedOnly()
+                                }
+                            },
+                            enabled = snapshot is NotesSnapshot.Ready,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                .testTag("noma_all_filter"),
+                            label = { Text(stringResource(R.string.all_notes_filter)) }
+                        )
                         FilterChip(
                             selected = archivedOnly,
                             onClick = {
@@ -1266,6 +1284,39 @@ private fun highlightMatches(value: String, query: String): androidx.compose.ui.
     }
 }
 
+/**
+ * Recognizable preview tile used by every note card. Text-only notes never
+ * pretend to have a photo attachment; the icon is decorative to TalkBack.
+ */
+@Composable
+private fun NomaNoteGlyph(note: Note) {
+    val color = when {
+        note.isArchived -> MaterialTheme.colorScheme.surfaceContainerHigh
+        note.isPinned -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.secondaryContainer
+    }
+    val glyph = when {
+        note.isArchived -> Icons.Outlined.Archive
+        note.isPinned -> Icons.Outlined.PushPin
+        else -> Icons.Outlined.EditNote
+    }
+    Surface(
+        modifier = Modifier.size(44.dp).testTag("noma_note_glyph"),
+        shape = RoundedCornerShape(14.dp),
+        color = color
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = glyph,
+                contentDescription = null,
+                modifier = Modifier.size(21.dp),
+                tint = if (note.isPinned) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+    }
+}
+
 @Composable
 private fun NoteCard(
     note: Note,
@@ -1298,7 +1349,7 @@ private fun NoteCard(
     }
     val cardColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow,
+            else MaterialTheme.colorScheme.surface,
         animationSpec = tween(NomaMotion.standard),
         label = "nomaCardSelectedSurface"
     )
@@ -1308,7 +1359,7 @@ private fun NoteCard(
         animationSpec = tween(NomaMotion.standard),
         label = "nomaCardSelectionBorder"
     )
-    val cornerRadius = if (selected) 28.dp else 22.dp
+    val cornerRadius = if (selected) 24.dp else 20.dp
     val cardElevation = if (selected) 0.dp else 1.dp
     Card(
         onClick = onOpen,
@@ -1323,17 +1374,19 @@ private fun NoteCard(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .defaultMinSize(minHeight = 96.dp)
-                .padding(start = 20.dp, top = 18.dp, end = 8.dp, bottom = 18.dp),
+                .defaultMinSize(minHeight = 100.dp)
+                .padding(start = NomaSpacing.medium, top = 14.dp, end = NomaSpacing.tiny, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            NomaNoteGlyph(note)
+            Spacer(Modifier.width(NomaSpacing.medium))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = highlightMatches(title, query),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (relevantPreview.isNotEmpty() &&
