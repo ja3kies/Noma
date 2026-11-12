@@ -88,7 +88,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -662,72 +662,85 @@ private fun NotesListScreen(
                             .testTag("noma_search_result_count")
                     )
                 }
-                BottomSearchPill(
-                    query = query,
-                    onQueryChange = viewModel::onQueryChange,
-                    enabled = snapshot is NotesSnapshot.Ready,
-                    accessibilityLabel = searchAccessibilityLabel,
-                    hint = contextualSearchHint,
-                    onSearchFocus = {
-                        sortMenuExpanded = false
-                        showAppearance = false
-                        showWidgetStyles = false
-                    },
-                    onSearchDone = {
-                        focusManager.clearFocus()
-                        searchKeyboard?.hide()
-                    },
-                    onDismiss = {
-                        focusManager.clearFocus()
-                        searchKeyboard?.hide()
-                    },
-                    // Clearing keeps the search field focused so another query
-                    // can be typed without dismissing and reopening the IME.
-                    onClear = {
-                        sortMenuExpanded = false
-                        viewModel.onQueryChange("")
-                    },
-                    modifier = Modifier.widthIn(max = 600.dp)
-                )
-            }
-        },
-        floatingActionButton = {
-            // Offer the same creation action in empty, filtered and populated libraries.
-            // Keep it hidden while storage is loading or unavailable.
-            if (snapshot is NotesSnapshot.Ready) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        if (!creatingOrCapturing) {
+                // One thumb-reachable row: search and capture share the same dock.
+                // This replaces the FAB stacked above the search field.
+                Row(
+                    modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth()
+                        .testTag("noma_bottom_dock"),
+                    horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BottomSearchPill(
+                        query = query,
+                        onQueryChange = viewModel::onQueryChange,
+                        enabled = snapshot is NotesSnapshot.Ready,
+                        accessibilityLabel = searchAccessibilityLabel,
+                        hint = contextualSearchHint,
+                        onSearchFocus = {
+                            sortMenuExpanded = false
+                            showAppearance = false
+                            showWidgetStyles = false
+                        },
+                        onSearchDone = {
                             focusManager.clearFocus()
                             searchKeyboard?.hide()
+                        },
+                        onDismiss = {
+                            focusManager.clearFocus()
+                            searchKeyboard?.hide()
+                        },
+                        // Preserve input focus when clearing so the next search
+                        // can be typed without dismissing and reopening the IME.
+                        onClear = {
                             sortMenuExpanded = false
-                            viewModel.createNote()
+                            viewModel.onQueryChange("")
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Capture stays available with a search keyboard open.
+                    // Busy and storage-not-ready cases preserve existing safeguards.
+                    if (snapshot is NotesSnapshot.Ready) {
+                        FloatingActionButton(
+                            onClick = {
+                                if (!creatingOrCapturing) {
+                                    focusManager.clearFocus()
+                                    searchKeyboard?.hide()
+                                    sortMenuExpanded = false
+                                    viewModel.createNote()
+                                }
+                            },
+                            modifier = Modifier.size(56.dp).testTag("noma_new_note")
+                                .semantics {
+                                    contentDescription = if (creatingOrCapturing) creatingNoteLabel
+                                        else newNoteLabel
+                                    if (creatingOrCapturing) disabled()
+                                },
+                            shape = CircleShape,
+                            containerColor = if (creatingOrCapturing)
+                                MaterialTheme.colorScheme.surfaceVariant
+                            else MaterialTheme.colorScheme.primary,
+                            contentColor = if (creatingOrCapturing)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onPrimary,
+                            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp)
+                        ) {
+                            if (creatingOrCapturing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp)
+                                        .testTag("noma_creation_spinner"),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Outlined.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(25.dp)
+                                )
+                            }
                         }
-                    },
-                    expanded = !imeVisible || creatingOrCapturing,
-                    icon = {
-                        if (creatingOrCapturing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp).testTag("noma_creation_spinner"),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Outlined.Add, contentDescription = null)
-                        }
-                    },
-                    text = {
-                        Text(if (creatingOrCapturing) stringResource(R.string.creating_note) else newNoteLabel)
-                    },
-                    containerColor = if (creatingOrCapturing) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
-                    contentColor = if (creatingOrCapturing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                    modifier = Modifier.testTag("noma_new_note").semantics {
-                        contentDescription = if (creatingOrCapturing) creatingNoteLabel
-                            else newNoteLabel
-                        if (creatingOrCapturing) disabled()
                     }
-                )
+                }
             }
         }
     ) { insets ->
