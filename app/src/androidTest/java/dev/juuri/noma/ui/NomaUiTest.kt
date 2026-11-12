@@ -842,6 +842,46 @@ class NomaUiTest {
     }
 
 
+    @Test fun rebornLibraryHasExplicitAllFilterAndPreservesSearch() {
+        val note = Note("pinned-1", "Course", "Material", true, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_all_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_pinned_filter").performClick()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_all_filter").performClick()
+        compose.onNodeWithTag("noma_all_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_search").performTextInput("Course")
+        compose.waitUntil(5_000) { model.query.value == "Course" }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithTag("noma_all_filter").performClick()
+        compose.runOnIdle { assertEquals("Course", model.query.value) }
+    }
+
+    @Test fun rebornCaptureIsOnTheSameRowAsTheSearchPill() {
+        val repo = FakeRepository(listOf(Note("n", "Memo", "Body", false, 1L, 1L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_bottom_dock").assertExists()
+        val search = compose.onNodeWithTag("noma_search_pill").fetchSemanticsNode().boundsInRoot
+        val capture = compose.onNodeWithTag("noma_new_note").fetchSemanticsNode().boundsInRoot
+        assertTrue("Search should be left of capture", search.right <= capture.left)
+        assertTrue("Dock actions must share a baseline",
+            kotlin.math.abs(search.center.y - capture.center.y) < capture.height)
+    }
+
+    @Test fun rebornEditorShowsDateWithoutChangingNoteBody() {
+        val note = Note("editor-meta", "Notebook", "The original body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(note) }
+        compose.onNodeWithTag("noma_editor_metadata").assertExists()
+        compose.onNodeWithTag("noma_body_input").assertExists()
+        compose.runOnIdle { assertEquals("The original body", model.active.value?.body) }
+    }
+
     @Test fun searchPillIsTheOnlySearchFieldAndDockedBelowNotes() {
         val saved = Note("a", "Weekend notes", "Body", false, 1L, 1L)
         val repo = FakeRepository(listOf(saved))
