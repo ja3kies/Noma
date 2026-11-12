@@ -1142,7 +1142,7 @@ private fun BottomSearchPill(
 ) {
     var focused by remember { mutableStateOf(false) }
     val elevation by animateDpAsState(
-        targetValue = if (focused) 9.dp else 3.dp,
+        targetValue = if (focused) 6.dp else 2.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -1150,8 +1150,7 @@ private fun BottomSearchPill(
         label = "nomaBottomSearchElevation"
     )
     val pillColor by animateColorAsState(
-        targetValue = if (focused) MaterialTheme.colorScheme.surface
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
+        targetValue = MaterialTheme.colorScheme.surface,
         animationSpec = tween(NomaMotion.standard),
         label = "nomaBottomSearchSurface"
     )
@@ -1931,8 +1930,21 @@ private fun NoteEditorScreen(
                         }
                     }
                 )
-                // The document is one continuous writing surface, not two forms.
-                Spacer(Modifier.height(24.dp))
+                // Preserve a continuous writing surface. Metadata is read-only
+                // and never participates in the editable or exported note text.
+                if (note.title.isNotBlank() || note.body.isNotBlank()) {
+                    Spacer(Modifier.height(NomaSpacing.small))
+                    Text(
+                        text = stringResource(
+                            R.string.last_edited_at,
+                            remember(note.updatedAt) { formatEdited(note.updatedAt) }
+                        ),
+                        modifier = Modifier.testTag("noma_editor_metadata"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(NomaSpacing.section))
                 BasicTextField(
                     value = note.body,
                     onValueChange = {
@@ -2095,13 +2107,13 @@ private fun AppearanceDialog(
                     )
                     val preview = when (mode) {
                         NomaAppearance.SYSTEM -> Brush.horizontalGradient(
-                            listOf(Color(0xFFF9F8F5), Color(0xFF14191E))
+                            listOf(Color(0xFFF6F7F2), Color(0xFF1B2B21))
                         )
                         NomaAppearance.LIGHT -> Brush.linearGradient(
-                            listOf(Color(0xFFF9F8F5), Color(0xFFDCE7F4))
+                            listOf(Color(0xFFFFFFFF), Color(0xFFDCEACF))
                         )
                         NomaAppearance.DARK -> Brush.linearGradient(
-                            listOf(Color(0xFF14191E), Color(0xFF2E4865))
+                            listOf(Color(0xFF121D16), Color(0xFF31523C))
                         )
                     }
                     Row(
@@ -2126,7 +2138,26 @@ private fun AppearanceDialog(
                                     RoundedCornerShape(10.dp)
                                 )
                                 .testTag("noma_theme_preview_${mode.name}")
-                        )
+                        ) {
+                            // A miniature note surface rather than an empty color swatch.
+                            val previewInk = if (mode == NomaAppearance.DARK)
+                                Color(0xFFB1D6B6) else Color(0xFF456C52)
+                            Box(
+                                Modifier.padding(start = 7.dp, top = 7.dp)
+                                    .size(width = 26.dp, height = 4.dp)
+                                    .background(previewInk, CircleShape)
+                            )
+                            Box(
+                                Modifier.align(Alignment.BottomStart)
+                                    .padding(start = 7.dp, bottom = 7.dp)
+                                    .size(width = 38.dp, height = 13.dp)
+                                    .background(
+                                        if (mode == NomaAppearance.DARK) Color(0xFF36493A)
+                                        else Color(0xFFFFFFFF),
+                                        RoundedCornerShape(5.dp)
+                                    )
+                            )
+                        }
                         Spacer(Modifier.width(NomaSpacing.medium))
                         Column(Modifier.weight(1f)) {
                             Text(
