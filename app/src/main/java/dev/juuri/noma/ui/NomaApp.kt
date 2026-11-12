@@ -161,6 +161,7 @@ import dev.juuri.noma.domain.NoteSearch
 import dev.juuri.noma.domain.NoteFindReplace
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
+import dev.juuri.noma.ui.theme.NomaAccent
 import dev.juuri.noma.ui.theme.NomaMotion
 import dev.juuri.noma.ui.theme.NomaSpacing
 import kotlinx.coroutines.flow.collect
@@ -177,6 +178,8 @@ fun NomaApp(
     viewModel: NotesViewModel,
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
     onAppearanceChange: (NomaAppearance) -> Unit = {},
+    accent: NomaAccent = NomaAccent.FOREST,
+    onAccentChange: (NomaAccent) -> Unit = {},
     widgetStyle: NomaWidgetStyle = NomaWidgetStyle.MATERIAL_YOU,
     onWidgetStyleChange: (NomaWidgetStyle) -> Unit = {}
 ) {
@@ -378,6 +381,8 @@ fun NomaApp(
                             selectedId = active?.id,
                             appearance = appearance,
                             onAppearanceChange = onAppearanceChange,
+                            accent = accent,
+                            onAccentChange = onAccentChange,
                             widgetStyle = widgetStyle,
                             onWidgetStyleChange = onWidgetStyleChange,
                             isTabletList = true,
@@ -411,6 +416,8 @@ fun NomaApp(
                         selectedId = null,
                         appearance = appearance,
                         onAppearanceChange = onAppearanceChange,
+                        accent = accent,
+                        onAccentChange = onAccentChange,
                         widgetStyle = widgetStyle,
                         onWidgetStyleChange = onWidgetStyleChange,
                         modifier = Modifier.fillMaxSize()
@@ -460,6 +467,8 @@ private fun NotesListScreen(
     selectedId: String?,
     appearance: NomaAppearance,
     onAppearanceChange: (NomaAppearance) -> Unit,
+    accent: NomaAccent,
+    onAccentChange: (NomaAccent) -> Unit,
     widgetStyle: NomaWidgetStyle,
     onWidgetStyleChange: (NomaWidgetStyle) -> Unit,
     isTabletList: Boolean = false,
@@ -526,6 +535,8 @@ private fun NotesListScreen(
     if (showAppearance) {
         AppearanceDialog(
             selected = appearance,
+            selectedAccent = accent,
+            onAccentSelect = onAccentChange,
             onSelect = {
                 onAppearanceChange(it)
                 showAppearance = false
@@ -2087,6 +2098,8 @@ private fun EmptyEditorPane() {
 @Composable
 private fun AppearanceDialog(
     selected: NomaAppearance,
+    selectedAccent: NomaAccent,
+    onAccentSelect: (NomaAccent) -> Unit,
     onSelect: (NomaAppearance) -> Unit,
     onDismiss: () -> Unit,
     onWidgetStyles: () -> Unit
@@ -2192,6 +2205,69 @@ private fun AppearanceDialog(
                             )
                         }
                         RadioButton(selected = isSelected, onClick = null)
+                    }
+                }
+                Spacer(Modifier.height(NomaSpacing.medium))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(NomaSpacing.medium))
+                Text(
+                    stringResource(R.string.accent_color_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { heading() }
+                )
+                // Two rows of three remain touch-friendly at large font scales.
+                NomaAccent.entries.chunked(3).forEach { accents ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
+                    ) {
+                        accents.forEach { swatch ->
+                            val isAccentSelected = swatch == selectedAccent
+                            val swatchLabel = stringResource(
+                                when (swatch) {
+                                    NomaAccent.FOREST -> R.string.accent_forest
+                                    NomaAccent.SAGE -> R.string.accent_sage
+                                    NomaAccent.HONEY -> R.string.accent_honey
+                                    NomaAccent.CORAL -> R.string.accent_coral
+                                    NomaAccent.LILAC -> R.string.accent_lilac
+                                    NomaAccent.SKY -> R.string.accent_sky
+                                }
+                            )
+                            Box(
+                                modifier = Modifier.size(52.dp)
+                                    .border(
+                                        width = if (isAccentSelected) 2.dp else 1.dp,
+                                        color = if (isAccentSelected)
+                                            MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outlineVariant,
+                                        shape = CircleShape
+                                    )
+                                    .selectable(
+                                        selected = isAccentSelected,
+                                        role = Role.RadioButton,
+                                        onClick = { onAccentSelect(swatch) }
+                                    )
+                                    .semantics { contentDescription = swatchLabel }
+                                    .testTag("noma_accent_${swatch.name}"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(38.dp)
+                                        .background(swatch.lightPrimary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isAccentSelected) {
+                                        Icon(
+                                            Icons.Outlined.Check,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
