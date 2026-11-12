@@ -2134,13 +2134,13 @@ private fun AppearanceDialog(
                     )
                     val preview = when (mode) {
                         NomaAppearance.SYSTEM -> Brush.horizontalGradient(
-                            listOf(Color(0xFFF6F7F2), Color(0xFF1B2B21))
+                            listOf(selectedAccent.lightContainer, selectedAccent.darkContainer)
                         )
                         NomaAppearance.LIGHT -> Brush.linearGradient(
-                            listOf(Color(0xFFFFFFFF), Color(0xFFDCEACF))
+                            listOf(Color.White, selectedAccent.lightContainer)
                         )
                         NomaAppearance.DARK -> Brush.linearGradient(
-                            listOf(Color(0xFF121D16), Color(0xFF31523C))
+                            listOf(Color(0xFF121D16), selectedAccent.darkContainer)
                         )
                     }
                     Row(
@@ -2168,7 +2168,7 @@ private fun AppearanceDialog(
                         ) {
                             // A miniature note surface rather than an empty color swatch.
                             val previewInk = if (mode == NomaAppearance.DARK)
-                                Color(0xFFB1D6B6) else Color(0xFF456C52)
+                                selectedAccent.darkPrimary else selectedAccent.lightPrimary
                             Box(
                                 Modifier.padding(start = 7.dp, top = 7.dp)
                                     .size(width = 26.dp, height = 4.dp)
