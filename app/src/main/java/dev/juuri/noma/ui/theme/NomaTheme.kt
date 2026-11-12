@@ -24,6 +24,30 @@ enum class NomaAppearance {
     }
 }
 
+/**
+ * Optional accent palettes from the Noma Reborn design exploration.
+ * Every light primary is dark enough for white text; every dark primary uses
+ * dark on-primary ink. Shared semantic surfaces remain independent of accent.
+ */
+enum class NomaAccent(
+    val lightPrimary: Color,
+    val lightContainer: Color,
+    val darkPrimary: Color,
+    val darkContainer: Color
+) {
+    FOREST(Color(0xFF456C52), Color(0xFFDCEACF), Color(0xFFB1D6B6), Color(0xFF31523C)),
+    SAGE(Color(0xFF5E6D45), Color(0xFFE3E9D5), Color(0xFFCAD8AB), Color(0xFF3B4932)),
+    HONEY(Color(0xFF80601B), Color(0xFFF9EDC2), Color(0xFFEFCB79), Color(0xFF655023)),
+    CORAL(Color(0xFF8D533F), Color(0xFFFBE5DB), Color(0xFFE8B6A3), Color(0xFF674338)),
+    LILAC(Color(0xFF755681), Color(0xFFEFE4F2), Color(0xFFD7B9E2), Color(0xFF533C5C)),
+    SKY(Color(0xFF4E6687), Color(0xFFE0EAF8), Color(0xFFB6CEF1), Color(0xFF364B66));
+
+    companion object {
+        fun fromStorage(value: String?): NomaAccent =
+            entries.firstOrNull { it.name == value } ?: FOREST
+    }
+}
+
 /** Consistent spacing and motion roles shared across all Noma surfaces. */
 object NomaSpacing {
     val tiny = 4.dp
@@ -164,10 +188,28 @@ fun isNomaDark(appearance: NomaAppearance): Boolean {
 @Composable
 fun NomaTheme(
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
+    accent: NomaAccent = NomaAccent.FOREST,
     content: @Composable () -> Unit
 ) {
+    val dark = isNomaDark(appearance)
+    val base = if (dark) DarkColors else LightColors
+    val colors = if (dark) {
+        base.copy(
+            primary = accent.darkPrimary,
+            onPrimary = Color(0xFF17271C),
+            primaryContainer = accent.darkContainer,
+            onPrimaryContainer = Color(0xFFE5EFE6)
+        )
+    } else {
+        base.copy(
+            primary = accent.lightPrimary,
+            onPrimary = Color.White,
+            primaryContainer = accent.lightContainer,
+            onPrimaryContainer = Color(0xFF193622)
+        )
+    }
     MaterialTheme(
-        colorScheme = if (isNomaDark(appearance)) DarkColors else LightColors,
+        colorScheme = colors,
         typography = NomaTypography,
         shapes = NomaShapes,
         content = content
