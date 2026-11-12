@@ -728,7 +728,8 @@ private fun NotesListScreen(
                                     viewModel.createNote()
                                 }
                             },
-                            modifier = Modifier.size(56.dp).testTag("noma_new_note")
+                            modifier = Modifier.size(if (imeVisible) 48.dp else 56.dp)
+                                .testTag("noma_new_note")
                                 .semantics {
                                     contentDescription = if (creatingOrCapturing) creatingNoteLabel
                                         else newNoteLabel
