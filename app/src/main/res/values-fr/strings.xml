@@ -164,4 +164,11 @@
     <string name="all_notes_filter">Toutes</string>
     <string name="note_preview_label">Aperçu de la note</string>
     <string name="last_edited_at">Modifiée le %1$s</string>
+    <string name="accent_color_title">Couleur d’accent</string>
+    <string name="accent_forest">Vert forêt</string>
+    <string name="accent_sage">Vert sauge</string>
+    <string name="accent_honey">Miel</string>
+    <string name="accent_coral">Corail</string>
+    <string name="accent_lilac">Lilas</string>
+    <string name="accent_sky">Bleu ciel</string>
 </resources>
