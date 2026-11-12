@@ -159,4 +159,8 @@
     <string name="matches_found">%1$d matches</string>
     <string name="no_search_matches">No matches found</string>
     <string name="find_replace_close">Close search</string>
+    <string name="library_title">My notes</string>
+    <string name="library_subtitle">A quiet space for your ideas</string>
+    <string name="all_notes_filter">All notes</string>
+    <string name="note_preview_label">Note preview</string>
 </resources>
