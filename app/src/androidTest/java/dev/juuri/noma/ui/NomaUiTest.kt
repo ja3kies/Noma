@@ -1,5 +1,9 @@
 package dev.juuri.noma.ui
 
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -115,6 +119,77 @@ class NomaUiTest {
         compose.waitUntil(5_000) {
             (repo.notes.value as NotesSnapshot.Ready).entries.single().body == "Bread"
         }
+    }
+
+    @Test fun findNextSelectsRealTextWithoutSavingARevision() {
+        val note = Note("find-next", "Find example", "cat one cat", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Find example").performClick()
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("cat")
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(0, 3)))
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(8, 11)))
+        compose.runOnIdle {
+            assertEquals(note.body, model.active.value?.body)
+            assertEquals(0, repo.saveAttempts)
+        }
+    }
+
+    @Test fun libraryControlsFit360Dp() = assertLibraryViewport(360)
+    @Test fun libraryControlsFit393Dp() = assertLibraryViewport(393)
+    @Test fun libraryControlsFit412Dp() = assertLibraryViewport(412)
+    @Test fun tabletKeepsLibraryAndEditorAt840Dp() = assertLibraryViewport(840)
+
+    private fun assertLibraryViewport(width: Int) {
+        val repo = FakeRepository(listOf(Note("viewport", "Test note", "Body", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            androidx.compose.foundation.layout.Box(
+                Modifier.width(width.dp).height(800.dp)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithTag("noma_all_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_archive_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_sort_button").assertIsDisplayed()
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onNodeWithTag("noma_new_note").assertIsDisplayed()
+        if (width >= 840) compose.onNodeWithTag("noma_tablet_empty_pane").assertIsDisplayed()
+    }
+
+    @Test fun appearanceChangesStayOpenAndWidgetBackReturnsToSettings() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val appearance = mutableStateOf(NomaAppearance.SYSTEM)
+        val accent = mutableStateOf(NomaAccent.FOREST)
+        compose.setContent {
+            NomaTheme(appearance.value, accent.value) {
+                NomaApp(model, appearance = appearance.value, accent = accent.value,
+                    onAppearanceChange = { appearance.value = it },
+                    onAccentChange = { accent.value = it })
+            }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithText("Dark").performClick()
+        compose.onNodeWithTag("noma_appearance_page").assertExists()
+        compose.onNodeWithTag("noma_accent_SAGE").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").assertIsSelected()
+        compose.runOnIdle {
+            assertEquals(NomaAppearance.DARK, appearance.value)
+            assertEquals(NomaAccent.SAGE, accent.value)
+        }
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
+        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithTag("noma_appearance_page").assertExists()
+        compose.onNodeWithContentDescription("Close").performClick()
+        compose.onNodeWithTag("noma_appearance_page").assertDoesNotExist()
     }
 
     @Test fun backupCheckRemainsAvailableAfterLocalStorageFailure() {
@@ -393,7 +468,7 @@ class NomaUiTest {
             }
         }
         compose.onNodeWithContentDescription("Appearance").performClick()
-        compose.onNodeWithText("Widget appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
         compose.onNodeWithText("Material You").assertExists()
         compose.onNodeWithText("Frosted green").assertExists()
         compose.onNodeWithText("Liquid Glass").performClick()
@@ -1256,7 +1331,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_theme_preview_SYSTEM", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_theme_preview_LIGHT", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_theme_preview_DARK", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("Widget appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
         compose.onNodeWithTag("noma_widget_preview_MATERIAL_YOU", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_widget_preview_FROSTED_GREEN", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS", useUnmergedTree = true).assertExists()

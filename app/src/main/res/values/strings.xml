@@ -173,4 +173,6 @@
     <string name="accent_sky">Sky blue</string>
     <string name="toggle_bullet">Toggle plain text bullet</string>
     <string name="hide_keyboard">Hide keyboard</string>
+    <string name="previous_match">Previous</string>
+    <string name="next_match">Next</string>
 </resources>

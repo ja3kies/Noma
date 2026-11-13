@@ -7,6 +7,19 @@ package dev.juuri.noma.domain
  * no regular expressions or special replacement syntax are evaluated.
  */
 object NoteFindReplace {
+    /** Navigate literal matches without allocating all positions in a long document. */
+    fun nextMatch(text: String, needle: String, from: Int, backwards: Boolean = false): IntRange? {
+        if (needle.isBlank()) return null
+        val found = if (backwards) {
+            text.lastIndexOf(needle, startIndex = from.coerceAtMost(text.length), ignoreCase = true)
+                .takeIf { it >= 0 } ?: text.lastIndexOf(needle, ignoreCase = true)
+        } else {
+            text.indexOf(needle, startIndex = from.coerceAtLeast(0), ignoreCase = true)
+                .takeIf { it >= 0 } ?: text.indexOf(needle, ignoreCase = true)
+        }
+        return if (found < 0) null else found until found + needle.length
+    }
+
     fun count(text: String, needle: String): Int {
         if (needle.isBlank()) return 0
         var matches = 0

@@ -14,8 +14,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -123,6 +121,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import dev.juuri.noma.ui.theme.nomaColorScheme
+import dev.juuri.noma.ui.theme.isNomaDark
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -132,12 +134,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.heading
@@ -260,7 +265,8 @@ fun NomaApp(
             shape = MaterialTheme.shapes.extraLarge,
             title = { Text(stringResource(R.string.incoming_share_title)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                Column(Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
                     Text(stringResource(R.string.incoming_share_body))
                     if (incoming.title.isNotEmpty()) {
                         Text(
@@ -526,8 +532,8 @@ private fun NotesListScreen(
 
     var deleting by remember { mutableStateOf<Note?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
-    var showAppearance by remember { mutableStateOf(false) }
-    var showWidgetStyles by remember { mutableStateOf(false) }
+    var showAppearance by rememberSaveable { mutableStateOf(false) }
+    var showWidgetStyles by rememberSaveable { mutableStateOf(false) }
 
     deleting?.let { note ->
         DeleteConfirmation(
@@ -546,7 +552,6 @@ private fun NotesListScreen(
             onAccentSelect = onAccentChange,
             onSelect = {
                 onAppearanceChange(it)
-                showAppearance = false
             },
             onDismiss = { showAppearance = false },
             onWidgetStyles = {
@@ -560,9 +565,8 @@ private fun NotesListScreen(
             selected = widgetStyle,
             onSelect = {
                 onWidgetStyleChange(it)
-                showWidgetStyles = false
             },
-            onDismiss = { showWidgetStyles = false }
+            onDismiss = { showWidgetStyles = false; showAppearance = true }
         )
     }
 
@@ -1204,7 +1208,7 @@ private fun BottomSearchPill(
                 singleLine = true,
                 shape = CircleShape,
                 textStyle = MaterialTheme.typography.bodyLarge,
-                placeholder = { Text(hint) },
+                placeholder = { Text(hint, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = {
                     Icon(
                         Icons.Outlined.Search,
@@ -1261,7 +1265,7 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
         modifier = Modifier.fillMaxWidth()
             .padding(start = NomaSpacing.tiny, top = NomaSpacing.small, bottom = NomaSpacing.tiny)
             .testTag("noma_section_header")
-            .semantics { heading() },
+            .clearAndSetSemantics { heading(); contentDescription = accessibleCount },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)
     ) {
@@ -1284,8 +1288,7 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
         ) {
             Text(
                 text = count.toString(),
-                modifier = Modifier.padding(horizontal = NomaSpacing.medium, vertical = NomaSpacing.tiny)
-                    .semantics { contentDescription = accessibleCount },
+                modifier = Modifier.padding(horizontal = NomaSpacing.medium, vertical = NomaSpacing.tiny),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1295,13 +1298,14 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
 
 @Composable
 private fun highlightMatches(value: String, query: String): androidx.compose.ui.text.AnnotatedString {
-    val accent = MaterialTheme.colorScheme.primary
-    return remember(value, query, accent) {
+    val accent = MaterialTheme.colorScheme.onPrimaryContainer
+    val background = MaterialTheme.colorScheme.primaryContainer
+    return remember(value, query, accent, background) {
         buildAnnotatedString {
             append(value)
             NoteSearch.matchRanges(value, query).forEach { range ->
                 addStyle(
-                    SpanStyle(fontWeight = FontWeight.Bold, color = accent),
+                    SpanStyle(fontWeight = FontWeight.Bold, color = accent, background = background),
                     start = range.first,
                     end = range.last + 1
                 )
@@ -1335,7 +1339,8 @@ private fun NoteCard(
     val title = remember(note.title, note.body, fallbackTitle) {
         note.displayTitle.ifBlank { fallbackTitle }
     }
-    val editedTimestamp = remember(note.updatedAt) { formatEdited(note.updatedAt) }
+    val localeKey = LocalConfiguration.current.locales.toLanguageTags()
+    val editedTimestamp = remember(note.updatedAt, localeKey) { formatEdited(note.updatedAt) }
     val pinnedBadgeVisible = note.isPinned && !note.isArchived
     val relevantPreview = remember(note.id, note.title, note.body, query) {
         NoteSearch.matchingPreview(note, query)
@@ -1553,6 +1558,7 @@ private fun NoteEditorScreen(
     var menuExpanded by remember(note.id) { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var findReplaceOpen by rememberSaveable(note.id) { mutableStateOf(false) }
+    var focusBodyAfterFind by remember(note.id) { mutableStateOf(false) }
     var findQuery by rememberSaveable(note.id) { mutableStateOf("") }
     var replaceWith by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
@@ -1571,8 +1577,15 @@ private fun NoteEditorScreen(
         animationSpec = tween(NomaMotion.standard),
         label = "nomaEditorSaveStatusSurface"
     )
-    val editorScrollState = remember(note.id) { ScrollState(0) }
+    val editorScrollState = rememberSaveable(note.id, saver = ScrollState.Saver) { ScrollState(0) }
     val pinStateDescription = stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)
+    LaunchedEffect(findReplaceOpen, focusBodyAfterFind) {
+        if (!findReplaceOpen && focusBodyAfterFind) {
+            bodyFocus.requestFocus()
+            keyboard?.hide()
+            focusBodyAfterFind = false
+        }
+    }
     val titleFieldLabel = stringResource(R.string.title_hint)
     val bodyFieldLabel = stringResource(R.string.body_accessibility_label)
 
@@ -1638,7 +1651,7 @@ private fun NoteEditorScreen(
                 }
             },
             dismissButton = {
-                Row {
+                FlowRow(horizontalArrangement = Arrangement.End) {
                     TextButton(
                         onClick = {
                             confirmDiscard = false
@@ -1667,17 +1680,29 @@ private fun NoteEditorScreen(
         val matches = remember(note.body, findQuery) {
             NoteFindReplace.count(note.body, findQuery)
         }
+        val findFocus = remember { FocusRequester() }
+        fun navigate(backwards: Boolean) {
+            val from = if (backwards) currentBody.selection.min - 1 else currentBody.selection.max
+            val range = NoteFindReplace.nextMatch(note.body, findQuery, from, backwards) ?: return
+            bodyValue = TextFieldValue(note.body, TextRange(range.first, range.last + 1))
+            findReplaceOpen = false
+            focusBodyAfterFind = true
+        }
         AlertDialog(
             onDismissRequest = { findReplaceOpen = false },
             title = { Text(stringResource(R.string.find_replace)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                Column(Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                    LaunchedEffect(Unit) { findFocus.requestFocus() }
                     TextField(
                         value = findQuery,
                         onValueChange = { findQuery = it },
                         singleLine = true,
                         label = { Text(stringResource(R.string.find_text)) },
-                        modifier = Modifier.fillMaxWidth().testTag("noma_find_input")
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { navigate(false) }),
+                        modifier = Modifier.fillMaxWidth().focusRequester(findFocus).testTag("noma_find_input")
                     )
                     TextField(
                         value = replaceWith,
@@ -1686,6 +1711,16 @@ private fun NoteEditorScreen(
                         label = { Text(stringResource(R.string.replacement_text)) },
                         modifier = Modifier.fillMaxWidth().testTag("noma_replace_input")
                     )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        TextButton(onClick = { navigate(true) }, enabled = matches > 0,
+                            modifier = Modifier.testTag("noma_find_previous")) {
+                            Text(stringResource(R.string.previous_match))
+                        }
+                        TextButton(onClick = { navigate(false) }, enabled = matches > 0,
+                            modifier = Modifier.testTag("noma_find_next")) {
+                            Text(stringResource(R.string.next_match))
+                        }
+                    }
                     Text(
                         text = if (matches > 0) stringResource(R.string.matches_found, matches)
                             else stringResource(R.string.no_search_matches),
@@ -1776,7 +1811,9 @@ private fun NoteEditorScreen(
                                 contentDescription = stringResource(
                                     if (note.isPinned) R.string.unpin_note else R.string.pin_note
                                 ),
-                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary
+                                tint = if (saveState != EditorSaveState.Saved || note.isArchived)
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    else if (note.isPinned) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1787,6 +1824,8 @@ private fun NoteEditorScreen(
                             closeWhenSaved = false
                             viewModel.changeBody(edit.text)
                             bodyFocus.requestFocus()
+                            keyboard?.show()
+                            keyboard?.show()
                         },
                         modifier = Modifier.testTag("noma_editor_bullet")
                     ) {
@@ -1931,7 +1970,7 @@ private fun NoteEditorScreen(
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { bodyFocus.requestFocus() }),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = NomaSpacing.touchTarget)
                         .focusRequester(titleFocus)
                         .semantics { contentDescription = titleFieldLabel }
                         .testTag("noma_title_input"),
@@ -1955,7 +1994,7 @@ private fun NoteEditorScreen(
                     Text(
                         text = stringResource(
                             R.string.last_edited_at,
-                            remember(note.updatedAt) { formatEdited(note.updatedAt) }
+                            remember(note.updatedAt, LocalConfiguration.current.locales.toLanguageTags()) { formatEdited(note.updatedAt) }
                         ),
                         modifier = Modifier.testTag("noma_editor_metadata"),
                         style = MaterialTheme.typography.labelSmall,
@@ -2041,10 +2080,10 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
                 Spacer(Modifier.width(NomaSpacing.small))
                 Text(
                     stringResource(R.string.save_failed_status),
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
-                Spacer(Modifier.weight(1f))
                 TextButton(onClick = onRetry,
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_retry_save")) {
                     Text(stringResource(R.string.retry))
@@ -2060,6 +2099,7 @@ private fun EmptyEditorPane() {
         Column(
             modifier = Modifier.widthIn(max = 460.dp)
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(NomaSpacing.page)
                 .testTag("noma_tablet_empty_pane"),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -2092,6 +2132,7 @@ private fun EmptyEditorPane() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppearanceDialog(
     selected: NomaAppearance,
@@ -2101,186 +2142,126 @@ private fun AppearanceDialog(
     onDismiss: () -> Unit,
     onWidgetStyles: () -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        shape = MaterialTheme.shapes.extraLarge,
-        title = { Text(stringResource(R.string.appearance)) },
-        text = {
-            Column(
-                Modifier.selectableGroup().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
-            ) {
-                val options = listOf(
-                    NomaAppearance.SYSTEM to R.string.appearance_system,
-                    NomaAppearance.LIGHT to R.string.appearance_light,
-                    NomaAppearance.DARK to R.string.appearance_dark
-                )
-                options.forEach { (mode, label) ->
-                    val isSelected = mode == selected
-                    val choiceColor by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                            else MaterialTheme.colorScheme.surfaceContainerLow,
-                        animationSpec = tween(NomaMotion.standard),
-                        label = "nomaThemeChoiceBackground"
-                    )
-                    val choiceOutline by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant,
-                        animationSpec = tween(NomaMotion.standard),
-                        label = "nomaThemeChoiceStroke"
-                    )
-                    val preview = when (mode) {
-                        NomaAppearance.SYSTEM -> Brush.horizontalGradient(
-                            listOf(selectedAccent.lightContainer, selectedAccent.darkContainer)
-                        )
-                        NomaAppearance.LIGHT -> Brush.linearGradient(
-                            listOf(Color.White, selectedAccent.lightContainer)
-                        )
-                        NomaAppearance.DARK -> Brush.linearGradient(
-                            listOf(Color(0xFF121D16), selectedAccent.darkContainer)
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(vertical = NomaSpacing.tiny)
-                            .background(choiceColor, RoundedCornerShape(20.dp))
-                            .border(1.dp, choiceOutline, RoundedCornerShape(20.dp))
-                            .defaultMinSize(minHeight = 76.dp)
-                            .selectable(
-                                selected = isSelected,
-                                role = Role.RadioButton,
-                                onClick = { onSelect(mode) }
-                            )
-                            .padding(horizontal = NomaSpacing.comfortable),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier.size(width = 58.dp, height = 38.dp)
-                                .background(preview, RoundedCornerShape(10.dp))
-                                .border(
-                                    1.dp, MaterialTheme.colorScheme.outlineVariant,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .testTag("noma_theme_preview_${mode.name}")
-                        ) {
-                            // A miniature note surface rather than an empty color swatch.
-                            val previewInk = if (mode == NomaAppearance.DARK)
-                                selectedAccent.darkPrimary else selectedAccent.lightPrimary
-                            Box(
-                                Modifier.padding(start = 7.dp, top = 7.dp)
-                                    .size(width = 26.dp, height = 4.dp)
-                                    .background(previewInk, CircleShape)
-                            )
-                            Box(
-                                Modifier.align(Alignment.BottomStart)
-                                    .padding(start = 7.dp, bottom = 7.dp)
-                                    .size(width = 38.dp, height = 13.dp)
-                                    .background(
-                                        if (mode == NomaAppearance.DARK) Color(0xFF36493A)
-                                        else Color(0xFFFFFFFF),
-                                        RoundedCornerShape(5.dp)
-                                    )
-                            )
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize().testTag("noma_appearance_page"),
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets.safeDrawing,
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.appearance)) },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.close))
                         }
-                        Spacer(Modifier.width(NomaSpacing.medium))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                stringResource(label),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
-                            )
-                            Text(
-                                stringResource(
-                                    when (mode) {
+                    }
+                )
+            }
+        ) { insets ->
+            Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+                Column(
+                    Modifier.widthIn(max = 560.dp).fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(NomaSpacing.comfortable),
+                    verticalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
+                ) {
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                        NomaAppearance.entries.forEach { mode ->
+                            val checked = mode == selected
+                            val preview = nomaColorScheme(isNomaDark(mode), selectedAccent)
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .background(if (checked) MaterialTheme.colorScheme.secondaryContainer
+                                        else MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                                    .selectable(selected = checked, role = Role.RadioButton,
+                                        onClick = { onSelect(mode) })
+                                    .padding(NomaSpacing.medium),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
+                            ) {
+                                Column(
+                                    Modifier.size(width = 64.dp, height = 56.dp)
+                                        .background(preview.background, RoundedCornerShape(8.dp))
+                                        .padding(6.dp).testTag("noma_theme_preview_${mode.name}"),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(Modifier.size(28.dp, 4.dp).background(preview.onBackground, CircleShape))
+                                    Box(Modifier.fillMaxWidth().weight(1f)
+                                        .background(preview.surface, RoundedCornerShape(4.dp)))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Box(Modifier.weight(1f).height(8.dp).background(preview.surfaceContainerHigh, CircleShape))
+                                        Box(Modifier.size(8.dp).background(preview.primary, CircleShape))
+                                    }
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text(stringResource(when (mode) {
+                                        NomaAppearance.SYSTEM -> R.string.appearance_system
+                                        NomaAppearance.LIGHT -> R.string.appearance_light
+                                        NomaAppearance.DARK -> R.string.appearance_dark
+                                    }), style = MaterialTheme.typography.titleMedium)
+                                    Text(stringResource(when (mode) {
                                         NomaAppearance.SYSTEM -> R.string.appearance_system_detail
                                         NomaAppearance.LIGHT -> R.string.appearance_light_detail
                                         NomaAppearance.DARK -> R.string.appearance_dark_detail
-                                    }
-                                ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        RadioButton(selected = isSelected, onClick = null)
-                    }
-                }
-                Spacer(Modifier.height(NomaSpacing.medium))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(Modifier.height(NomaSpacing.medium))
-                Text(
-                    stringResource(R.string.accent_color_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.semantics { heading() }
-                )
-                // Two rows of three remain touch-friendly at large font scales.
-                NomaAccent.entries.chunked(3).forEach { accents ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
-                    ) {
-                        accents.forEach { swatch ->
-                            val isAccentSelected = swatch == selectedAccent
-                            val swatchLabel = stringResource(
-                                when (swatch) {
-                                    NomaAccent.FOREST -> R.string.accent_forest
-                                    NomaAccent.SAGE -> R.string.accent_sage
-                                    NomaAccent.HONEY -> R.string.accent_honey
-                                    NomaAccent.CORAL -> R.string.accent_coral
-                                    NomaAccent.LILAC -> R.string.accent_lilac
-                                    NomaAccent.SKY -> R.string.accent_sky
+                                    }), style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                            )
-                            Box(
-                                modifier = Modifier.size(52.dp)
-                                    .border(
-                                        width = if (isAccentSelected) 2.dp else 1.dp,
-                                        color = if (isAccentSelected)
-                                            MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outlineVariant,
-                                        shape = CircleShape
-                                    )
-                                    .selectable(
-                                        selected = isAccentSelected,
-                                        role = Role.RadioButton,
-                                        onClick = { onAccentSelect(swatch) }
-                                    )
-                                    .semantics { contentDescription = swatchLabel }
-                                    .testTag("noma_accent_${swatch.name}"),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier.size(38.dp)
-                                        .background(swatch.lightPrimary, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (isAccentSelected) {
-                                        Icon(
-                                            Icons.Outlined.Check,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                RadioButton(selected = checked, onClick = null)
+                            }
+                        }
+                    }
+                    Text(stringResource(R.string.accent_color_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = NomaSpacing.small).semantics { heading() })
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                        NomaAccent.entries.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                                row.forEach { swatch ->
+                                    val checked = swatch == selectedAccent
+                                    val label = stringResource(when (swatch) {
+                                        NomaAccent.FOREST -> R.string.accent_forest
+                                        NomaAccent.SAGE -> R.string.accent_sage
+                                        NomaAccent.HONEY -> R.string.accent_honey
+                                        NomaAccent.CORAL -> R.string.accent_coral
+                                        NomaAccent.LILAC -> R.string.accent_lilac
+                                        NomaAccent.SKY -> R.string.accent_sky
+                                    })
+                                    val colors = nomaColorScheme(isNomaDark(selected), swatch)
+                                    Column(
+                                        Modifier.weight(1f)
+                                            .background(if (checked) MaterialTheme.colorScheme.secondaryContainer
+                                                else MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
+                                            .selectable(selected = checked, role = Role.RadioButton,
+                                                onClick = { onAccentSelect(swatch) })
+                                            .padding(vertical = NomaSpacing.small, horizontal = NomaSpacing.tiny)
+                                            .testTag("noma_accent_${swatch.name}"),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+                                    ) {
+                                        Box(Modifier.size(32.dp).background(colors.primary, CircleShape),
+                                            contentAlignment = Alignment.Center) {
+                                            if (checked) Icon(Icons.Outlined.Check, null,
+                                                tint = colors.onPrimary, modifier = Modifier.size(20.dp))
+                                        }
+                                        Text(label, style = MaterialTheme.typography.labelMedium,
+                                            textAlign = TextAlign.Center)
                                     }
                                 }
                             }
                         }
                     }
+                    OutlinedButton(onClick = onWidgetStyles,
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = NomaSpacing.touchTarget)) {
+                        Text(stringResource(R.string.widget_style_settings))
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.close)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onWidgetStyles) {
-                Text(stringResource(R.string.widget_style_settings))
-            }
         }
-    )
+    }
 }
 
 @Composable
@@ -2403,7 +2384,8 @@ private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfir
         onDismissRequest = onCancel,
         shape = MaterialTheme.shapes.extraLarge,
         title = { Text(stringResource(R.string.delete_confirm_title)) },
-        text = { Text(stringResource(R.string.delete_confirm_body_named, noteTitle.take(80))) },
+        text = { Text(stringResource(R.string.delete_confirm_body_named, noteTitle.take(80)),
+            modifier = Modifier.verticalScroll(rememberScrollState())) },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
@@ -2428,12 +2410,17 @@ private fun DeleteConfirmation(noteTitle: String, onCancel: () -> Unit, onConfir
 
 @Composable
 private fun CenterMessage(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 30.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        content = content
-    )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportHeight = maxHeight
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight)
+                .padding(horizontal = NomaSpacing.section, vertical = NomaSpacing.comfortable),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content
+        )
+    }
 }
 
 private fun formatEdited(timestamp: Long): String =

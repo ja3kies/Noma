@@ -173,4 +173,6 @@
     <string name="accent_sky">Bleu ciel</string>
     <string name="toggle_bullet">Ajouter ou retirer une puce de texte</string>
     <string name="hide_keyboard">Masquer le clavier</string>
+    <string name="previous_match">Précédent</string>
+    <string name="next_match">Suivant</string>
 </resources>
