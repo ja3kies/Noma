@@ -9,7 +9,11 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import android.os.Build
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -23,6 +27,15 @@ enum class NomaAppearance {
     companion object {
         fun fromStorage(value: String?): NomaAppearance =
             entries.firstOrNull { it.name == value } ?: SYSTEM
+    }
+}
+
+enum class NomaThemeFamily {
+    BW_ACCENT, BW_PURE, MATERIAL_YOU, ACCENT_WHITE;
+
+    companion object {
+        fun fromStorage(value: String?): NomaThemeFamily =
+            entries.firstOrNull { it.name == value } ?: ACCENT_WHITE
     }
 }
 
@@ -189,8 +202,28 @@ fun isNomaDark(appearance: NomaAppearance): Boolean {
 }
 
 /** Shared by the live application and appearance previews. */
-internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent): ColorScheme {
+internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent, family: NomaThemeFamily = NomaThemeFamily.ACCENT_WHITE): ColorScheme {
     val base = if (dark) DarkColors else LightColors
+    if (family == NomaThemeFamily.BW_PURE || family == NomaThemeFamily.BW_ACCENT) {
+        val mono = if (dark) darkColorScheme(
+            primary = Color.White, onPrimary = Color.Black, primaryContainer = Color(0xFF303030), onPrimaryContainer = Color.White,
+            secondary = Color.LightGray, onSecondary = Color.Black, secondaryContainer = Color(0xFF292929), onSecondaryContainer = Color.White,
+            background = Color(0xFF101010), onBackground = Color.White, surface = Color(0xFF181818), onSurface = Color.White,
+            surfaceVariant = Color(0xFF303030), onSurfaceVariant = Color(0xFFD0D0D0), outline = Color.LightGray,
+            outlineVariant = Color(0xFF555555), error = Color.White, onError = Color.Black
+        ) else lightColorScheme(
+            primary = Color.Black, onPrimary = Color.White, primaryContainer = Color(0xFFE5E5E5), onPrimaryContainer = Color.Black,
+            secondary = Color.DarkGray, onSecondary = Color.White, secondaryContainer = Color(0xFFF0F0F0), onSecondaryContainer = Color.Black,
+            background = Color(0xFFF8F8F8), onBackground = Color.Black, surface = Color.White, onSurface = Color.Black,
+            surfaceVariant = Color(0xFFE8E8E8), onSurfaceVariant = Color(0xFF333333), outline = Color.DarkGray,
+            outlineVariant = Color(0xFFBBBBBB), error = Color.Black, onError = Color.White
+        )
+        return if (family == NomaThemeFamily.BW_PURE) mono else mono.copy(
+            primary = if (dark) accent.darkPrimary else accent.lightPrimary,
+            onPrimary = if (dark) Color(0xFF17271C) else Color.White,
+            inversePrimary = if (dark) accent.lightPrimary else accent.darkPrimary
+        )
+    }
     val primary = if (dark) accent.darkPrimary else accent.lightPrimary
     val container = if (dark) accent.darkContainer else accent.lightContainer
     val ink = if (dark) Color(0xFFE5EFE6) else Color(0xFF193622)
@@ -217,10 +250,18 @@ internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent): ColorScheme {
 fun NomaTheme(
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
     accent: NomaAccent = NomaAccent.FOREST,
+    family: NomaThemeFamily = NomaThemeFamily.ACCENT_WHITE,
     content: @Composable () -> Unit
 ) {
+    val dark = isNomaDark(appearance)
+    val context = LocalContext.current
+    val colors = when {
+        family == NomaThemeFamily.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        else -> nomaColorScheme(dark, accent, family)
+    }
     MaterialTheme(
-        colorScheme = nomaColorScheme(isNomaDark(appearance), accent),
+        colorScheme = colors,
         typography = NomaTypography,
         shapes = NomaShapes,
         content = content

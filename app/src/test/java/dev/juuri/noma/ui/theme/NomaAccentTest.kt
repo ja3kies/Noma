@@ -53,6 +53,25 @@ class NomaAccentTest {
         }
     }
 
+    @Test fun themeFamilyMigrationDefaultsUnknownValuesAndRoundTrips() {
+        assertEquals(NomaThemeFamily.ACCENT_WHITE, NomaThemeFamily.fromStorage(null))
+        assertEquals(NomaThemeFamily.ACCENT_WHITE, NomaThemeFamily.fromStorage("old-value"))
+        NomaThemeFamily.entries.forEach { assertEquals(it, NomaThemeFamily.fromStorage(it.name)) }
+    }
+
+    @Test fun monochromeFamiliesKeepSurfacesGrayAndDifferByAccentRole() {
+        listOf(false, true).forEach { dark ->
+            val pure = nomaColorScheme(dark, NomaAccent.CORAL, NomaThemeFamily.BW_PURE)
+            val accented = nomaColorScheme(dark, NomaAccent.CORAL, NomaThemeFamily.BW_ACCENT)
+            assertEquals(pure.background, accented.background)
+            assertEquals(pure.surface, accented.surface)
+            assertEquals(pure.error.red, pure.error.green, 0f)
+            assertEquals(pure.error.green, pure.error.blue, 0f)
+            assertEquals(NomaAccent.CORAL.let { if (dark) it.darkPrimary else it.lightPrimary }, accented.primary)
+            assertTrue(contrast(pure.onSurface, pure.surface) >= 4.5)
+        }
+    }
+
     private fun contrast(first: Color, second: Color): Double {
         val a = luminance(first)
         val b = luminance(second)

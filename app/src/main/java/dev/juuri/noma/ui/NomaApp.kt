@@ -174,6 +174,7 @@ import dev.juuri.noma.domain.NoteFindReplace
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaAccent
+import dev.juuri.noma.ui.theme.NomaThemeFamily
 import dev.juuri.noma.ui.theme.NomaMotion
 import dev.juuri.noma.ui.theme.NomaSpacing
 import kotlinx.coroutines.flow.collect
@@ -191,6 +192,8 @@ fun NomaApp(
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
     onAppearanceChange: (NomaAppearance) -> Unit = {},
     accent: NomaAccent = NomaAccent.FOREST,
+    family: NomaThemeFamily = NomaThemeFamily.ACCENT_WHITE,
+    onFamilyChange: (NomaThemeFamily) -> Unit = {},
     onAccentChange: (NomaAccent) -> Unit = {},
     widgetStyle: NomaWidgetStyle = NomaWidgetStyle.MATERIAL_YOU,
     onWidgetStyleChange: (NomaWidgetStyle) -> Unit = {}
@@ -395,6 +398,8 @@ fun NomaApp(
                             appearance = appearance,
                             onAppearanceChange = onAppearanceChange,
                             accent = accent,
+                            family = family,
+                            onFamilyChange = onFamilyChange,
                             onAccentChange = onAccentChange,
                             widgetStyle = widgetStyle,
                             onWidgetStyleChange = onWidgetStyleChange,
@@ -430,6 +435,8 @@ fun NomaApp(
                         appearance = appearance,
                         onAppearanceChange = onAppearanceChange,
                         accent = accent,
+                        family = family,
+                        onFamilyChange = onFamilyChange,
                         onAccentChange = onAccentChange,
                         widgetStyle = widgetStyle,
                         onWidgetStyleChange = onWidgetStyleChange,
@@ -481,6 +488,8 @@ private fun NotesListScreen(
     appearance: NomaAppearance,
     onAppearanceChange: (NomaAppearance) -> Unit,
     accent: NomaAccent,
+    family: NomaThemeFamily,
+    onFamilyChange: (NomaThemeFamily) -> Unit,
     onAccentChange: (NomaAccent) -> Unit,
     widgetStyle: NomaWidgetStyle,
     onWidgetStyleChange: (NomaWidgetStyle) -> Unit,
@@ -549,6 +558,8 @@ private fun NotesListScreen(
         AppearanceDialog(
             selected = appearance,
             selectedAccent = accent,
+            selectedFamily = family,
+            onFamilySelect = onFamilyChange,
             onAccentSelect = onAccentChange,
             onSelect = {
                 onAppearanceChange(it)
@@ -1681,6 +1692,10 @@ private fun NoteEditorScreen(
             NoteFindReplace.count(note.body, findQuery)
         }
         val findFocus = remember { FocusRequester() }
+        val selectedRange = currentBody.selection
+        val currentOccurrence = if (findQuery.isNotBlank() && selectedRange.min < note.body.length &&
+            note.body.regionMatches(selectedRange.min, findQuery, 0, findQuery.length, ignoreCase = true))
+            NoteFindReplace.count(note.body.substring(0, selectedRange.min), findQuery) + 1 else 0
         fun navigate(backwards: Boolean) {
             val from = if (backwards) currentBody.selection.min - 1 else currentBody.selection.max
             val range = NoteFindReplace.nextMatch(note.body, findQuery, from, backwards) ?: return
@@ -1722,7 +1737,7 @@ private fun NoteEditorScreen(
                         }
                     }
                     Text(
-                        text = if (matches > 0) stringResource(R.string.matches_found, matches)
+                        text = if (matches > 0) stringResource(R.string.match_position, currentOccurrence, matches)
                             else stringResource(R.string.no_search_matches),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
@@ -1741,9 +1756,12 @@ private fun NoteEditorScreen(
                         enabled = matches > 0,
                         onClick = {
                             closeWhenSaved = false
-                            viewModel.changeBody(
-                                NoteFindReplace.replaceFirst(note.body, findQuery, replaceWith)
-                            )
+                            val updated = NoteFindReplace.replaceFirst(note.body, findQuery, replaceWith)
+                            val replacedAt = note.body.indexOf(findQuery, ignoreCase = true)
+                            val range = NoteFindReplace.nextMatch(updated, findQuery,
+                                replacedAt.coerceAtLeast(0) + replaceWith.length)
+                            bodyValue = TextFieldValue(updated, TextRange(range?.first ?: 0))
+                            viewModel.changeBody(updated)
                         },
                         modifier = Modifier.fillMaxWidth().testTag("noma_replace_first")
                             .defaultMinSize(minHeight = 48.dp)
@@ -1752,9 +1770,10 @@ private fun NoteEditorScreen(
                         enabled = matches > 0,
                         onClick = {
                             closeWhenSaved = false
-                            viewModel.changeBody(
-                                NoteFindReplace.replaceAll(note.body, findQuery, replaceWith)
-                            )
+                            val updated = NoteFindReplace.replaceAll(note.body, findQuery, replaceWith)
+                            val range = NoteFindReplace.nextMatch(updated, findQuery, 0)
+                            bodyValue = TextFieldValue(updated, TextRange(range?.first ?: 0))
+                            viewModel.changeBody(updated)
                         },
                         modifier = Modifier.fillMaxWidth().testTag("noma_replace_all")
                             .defaultMinSize(minHeight = 48.dp)
@@ -1786,6 +1805,10 @@ private fun NoteEditorScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
+                    val exportScope = rememberCoroutineScope()
+                    PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
+                        exportScope.launch { snackbar.showSnackbar(message) }
+                    })
                         IconButton(
                             onClick = {
                                 menuExpanded = false
@@ -1824,7 +1847,6 @@ private fun NoteEditorScreen(
                             closeWhenSaved = false
                             viewModel.changeBody(edit.text)
                             bodyFocus.requestFocus()
-                            keyboard?.show()
                             keyboard?.show()
                         },
                         modifier = Modifier.testTag("noma_editor_bullet")
@@ -1866,10 +1888,6 @@ private fun NoteEditorScreen(
                         }
                     },
                     actions = {
-                        val portableScope = rememberCoroutineScope()
-                        PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
-                            portableScope.launch { snackbar.showSnackbar(message) }
-                        })
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
@@ -2137,6 +2155,8 @@ private fun EmptyEditorPane() {
 private fun AppearanceDialog(
     selected: NomaAppearance,
     selectedAccent: NomaAccent,
+    selectedFamily: NomaThemeFamily,
+    onFamilySelect: (NomaThemeFamily) -> Unit,
     onAccentSelect: (NomaAccent) -> Unit,
     onSelect: (NomaAppearance) -> Unit,
     onDismiss: () -> Unit,
@@ -2169,10 +2189,28 @@ private fun AppearanceDialog(
                         .padding(NomaSpacing.comfortable),
                     verticalArrangement = Arrangement.spacedBy(NomaSpacing.medium)
                 ) {
+                    Text(stringResource(R.string.theme_family_title), style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() })
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                        NomaThemeFamily.entries.forEach { option ->
+                            val label = stringResource(when (option) {
+                                NomaThemeFamily.BW_ACCENT -> R.string.theme_bw_accent
+                                NomaThemeFamily.BW_PURE -> R.string.theme_bw_pure
+                                NomaThemeFamily.MATERIAL_YOU -> R.string.theme_material_you
+                                NomaThemeFamily.ACCENT_WHITE -> R.string.theme_accent_white
+                            })
+                            Row(Modifier.fillMaxWidth().selectable(selected = selectedFamily == option, role = Role.RadioButton,
+                                onClick = { onFamilySelect(option) }).padding(vertical = NomaSpacing.small),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                RadioButton(selectedFamily == option, onClick = null)
+                            }
+                        }
+                    }
                     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
                         NomaAppearance.entries.forEach { mode ->
                             val checked = mode == selected
-                            val preview = nomaColorScheme(isNomaDark(mode), selectedAccent)
+                            val preview = nomaColorScheme(isNomaDark(mode), selectedAccent, selectedFamily)
                             Row(
                                 modifier = Modifier.fillMaxWidth()
                                     .background(if (checked) MaterialTheme.colorScheme.secondaryContainer
@@ -2214,10 +2252,10 @@ private fun AppearanceDialog(
                             }
                         }
                     }
-                    Text(stringResource(R.string.accent_color_title),
+                    if (selectedFamily == NomaThemeFamily.BW_ACCENT || selectedFamily == NomaThemeFamily.ACCENT_WHITE) Text(stringResource(R.string.accent_color_title),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = NomaSpacing.small).semantics { heading() })
-                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                    if (selectedFamily == NomaThemeFamily.BW_ACCENT || selectedFamily == NomaThemeFamily.ACCENT_WHITE) Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
                         NomaAccent.entries.chunked(3).forEach { row ->
                             Row(horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
                                 row.forEach { swatch ->
@@ -2230,7 +2268,7 @@ private fun AppearanceDialog(
                                         NomaAccent.LILAC -> R.string.accent_lilac
                                         NomaAccent.SKY -> R.string.accent_sky
                                     })
-                                    val colors = nomaColorScheme(isNomaDark(selected), swatch)
+                                    val colors = nomaColorScheme(isNomaDark(selected), swatch, selectedFamily)
                                     Column(
                                         Modifier.weight(1f)
                                             .background(if (checked) MaterialTheme.colorScheme.secondaryContainer

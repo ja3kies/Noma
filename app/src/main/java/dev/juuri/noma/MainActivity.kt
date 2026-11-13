@@ -27,6 +27,7 @@ import dev.juuri.noma.ui.NomaApp
 import dev.juuri.noma.ui.NotesViewModel
 import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaAccent
+import dev.juuri.noma.ui.theme.NomaThemeFamily
 import dev.juuri.noma.ui.theme.NomaTheme
 import dev.juuri.noma.ui.theme.isNomaDark
 
@@ -117,6 +118,9 @@ class MainActivity : ComponentActivity() {
             var accent by remember {
                 mutableStateOf(NomaAccent.fromStorage(preferences.getString("accent", null)))
             }
+            var family by remember {
+                mutableStateOf(NomaThemeFamily.fromStorage(preferences.getString("family", null)))
+            }
             var widgetStyle by remember {
                 mutableStateOf(NomaWidgetPreferences.read(applicationContext))
             }
@@ -127,11 +131,16 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = !dark
                 }
             }
-            NomaTheme(appearance = appearance, accent = accent) {
+            NomaTheme(appearance = appearance, accent = accent, family = family) {
                 NomaApp(
                     viewModel = notesViewModel,
                     appearance = appearance,
                     accent = accent,
+                    family = family,
+                    onFamilyChange = { selected ->
+                        preferences.edit().putString("family", selected.name).apply()
+                        family = selected
+                    },
                     onAccentChange = { selected ->
                         preferences.edit().putString("accent", selected.name).apply()
                         accent = selected

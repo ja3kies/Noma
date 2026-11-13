@@ -156,7 +156,6 @@
     <string name="replacement_text">Replace with</string>
     <string name="replace_first">Replace first</string>
     <string name="replace_all">Replace all</string>
-    <string name="matches_found">%1$d matches</string>
     <string name="no_search_matches">No matches found</string>
     <string name="find_replace_close">Close search</string>
     <string name="library_title">My notes</string>
@@ -175,4 +174,10 @@
     <string name="hide_keyboard">Hide keyboard</string>
     <string name="previous_match">Previous</string>
     <string name="next_match">Next</string>
+    <string name="theme_family_title">Theme family</string>
+    <string name="theme_bw_accent">B and W + accent</string>
+    <string name="theme_bw_pure">B and W pure</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_accent_white">Accent and White</string>
+    <string name="match_position">%1$d of %2$d</string>
 </resources>

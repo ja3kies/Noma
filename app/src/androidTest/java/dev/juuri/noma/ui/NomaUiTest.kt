@@ -37,6 +37,7 @@ import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
 import dev.juuri.noma.ui.theme.NomaAccent
+import dev.juuri.noma.ui.theme.NomaThemeFamily
 import dev.juuri.noma.ui.theme.NomaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,6 +134,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
             SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(0, 3)))
         compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithText("1 of 2").assertExists()
         compose.onNodeWithTag("noma_find_next").performClick()
         compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
             SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(8, 11)))
@@ -169,10 +171,13 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         val appearance = mutableStateOf(NomaAppearance.SYSTEM)
         val accent = mutableStateOf(NomaAccent.FOREST)
+        val family = mutableStateOf(NomaThemeFamily.ACCENT_WHITE)
         compose.setContent {
-            NomaTheme(appearance.value, accent.value) {
+            NomaTheme(appearance.value, accent.value, family.value) {
                 NomaApp(model, appearance = appearance.value, accent = accent.value,
+                    family = family.value,
                     onAppearanceChange = { appearance.value = it },
+                    onFamilyChange = { family.value = it },
                     onAccentChange = { accent.value = it })
             }
         }
@@ -181,9 +186,14 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_appearance_page").assertExists()
         compose.onNodeWithTag("noma_accent_SAGE").performScrollTo().performClick()
         compose.onNodeWithTag("noma_accent_SAGE").assertIsSelected()
+        compose.onNodeWithText("B and W pure").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").assertDoesNotExist()
+        compose.onNodeWithText("Accent and White").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").assertExists()
         compose.runOnIdle {
             assertEquals(NomaAppearance.DARK, appearance.value)
             assertEquals(NomaAccent.SAGE, accent.value)
+            assertEquals(NomaThemeFamily.ACCENT_WHITE, family.value)
         }
         compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
         compose.onNodeWithText("Close").performClick()

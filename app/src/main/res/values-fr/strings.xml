@@ -156,7 +156,6 @@
     <string name="replacement_text">Remplacer par</string>
     <string name="replace_first">Remplacer la première occurrence</string>
     <string name="replace_all">Tout remplacer</string>
-    <string name="matches_found">%1$d occurrences</string>
     <string name="no_search_matches">Aucune occurrence</string>
     <string name="find_replace_close">Fermer la recherche</string>
     <string name="library_title">Mes notes</string>
@@ -175,4 +174,10 @@
     <string name="hide_keyboard">Masquer le clavier</string>
     <string name="previous_match">Précédent</string>
     <string name="next_match">Suivant</string>
+    <string name="theme_family_title">Famille de thème</string>
+    <string name="theme_bw_accent">Noir et blanc + accent</string>
+    <string name="theme_bw_pure">Noir et blanc pur</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_accent_white">Accent et blanc</string>
+    <string name="match_position">%1$d sur %2$d</string>
 </resources>
