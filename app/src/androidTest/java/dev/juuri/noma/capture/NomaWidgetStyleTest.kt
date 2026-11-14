@@ -70,6 +70,7 @@ class NomaWidgetStyleTest {
             R.color.noma_widget_frosted_stroke,
             R.color.noma_widget_glass_text,
             R.color.noma_widget_glass_fill,
+            R.color.noma_widget_glass_outer_stroke,
             R.color.noma_widget_glass_stroke
         )
         colors.forEach { assertTrue(context.getColor(it) != 0) }

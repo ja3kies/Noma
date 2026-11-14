@@ -7,7 +7,8 @@
 <color name="noma_widget_frosted_center">#B93D4B43</color>
 <color name="noma_widget_frosted_end">#C21B2922</color>
 <color name="noma_widget_frosted_stroke">#75FFFFFF</color>
-<color name="noma_widget_glass_fill">#B81D2827</color>
-<color name="noma_widget_glass_stroke">#75FFFFFF</color>
+<color name="noma_widget_glass_fill">#C21D2323</color>
+<color name="noma_widget_glass_outer_stroke">#7D000000</color>
+<color name="noma_widget_glass_stroke">#76FFFFFF</color>
 <color name="noma_widget_glass_text">#F4F6F4</color>
 </resources>

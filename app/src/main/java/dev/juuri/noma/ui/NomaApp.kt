@@ -136,7 +136,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
@@ -1813,9 +1812,13 @@ private fun NoteEditorScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     val exportScope = rememberCoroutineScope()
-                    PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
-                        exportScope.launch { snackbar.showSnackbar(message) }
-                    })
+                    // Document export stays available when reading, but does not compete
+                    // with the writing tools or Gboard while the IME is visible.
+                    if (!keyboardVisible) {
+                        PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
+                            exportScope.launch { snackbar.showSnackbar(message) }
+                        })
+                    }
                         IconButton(
                             onClick = {
                                 menuExpanded = false
@@ -1854,7 +1857,7 @@ private fun NoteEditorScreen(
             }
         },
         topBar = {
-            Column(Modifier.animateContentSize(tween(NomaMotion.quick))) {
+            Column(Modifier.animateContentSize(NomaMotion.spatialGentle())) {
                 TopAppBar(
                     title = {
                         Text(
@@ -1967,7 +1970,8 @@ private fun NoteEditorScreen(
                         closeWhenSaved = false
                         viewModel.changeTitle(it)
                     },
-                    singleLine = true,
+                    singleLine = false,
+                    maxLines = 3,
                     textStyle = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -2007,7 +2011,8 @@ private fun NoteEditorScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(Modifier.height(NomaSpacing.section))
+                // Editorial rhythm: keep the writing area close to its title.
+                Spacer(Modifier.height(NomaSpacing.medium))
                 BasicTextField(
                     value = currentBody,
                     onValueChange = {
@@ -2374,7 +2379,7 @@ private fun WidgetStyleDialog(
                         val previewOutline = colorResource(when (style) {
                             NomaWidgetStyle.MATERIAL_YOU -> R.color.noma_widget_material_outline
                             NomaWidgetStyle.FROSTED_GREEN -> R.color.noma_widget_frosted_stroke
-                            NomaWidgetStyle.LIQUID_GLASS -> R.color.noma_widget_glass_stroke
+                            NomaWidgetStyle.LIQUID_GLASS -> R.color.noma_widget_glass_outer_stroke
                         })
                         val previewText = colorResource(when (style) {
                             NomaWidgetStyle.MATERIAL_YOU -> R.color.noma_widget_material_text
@@ -2385,6 +2390,10 @@ private fun WidgetStyleDialog(
                             modifier = Modifier.size(width = 116.dp, height = 36.dp)
                                 .background(previewBrush, RoundedCornerShape(15.dp))
                                 .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
+                                .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
+                                    Modifier.padding(1.dp).border(1.dp,
+                                        colorResource(R.color.noma_widget_glass_stroke), RoundedCornerShape(14.dp))
+                                    else Modifier)
                                 .testTag("noma_widget_preview_${style.name}"),
                             contentAlignment = Alignment.CenterStart
                         ) {
