@@ -289,19 +289,23 @@ private fun monochromeForeground(background: Color): Color {
 }
 
 @Composable
+internal fun resolveNomaColorScheme(dark: Boolean, accent: NomaAccent, family: NomaThemeFamily): ColorScheme {
+    val context = LocalContext.current
+    return when {
+        family == NomaThemeFamily.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        else -> nomaColorScheme(dark, accent, family)
+    }
+}
+
+@Composable
 fun NomaTheme(
     appearance: NomaAppearance = NomaAppearance.SYSTEM,
     accent: NomaAccent = NomaAccent.FOREST,
     family: NomaThemeFamily = NomaThemeFamily.ACCENT_WHITE,
     content: @Composable () -> Unit
 ) {
-    val dark = isNomaDark(appearance)
-    val context = LocalContext.current
-    val colors = when {
-        family == NomaThemeFamily.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        else -> nomaColorScheme(dark, accent, family)
-    }
+    val colors = resolveNomaColorScheme(isNomaDark(appearance), accent, family)
     MaterialTheme(
         colorScheme = colors,
         typography = NomaTypography,
