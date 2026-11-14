@@ -48,6 +48,7 @@ class NomaAccentTest {
                 ).forEach { (ink, paper) ->
                     assertTrue("$accent dark=$dark contrast", contrast(ink, paper) >= 4.5)
                 }
+                assertTrue("error container $accent dark=$dark", contrast(colors.onErrorContainer, colors.errorContainer) >= 4.5)
                 assertEquals(colors.primary, colors.surfaceTint)
             }
         }
@@ -65,12 +66,42 @@ class NomaAccentTest {
             val accented = nomaColorScheme(dark, NomaAccent.CORAL, NomaThemeFamily.BW_ACCENT)
             assertEquals(pure.background, accented.background)
             assertEquals(pure.surface, accented.surface)
-            assertEquals(pure.error.red, pure.error.green, 0f)
-            assertEquals(pure.error.green, pure.error.blue, 0f)
+            monochromeRoles(pure).forEach { color ->
+                assertEquals("red/green in $color", color.red, color.green, 0f)
+                assertEquals("green/blue in $color", color.green, color.blue, 0f)
+            }
+            monochromeRoles(accented).forEach { color ->
+                assertEquals("BW_ACCENT red/green in $color", color.red, color.green, 0f)
+                assertEquals("BW_ACCENT green/blue in $color", color.green, color.blue, 0f)
+            }
             assertEquals(NomaAccent.CORAL.let { if (dark) it.darkPrimary else it.lightPrimary }, accented.primary)
+            assertTrue(contrast(accented.primary, accented.onPrimary) >= 4.5)
             assertTrue(contrast(pure.onSurface, pure.surface) >= 4.5)
         }
     }
+
+    @Test fun everyAccentChoosesReadableForegroundInBothModesAndFamilies() {
+        NomaAccent.entries.forEach { accent ->
+            listOf(false, true).forEach { dark ->
+                listOf(NomaThemeFamily.BW_ACCENT, NomaThemeFamily.ACCENT_WHITE).forEach { family ->
+                    val scheme = nomaColorScheme(dark, accent, family)
+                    assertTrue("$family $accent dark=$dark", contrast(scheme.primary, scheme.onPrimary) >= 4.5)
+                }
+            }
+        }
+    }
+
+    private fun monochromeRoles(scheme: androidx.compose.material3.ColorScheme) = listOf(
+        scheme.onPrimary, scheme.primaryContainer, scheme.onPrimaryContainer,
+        scheme.secondary, scheme.onSecondary, scheme.secondaryContainer, scheme.onSecondaryContainer,
+        scheme.tertiary, scheme.onTertiary, scheme.tertiaryContainer, scheme.onTertiaryContainer,
+        scheme.background, scheme.onBackground, scheme.surface, scheme.onSurface, scheme.surfaceVariant,
+        scheme.onSurfaceVariant, scheme.surfaceTint, scheme.inverseSurface, scheme.inverseOnSurface,
+        scheme.error, scheme.onError, scheme.errorContainer, scheme.onErrorContainer, scheme.outline,
+        scheme.outlineVariant, scheme.scrim, scheme.surfaceBright, scheme.surfaceDim, scheme.surfaceContainer,
+        scheme.surfaceContainerHigh, scheme.surfaceContainerHighest, scheme.surfaceContainerLow,
+        scheme.surfaceContainerLowest
+    )
 
     private fun contrast(first: Color, second: Color): Double {
         val a = luminance(first)

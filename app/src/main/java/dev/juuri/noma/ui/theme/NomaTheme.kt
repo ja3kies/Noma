@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.pow
 
 enum class NomaAppearance {
     SYSTEM, LIGHT, DARK;
@@ -110,7 +111,9 @@ private val LightColors = lightColorScheme(
     outline = Color(0xFF637565),
     outlineVariant = Color(0xFFD8E0D6),
     error = Color(0xFFB3261E),
-    onError = Color.White
+    onError = Color.White,
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B)
 )
 
 private val DarkColors = darkColorScheme(
@@ -140,7 +143,9 @@ private val DarkColors = darkColorScheme(
     outline = Color(0xFFA0B1A2),
     outlineVariant = Color(0xFF425547),
     error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005)
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val NomaShapes = Shapes(
@@ -208,19 +213,35 @@ internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent, family: NomaThem
         val mono = if (dark) darkColorScheme(
             primary = Color.White, onPrimary = Color.Black, primaryContainer = Color(0xFF303030), onPrimaryContainer = Color.White,
             secondary = Color.LightGray, onSecondary = Color.Black, secondaryContainer = Color(0xFF292929), onSecondaryContainer = Color.White,
+            tertiary = Color.LightGray, onTertiary = Color.Black, tertiaryContainer = Color(0xFF292929), onTertiaryContainer = Color.White,
+            inversePrimary = Color.Black,
             background = Color(0xFF101010), onBackground = Color.White, surface = Color(0xFF181818), onSurface = Color.White,
             surfaceVariant = Color(0xFF303030), onSurfaceVariant = Color(0xFFD0D0D0), outline = Color.LightGray,
-            outlineVariant = Color(0xFF555555), error = Color.White, onError = Color.Black
+            outlineVariant = Color(0xFF555555), error = Color.White, onError = Color.Black,
+            errorContainer = Color(0xFF3A3A3A), onErrorContainer = Color.White,
+            surfaceTint = Color.White, inverseSurface = Color(0xFFE5E5E5), inverseOnSurface = Color(0xFF202020),
+            scrim = Color.Black, surfaceBright = Color(0xFF414141), surfaceDim = Color(0xFF101010),
+            surfaceContainerLowest = Color(0xFF0A0A0A), surfaceContainerLow = Color(0xFF181818),
+            surfaceContainer = Color(0xFF202020), surfaceContainerHigh = Color(0xFF292929),
+            surfaceContainerHighest = Color(0xFF333333)
         ) else lightColorScheme(
             primary = Color.Black, onPrimary = Color.White, primaryContainer = Color(0xFFE5E5E5), onPrimaryContainer = Color.Black,
             secondary = Color.DarkGray, onSecondary = Color.White, secondaryContainer = Color(0xFFF0F0F0), onSecondaryContainer = Color.Black,
+            tertiary = Color.DarkGray, onTertiary = Color.White, tertiaryContainer = Color(0xFFF0F0F0), onTertiaryContainer = Color.Black,
+            inversePrimary = Color.White,
             background = Color(0xFFF8F8F8), onBackground = Color.Black, surface = Color.White, onSurface = Color.Black,
             surfaceVariant = Color(0xFFE8E8E8), onSurfaceVariant = Color(0xFF333333), outline = Color.DarkGray,
-            outlineVariant = Color(0xFFBBBBBB), error = Color.Black, onError = Color.White
+            outlineVariant = Color(0xFFBBBBBB), error = Color.Black, onError = Color.White,
+            errorContainer = Color(0xFFE8E8E8), onErrorContainer = Color(0xFF202020),
+            surfaceTint = Color.Black, inverseSurface = Color(0xFF303030), inverseOnSurface = Color.White,
+            scrim = Color.Black, surfaceBright = Color.White, surfaceDim = Color(0xFFD6D6D6),
+            surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF8F8F8),
+            surfaceContainer = Color(0xFFF0F0F0), surfaceContainerHigh = Color(0xFFE8E8E8),
+            surfaceContainerHighest = Color(0xFFE0E0E0)
         )
         return if (family == NomaThemeFamily.BW_PURE) mono else mono.copy(
             primary = if (dark) accent.darkPrimary else accent.lightPrimary,
-            onPrimary = if (dark) Color(0xFF17271C) else Color.White,
+            onPrimary = monochromeForeground(if (dark) accent.darkPrimary else accent.lightPrimary),
             inversePrimary = if (dark) accent.lightPrimary else accent.darkPrimary
         )
     }
@@ -229,11 +250,11 @@ internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent, family: NomaThem
     val ink = if (dark) Color(0xFFE5EFE6) else Color(0xFF193622)
     return base.copy(
         primary = primary,
-        onPrimary = if (dark) Color(0xFF17271C) else Color.White,
+        onPrimary = readableForeground(primary),
         primaryContainer = container,
         onPrimaryContainer = ink,
         secondary = primary,
-        onSecondary = if (dark) Color(0xFF17271C) else Color.White,
+        onSecondary = readableForeground(primary),
         secondaryContainer = container,
         onSecondaryContainer = ink,
         surfaceTint = primary,
@@ -244,6 +265,27 @@ internal fun nomaColorScheme(dark: Boolean, accent: NomaAccent, family: NomaThem
         surfaceContainerHigh = lerp(base.surfaceContainerHigh, container, 0.16f),
         surfaceContainerHighest = lerp(base.surfaceContainerHighest, container, 0.20f)
     )
+}
+
+private fun readableForeground(background: Color): Color {
+    fun luminance(color: Color): Double {
+        fun linear(component: Float): Double = component.toDouble().let {
+            if (it <= 0.04045) it / 12.92 else ((it + 0.055) / 1.055).pow(2.4)
+        }
+        return 0.2126 * linear(color.red) + 0.7152 * linear(color.green) + 0.0722 * linear(color.blue)
+    }
+    fun contrast(foreground: Color): Double {
+        val a = luminance(background)
+        val b = luminance(foreground)
+        return (maxOf(a, b) + 0.05) / (minOf(a, b) + 0.05)
+    }
+    val darkInk = Color(0xFF17271C)
+    return if (contrast(darkInk) >= contrast(Color.White)) darkInk else Color.White
+}
+
+private fun monochromeForeground(background: Color): Color {
+    val lightContrast = readableForeground(background)
+    return if (lightContrast == Color.White) Color.White else Color.Black
 }
 
 @Composable
