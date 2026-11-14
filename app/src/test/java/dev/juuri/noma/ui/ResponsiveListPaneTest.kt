@@ -6,6 +6,15 @@ import org.junit.Test
 
 /** Pure layout checks: no device or persistence required. */
 class ResponsiveListPaneTest {
+    @Test fun familyPreviewGridAvoidsCrampedLabelsOnSmallScreens() {
+        assertEquals(1, nomaThemeFamilyColumns(320.dp, 1f))
+        assertEquals(1, nomaThemeFamilyColumns(360.dp, 1f))
+        assertEquals(1, nomaThemeFamilyColumns(393.dp, 1.5f))
+        assertEquals(1, nomaThemeFamilyColumns(560.dp, 2f))
+        assertEquals(2, nomaThemeFamilyColumns(393.dp, 1f))
+        assertEquals(2, nomaThemeFamilyColumns(560.dp, 1.2f))
+    }
+
     @Test fun minimumListWidthAtCompactTabletBreakpoint() {
         assertEquals(320.dp, responsiveListPaneWidth(840.dp))
     }

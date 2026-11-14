@@ -471,6 +471,10 @@ internal fun shouldShowNomaTwoPane(windowWidth: Dp): Boolean =
 internal fun shouldAnimateNomaListItems(noteCount: Int): Boolean =
     noteCount in 0..80
 
+/** Keep long theme-family labels readable instead of crushing two cards on narrow windows. */
+internal fun nomaThemeFamilyColumns(availableWidth: Dp, fontScale: Float): Int =
+    if (availableWidth < 380.dp || fontScale >= 1.3f) 1 else 2
+
 internal fun nomaPaneGutter(windowWidth: Dp): Dp =
     if (windowWidth >= 1200.dp) 16.dp else 8.dp
 
@@ -1599,7 +1603,9 @@ private fun NoteEditorScreen(
     LaunchedEffect(findReplaceOpen, focusBodyAfterFind) {
         if (!findReplaceOpen && focusBodyAfterFind) {
             bodyFocus.requestFocus()
-            keyboard?.hide()
+            // Return directly to editing the selected result; dismissing the
+            // search dialog must not unexpectedly hide the writing keyboard.
+            keyboard?.show()
             focusBodyAfterFind = false
         }
     }
@@ -2184,8 +2190,11 @@ private fun AppearanceDialog(
                 ) {
                     Text(stringResource(R.string.theme_family_title), style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.semantics { heading() })
-                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
-                        NomaThemeFamily.entries.chunked(2).forEach { options ->
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val columns = nomaThemeFamilyColumns(maxWidth, LocalDensity.current.fontScale)
+                        Column(Modifier.selectableGroup(),
+                            verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
+                            NomaThemeFamily.entries.chunked(columns).forEach { options ->
                             Row(horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
                                 options.forEach { option ->
                                     val label = stringResource(when (option) {
@@ -2237,6 +2246,7 @@ private fun AppearanceDialog(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                     Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
