@@ -1901,8 +1901,9 @@ private fun NoteEditorScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            if (expanded) note.displayTitle.ifBlank { stringResource(R.string.untitled) } else safeTitle,
-                            style = MaterialTheme.typography.titleMedium,
+                            safeTitle,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -2050,7 +2051,7 @@ private fun NoteEditorScreen(
                 )
                 // Preserve a continuous writing surface. Metadata is read-only
                 // and never participates in the editable or exported note text.
-                if (!keyboardVisible && (note.title.isNotBlank() || note.body.isNotBlank())) {
+                if (note.title.isNotBlank() || note.body.isNotBlank()) {
                     Spacer(Modifier.height(NomaSpacing.small))
                     Text(
                         text = stringResource(
