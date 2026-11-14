@@ -147,21 +147,27 @@ class MainActivity : ComponentActivity() {
                     },
                     widgetStyle = widgetStyle,
                     onWidgetStyleChange = { selected ->
-                        try {
-                            // Write first: never show a selection that cannot survive restart.
-                            NomaWidgetPreferences.save(applicationContext, selected)
-                            widgetStyle = selected
-                        } catch (failure: RuntimeException) {
-                            android.util.Log.e("NomaWidget", "Cannot save widget style", failure)
-                            android.widget.Toast.makeText(
-                                this, R.string.widget_style_save_error,
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        try {
-                            NomaQuickCaptureWidget.refreshAll(applicationContext)
-                        } catch (failure: RuntimeException) {
-                            android.util.Log.w("NomaWidget", "Widget host refused refresh", failure)
+                        if (selected != widgetStyle) {
+                            try {
+                                // Commit before applying UI state or refreshing a host.
+                                NomaWidgetPreferences.save(applicationContext, selected)
+                                widgetStyle = selected
+                                try {
+                                    NomaQuickCaptureWidget.refreshAll(applicationContext)
+                                } catch (failure: RuntimeException) {
+                                    // Persisted setting remains selected: the next
+                                    // widget update can recover a host failure.
+                                    android.util.Log.w("NomaWidget", "Widget host refused refresh", failure)
+                                }
+                            } catch (failure: RuntimeException) {
+                                // A failed write must not trigger a spurious widget
+                                // refresh or appear successfully selected.
+                                android.util.Log.e("NomaWidget", "Cannot save widget style", failure)
+                                android.widget.Toast.makeText(
+                                    this, R.string.widget_style_save_error,
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     },
                     onAppearanceChange = { selected ->
