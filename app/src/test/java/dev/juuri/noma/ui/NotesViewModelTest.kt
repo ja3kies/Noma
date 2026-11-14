@@ -79,6 +79,21 @@ class NotesViewModelTest {
         override suspend fun refresh() = Unit
     }
 
+    @Test fun importedFutureDateRemainsValidDuringEditorAutosave() = runTest {
+        val future = 4_102_444_800_000L
+        val imported = Note("future", "Imported", "Old body", false, future, future + 100)
+        val repo = FakeRepository(imported)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(imported)
+        model.changeBody("New body")
+        assertEquals("New body", model.active.value?.body)
+        assertTrue(model.active.value!!.updatedAt >= imported.updatedAt)
+        advanceUntilIdle()
+        val stored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertTrue(stored.updatedAt >= stored.createdAt)
+        assertTrue(stored.updatedAt >= imported.updatedAt)
+    }
+
     @Test fun savedStatusFollowsLatestWriteAcknowledgement() = runTest {
         val note = Note("id", "Initial", "", false, 1L, 1L)
         val repo = FakeRepository(note)

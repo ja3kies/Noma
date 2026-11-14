@@ -450,7 +450,9 @@ class NotesViewModel(
     }
 
     private fun updateActive(note: Note) {
-        val updated = note.copy(updatedAt = System.currentTimeMillis())
+        val updated = note.copy(updatedAt = maxOf(
+            System.currentTimeMillis(), note.createdAt, note.updatedAt
+        ))
         _active.value = updated
         editorRevision++
         _saveState.value = EditorSaveState.Saving
