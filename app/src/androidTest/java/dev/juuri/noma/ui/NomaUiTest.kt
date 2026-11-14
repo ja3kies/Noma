@@ -48,6 +48,9 @@ import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import android.graphics.Bitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Rule
 import org.junit.Test
 
@@ -165,6 +168,69 @@ class NomaUiTest {
         compose.runOnIdle {
             assertTrue(model.active.value?.body?.contains("changed") == true)
         }
+    }
+
+
+    /**
+     * Production-equivalent emulator visual evidence for user and competitor
+     * stress review. Uses synthetic notes only; no person's private text.
+     */
+    @Test fun premiumEditorCapturesAdversarialScreenStates() {
+        val initialBody = ("A quiet place for ideas. Every paragraph should remain easy to read.\\n").repeat(18)
+        val note = Note("premium-visual", "Visual draft", initialBody, false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val dark = mutableStateOf(false)
+        val fontScale = mutableStateOf(1f)
+        compose.setContent {
+            val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(baseDensity.density, fontScale.value)
+            ) {
+                NomaTheme(appearance = if (dark.value) NomaAppearance.DARK else NomaAppearance.LIGHT) {
+                    NomaApp(model)
+                }
+            }
+        }
+        compose.onNodeWithText("Visual draft").performClick()
+        savePremiumScreenshot("01-editor-light")
+
+        compose.onNodeWithTag("noma_body_input").performTextInput(" Writing with the keyboard.")
+        compose.waitUntil(10_000) {
+            model.saveState.value == EditorSaveState.Saved &&
+                model.active.value?.body?.contains("Writing with") == true
+        }
+        savePremiumScreenshot("02-editor-ime")
+
+        compose.runOnIdle { repo.failWrites = true }
+        compose.onNodeWithTag("noma_body_input").performTextInput(" offline draft")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+        savePremiumScreenshot("03-editor-save-failure")
+
+        compose.runOnIdle { repo.failWrites = false }
+        compose.onNodeWithTag("noma_retry_save").performClick()
+        compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+        compose.runOnIdle { dark.value = true }
+        savePremiumScreenshot("04-editor-dark")
+
+        compose.runOnIdle { fontScale.value = 1.6f }
+        compose.onNodeWithTag("noma_editor_toolbar").assertIsDisplayed()
+        savePremiumScreenshot("05-editor-large-font")
+    }
+
+    private fun savePremiumScreenshot(name: String) {
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val image = instrumentation.uiAutomation.takeScreenshot()
+            ?: throw AssertionError("Android UiAutomation could not capture $name")
+        val directory = File(instrumentation.targetContext.filesDir, "editor-snapshots")
+        assertTrue("Cannot create screenshot directory", directory.isDirectory || directory.mkdirs())
+        File(directory, "$name.png").outputStream().use { stream ->
+            assertTrue("Screenshot bitmap encoding failed", image.compress(Bitmap.CompressFormat.PNG, 100, stream))
+        }
+        image.recycle()
     }
 
     @Test fun compactLibraryKeepsEveryFilterVisibleWithLargeText() {
