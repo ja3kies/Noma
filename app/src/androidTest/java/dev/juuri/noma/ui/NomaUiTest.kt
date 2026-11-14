@@ -3,6 +3,7 @@ package dev.juuri.noma.ui
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
@@ -98,6 +99,73 @@ class NomaUiTest {
             return missing.size
         }
         override suspend fun refresh() = Unit
+    }
+
+
+    @Test fun premiumEditorKeepsMetadataInWritingFlowWhenImeOpens() {
+        val note = Note("premium-metadata", "Evening notes", "Opening words", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val imeVisible = mutableStateOf(false)
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.SideEffect {
+                imeVisible.value = androidx.compose.foundation.layout.WindowInsets.ime
+                    .getBottom(density) > 0
+            }
+            NomaTheme { NomaApp(model) }
+        }
+        compose.onNodeWithText("Evening notes").performClick()
+        compose.onNodeWithTag("noma_editor_metadata").assertIsDisplayed()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" continued")
+        compose.waitUntil(10_000) { imeVisible.value }
+        compose.onNodeWithTag("noma_editor_metadata").assertIsDisplayed()
+        compose.runOnIdle {
+            assertTrue(model.active.value?.body?.contains("continued") == true)
+        }
+    }
+
+    @Test fun premiumEditorDockIsCompactAndKeepsPrimaryToolsAccessible() {
+        val note = Note("premium-dock", "Toolbar test", "Body", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Toolbar test").performClick()
+        val dock = compose.onNodeWithTag("noma_editor_dock")
+        dock.assertIsDisplayed()
+        val dockBounds = dock.fetchSemanticsNode().boundsInRoot
+        val screenBounds = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue("Dock must not occupy the full screen width",
+            dockBounds.width < screenBounds.width * 0.9f)
+        compose.onNodeWithTag("noma_editor_toolbar").assertIsDisplayed()
+        compose.onNodeWithTag("noma_editor_find_replace").assertIsDisplayed()
+        compose.onNodeWithTag("noma_editor_bullet").assertIsDisplayed()
+        compose.onNodeWithTag("noma_editor_bullet").performClick()
+        compose.waitUntil(10_000) {
+            model.active.value?.body == "- Body"
+        }
+    }
+
+    @Test fun premiumEditorRetryBelongsToTheStickyFailureSurface() {
+        val note = Note("premium-retry", "Recovery test", "Before", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Recovery test").performClick()
+        compose.onNodeWithTag("noma_body_input").performTextInput(" changed")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        val surface = compose.onNodeWithTag("noma_editor_save_bar").assertIsDisplayed()
+        val retry = compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+        compose.onNodeWithTag("noma_save_failure_guidance").assertIsDisplayed()
+        val banner = surface.fetchSemanticsNode().boundsInRoot
+        val action = retry.fetchSemanticsNode().boundsInRoot
+        assertTrue("Retry must be visible inside the same sticky save surface",
+            action.top >= banner.top && action.bottom <= banner.bottom &&
+                action.left >= banner.left && action.right <= banner.right)
+        compose.runOnIdle {
+            assertTrue(model.active.value?.body?.contains("changed") == true)
+        }
     }
 
     @Test fun compactLibraryKeepsEveryFilterVisibleWithLargeText() {
