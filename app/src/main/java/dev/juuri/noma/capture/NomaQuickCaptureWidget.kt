@@ -60,6 +60,12 @@ class NomaQuickCaptureWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) refreshAll(context)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
+        ) {
+            // Cached RemoteViews still reference the previous APK's resources
+            // until each installed instance receives a complete refresh.
+            refreshAll(context)
+        }
     }
 }

@@ -3,6 +3,7 @@ package dev.juuri.noma.data
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.juuri.noma.domain.Note
+import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -77,6 +78,23 @@ class SqlitePersistenceTest {
             val reopened = NotesOpenHelper(context, testDb).readAll()
             assertTrue(reopened.isEmpty())
         }
+    }
+
+    @Test fun editedFutureDatedImportSurvivesBackupAndDatabaseReopen() = runBlocking {
+        val future = 4_102_444_800_000L
+        val imported = Note("future", "Imported", "Old body", false, future, future + 100)
+        val repository = SqliteNotesRepository(context, testDb)
+        assertEquals(1, repository.importMissing(listOf(imported)))
+        NotesService(repository, clock = { 100L }).save(imported.copy(body = "Edited here"))
+
+        val saved = (repository.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(future + 100, saved.updatedAt)
+        assertEquals("Edited here", saved.body)
+        assertEquals(saved, NotesPortableFormat.decode(NotesPortableFormat.encode(listOf(saved))).single())
+
+        val reopened = SqliteNotesRepository(context, testDb)
+        reopened.refresh()
+        assertEquals(saved, (reopened.notes.value as NotesSnapshot.Ready).entries.single())
     }
 
     @Test fun writesSurviveNewRepositoryInstancesAndDeletion() = runBlocking {

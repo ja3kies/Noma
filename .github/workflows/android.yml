@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: noma-validation-${{ github.ref }}
+  # Push and PR checks for the same head branch share one group.
+  group: noma-validation-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -75,6 +76,25 @@ jobs:
       - name: Enable KVM for Android emulator
         run: |
           if test -e /dev/kvm; then sudo chmod a+rw /dev/kvm; fi
+      # The Google APIs system image occasionally arrives as a corrupt ZIP
+      # on hosted runners. Preinstall with bounded retries so a transient
+      # SDK mirror failure does not masquerade as an app-test failure.
+      - name: Preinstall Android emulator system image with retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          package='system-images;android-35;google_apis;x86_64'
+          for attempt in 1 2 3; do
+            if sdkmanager --install "$package"; then
+              exit 0
+            fi
+            echo "::warning::Android SDK image installation failed (attempt $attempt/3)"
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 15))
+            fi
+          done
+          echo "::error::Android SDK image installation failed after 3 attempts"
+          exit 1
       - name: Run Android device and UI instrumentation
         uses: reactivecircus/android-emulator-runner@v2
         with:

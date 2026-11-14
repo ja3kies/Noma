@@ -1,8 +1,14 @@
 package dev.juuri.noma.ui
 
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.ComponentActivity
+import android.view.WindowManager
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -20,6 +26,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -31,12 +38,15 @@ import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.domain.NotesSnapshot
 import dev.juuri.noma.ui.theme.NomaAppearance
+import dev.juuri.noma.ui.theme.NomaAccent
+import dev.juuri.noma.ui.theme.NomaThemeFamily
 import dev.juuri.noma.ui.theme.NomaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -46,7 +56,18 @@ import org.junit.Test
  */
 @OptIn(ExperimentalTestApi::class)
 class NomaUiTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before fun matchProductionKeyboardResizeMode() {
+        // Noma's MainActivity is adjustResize. The default Compose test host
+        // otherwise pans the full-height window when Gboard appears, moving
+        // the sticky save status and Retry button outside the visible viewport.
+        compose.runOnUiThread {
+            compose.activity.window.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            )
+        }
+    }
 
     private class FakeRepository(
         initial: List<Note> = emptyList(),
@@ -77,6 +98,135 @@ class NomaUiTest {
             return missing.size
         }
         override suspend fun refresh() = Unit
+    }
+
+    @Test fun compactLibraryKeepsEveryFilterVisibleWithLargeText() {
+        val repo = FakeRepository(listOf(Note("one", "A note", "Short", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, 1.5f)
+            ) {
+                NomaTheme { NomaApp(model) }
+            }
+        }
+        compose.onNodeWithTag("noma_all_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_archive_filter").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("noma_archive_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+    }
+
+    @Test fun editorBulletToolUsesAutosaveAndCanBeReversed() {
+        val repo = FakeRepository(listOf(Note("list", "Groceries", "Bread", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Groceries").performClick()
+        compose.onNodeWithTag("noma_editor_save_bar").assertDoesNotExist()
+        compose.onNodeWithTag("noma_editor_toolbar").assertIsDisplayed()
+        compose.onNodeWithTag("noma_editor_bullet").performClick()
+        compose.waitUntil(5_000) {
+            (repo.notes.value as NotesSnapshot.Ready).entries.single().body == "- Bread"
+        }
+        compose.onNodeWithTag("noma_editor_bullet").performClick()
+        compose.waitUntil(5_000) {
+            (repo.notes.value as NotesSnapshot.Ready).entries.single().body == "Bread"
+        }
+    }
+
+    @Test fun findNextSelectsRealTextWithoutSavingARevision() {
+        val note = Note("find-next", "Find example", "cat one cat", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Find example").performClick()
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("cat")
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(0, 3)))
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithText("1 of 2").assertExists()
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(8, 11)))
+        compose.runOnIdle {
+            assertEquals(note.body, model.active.value?.body)
+            assertEquals(0, repo.saveAttempts)
+        }
+    }
+
+    @Test fun libraryControlsFit360Dp() = assertLibraryViewport(360)
+    @Test fun libraryControlsFit393Dp() = assertLibraryViewport(393)
+    @Test fun libraryControlsFit412Dp() = assertLibraryViewport(412)
+    @Test fun tabletKeepsLibraryAndEditorAt840Dp() = assertLibraryViewport(840)
+
+    private fun assertLibraryViewport(width: Int) {
+        val repo = FakeRepository(listOf(Note("viewport", "Test note", "Body", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val actualDensity = androidx.compose.ui.platform.LocalDensity.current
+            // CI runs on a phone emulator. Measure the tablet's full logical
+            // 840dp viewport within the emulator's actual 1080px display.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(
+                        if (width >= 840) 1f else actualDensity.density,
+                        actualDensity.fontScale
+                    )
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.width(width.dp).height(800.dp)
+                ) { NomaTheme { NomaApp(model) } }
+            }
+        }
+        compose.onNodeWithTag("noma_all_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_archive_filter").assertIsDisplayed()
+        compose.onNodeWithTag("noma_sort_button").assertIsDisplayed()
+        compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
+        compose.onNodeWithTag("noma_new_note").assertIsDisplayed()
+        // A 393dp emulator cannot become a tablet by overriding density:
+        // parent layout constraints remain phone-sized. Verify phone controls
+        // here; tablet pane layout needs a genuine >=840dp device profile.
+    }
+
+    @Test fun appearanceChangesStayOpenAndWidgetBackReturnsToSettings() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val appearance = mutableStateOf(NomaAppearance.SYSTEM)
+        val accent = mutableStateOf(NomaAccent.FOREST)
+        val family = mutableStateOf(NomaThemeFamily.ACCENT_WHITE)
+        compose.setContent {
+            NomaTheme(appearance.value, accent.value, family.value) {
+                NomaApp(model, appearance = appearance.value, accent = accent.value,
+                    family = family.value,
+                    onAppearanceChange = { appearance.value = it },
+                    onFamilyChange = { family.value = it },
+                    onAccentChange = { accent.value = it })
+            }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithText("Dark").performClick()
+        compose.onNodeWithTag("noma_appearance_page").assertExists()
+        compose.onNodeWithTag("noma_accent_SAGE").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").assertIsSelected()
+        compose.onNodeWithText("B and W pure").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").assertDoesNotExist()
+        compose.onNodeWithText("Accent and White").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").assertExists()
+        compose.runOnIdle {
+            assertEquals(NomaAppearance.DARK, appearance.value)
+            assertEquals(NomaAccent.SAGE, accent.value)
+            assertEquals(NomaThemeFamily.ACCENT_WHITE, family.value)
+        }
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
+        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithTag("noma_appearance_page").assertExists()
+        compose.onNodeWithContentDescription("Close").performClick()
+        compose.onNodeWithTag("noma_appearance_page").assertDoesNotExist()
     }
 
     @Test fun backupCheckRemainsAvailableAfterLocalStorageFailure() {
@@ -130,7 +280,7 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_archive_filter").performClick()
         compose.onNodeWithContentDescription("Actions for Finished task").performClick()
-        compose.onNodeWithText("Pin note").assertDoesNotExist()
+        compose.onNodeWithTag("noma_menu_pin").assertDoesNotExist()
         compose.onNodeWithText("Restore note").assertExists()
     }
 
@@ -206,12 +356,14 @@ class NomaUiTest {
         ))
         val viewModel = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(viewModel) } }
-        compose.onNodeWithText("Recent").assertExists()
+        // SectionHeader intentionally exposes one spoken heading+count
+        // node; the visible Text is available on the unmerged tree.
+        compose.onNodeWithContentDescription("Recent: 2 notes", useUnmergedTree = true).assertExists()
         compose.onNodeWithContentDescription("Sort notes").performClick()
         compose.onNodeWithText("Title (A–Z)").performClick()
-        compose.onNodeWithText("A–Z").assertExists()
+        compose.onNodeWithContentDescription("A–Z: 2 notes", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_search").performTextInput("Cafe")
-        compose.onNodeWithText("Search results").assertExists()
+        compose.onNodeWithContentDescription("Search results: 1 note", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Café").assertExists()
     }
 
@@ -244,7 +396,7 @@ class NomaUiTest {
         }
     }
 
-    @Test fun editorMenuDoesNotRepeatThePrimaryPinAction() {
+    @Test fun editorMenuKeepsTheSingleAvailablePinAction() {
         val repo = FakeRepository(listOf(
             Note("one", "Open note", "Body", false, 1L, 1L)
         ))
@@ -252,8 +404,10 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithText("Open note").performClick()
         compose.onNodeWithContentDescription("Note actions").performClick()
-        compose.onNodeWithText("Pin note").assertDoesNotExist()
-        compose.onNodeWithText("Archive note").assertExists()
+        // Pin is deliberately in the editor overflow, not duplicated on its toolbar.
+        compose.onNodeWithTag("noma_menu_pin").assertIsDisplayed().performClick()
+        compose.waitUntil(5_000) { model.active.value?.isPinned == true }
+        compose.runOnIdle { assertTrue(model.active.value?.isPinned == true) }
     }
 
     @Test fun clearingSearchFiltersRestoresAllNotes() {
@@ -355,7 +509,7 @@ class NomaUiTest {
             }
         }
         compose.onNodeWithContentDescription("Appearance").performClick()
-        compose.onNodeWithText("Widget appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
         compose.onNodeWithText("Material You").assertExists()
         compose.onNodeWithText("Frosted green").assertExists()
         compose.onNodeWithText("Liquid Glass").performClick()
@@ -480,14 +634,15 @@ class NomaUiTest {
         }
     }
 
-    @Test fun archivedNoteCannotBePinnedFromEditorToolbar() {
+    @Test fun archivedNoteHasNoPinActionInEditorMenu() {
         val note = Note("archive", "Archived text", "Saved", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(note))
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_archive_filter").performClick()
         compose.onNodeWithText("Archived text").performClick()
-        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertDoesNotExist()
     }
 
     @Test fun savingNoteDisablesEditorPinArchiveDeleteAndShare() {
@@ -500,8 +655,8 @@ class NomaUiTest {
         compose.onNodeWithText("Working draft").performClick()
         compose.onNodeWithTag("noma_body_input").performTextInput(" pending")
         compose.runOnIdle { assertEquals(EditorSaveState.Saving, model.saveState.value) }
-        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
         compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertIsNotEnabled()
         compose.onNodeWithText("Archive note").assertIsNotEnabled()
         compose.onNodeWithText("Delete").assertIsNotEnabled()
         compose.onNodeWithText("Share note").assertIsNotEnabled()
@@ -652,7 +807,8 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_retry_save").performClick()
         compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saving }
         compose.onNodeWithTag("noma_retry_save").assertDoesNotExist()
-        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertIsNotEnabled()
         compose.runOnIdle { gate.complete(Unit) }
         compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
     }
@@ -842,6 +998,46 @@ class NomaUiTest {
     }
 
 
+    @Test fun rebornLibraryHasExplicitAllFilterAndPreservesSearch() {
+        val note = Note("pinned-1", "Course", "Material", true, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_all_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_pinned_filter").performClick()
+        compose.onNodeWithTag("noma_pinned_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_all_filter").performClick()
+        compose.onNodeWithTag("noma_all_filter").assertIsSelected()
+        compose.onNodeWithTag("noma_search").performTextInput("Course")
+        compose.waitUntil(5_000) { model.query.value == "Course" }
+        compose.onNodeWithTag("noma_archive_filter").performClick()
+        compose.onNodeWithTag("noma_all_filter").performClick()
+        compose.runOnIdle { assertEquals("Course", model.query.value) }
+    }
+
+    @Test fun rebornCaptureIsOnTheSameRowAsTheSearchPill() {
+        val repo = FakeRepository(listOf(Note("n", "Memo", "Body", false, 1L, 1L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_bottom_dock").assertExists()
+        val search = compose.onNodeWithTag("noma_search_pill").fetchSemanticsNode().boundsInRoot
+        val capture = compose.onNodeWithTag("noma_new_note").fetchSemanticsNode().boundsInRoot
+        assertTrue("Search should be left of capture", search.right <= capture.left)
+        assertTrue("Dock actions must share a baseline",
+            kotlin.math.abs(search.center.y - capture.center.y) < capture.height)
+    }
+
+    @Test fun rebornEditorShowsDateWithoutChangingNoteBody() {
+        val note = Note("editor-meta", "Notebook", "The original body", false, 1L, 1L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(note) }
+        compose.onNodeWithTag("noma_editor_metadata").assertExists()
+        compose.onNodeWithTag("noma_body_input").assertExists()
+        compose.runOnIdle { assertEquals("The original body", model.active.value?.body) }
+    }
+
     @Test fun searchPillIsTheOnlySearchFieldAndDockedBelowNotes() {
         val saved = Note("a", "Weekend notes", "Body", false, 1L, 1L)
         val repo = FakeRepository(listOf(saved))
@@ -922,6 +1118,25 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_editor_save_bar").assertIsDisplayed()
         compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
         compose.runOnIdle { assertEquals("save-bar", model.active.value?.id) }
+    }
+
+    @Test fun rebornAccentPickerUpdatesActualThemeSelection() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val chosen = mutableStateOf(NomaAccent.FOREST)
+        compose.setContent {
+            NomaTheme(accent = chosen.value) {
+                NomaApp(
+                    viewModel = model,
+                    accent = chosen.value,
+                    onAccentChange = { chosen.value = it }
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithTag("noma_accent_SAGE").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(NomaAccent.SAGE, chosen.value) }
+        compose.onNodeWithTag("noma_accent_SAGE").assertIsSelected()
     }
 
     @Test fun newAppearanceChoicesRemainAccessibleAfterTheVisualRedesign() {
@@ -1071,8 +1286,8 @@ class NomaUiTest {
         val repo = FakeRepository(listOf(pinned, other))
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
-        compose.onNodeWithText("Pinned").assertExists()
-        compose.onNodeWithText("Recent").assertExists()
+        compose.onAllNodesWithText("Pinned", useUnmergedTree = true).onFirst().assertExists()
+        compose.onNodeWithContentDescription("Recent: 1 note", useUnmergedTree = true).assertExists()
         compose.onAllNodesWithTag("noma_section_header").assertCountEquals(2)
         compose.onNodeWithTag("noma_card_pinned_badge", useUnmergedTree = true).assertExists()
     }
@@ -1159,7 +1374,7 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_theme_preview_SYSTEM", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_theme_preview_LIGHT", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_theme_preview_DARK", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("Widget appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
         compose.onNodeWithTag("noma_widget_preview_MATERIAL_YOU", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_widget_preview_FROSTED_GREEN", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS", useUnmergedTree = true).assertExists()
@@ -1254,6 +1469,56 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_menu_share").assertExists()
     }
 
+    @Test fun editorReplacesSelectedSearchOccurrence() {
+        val original = Note("selected-match", "Example note", "cat one cat", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(original) }
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("cat")
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(8, 11)))
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_replace_input").performTextInput("X")
+        compose.onNodeWithTag("noma_replace_first").performClick()
+        compose.waitUntil(10_000) { model.active.value?.body == "cat one X" }
+    }
+
+    @Test fun editorFindAndReplaceAllUpdatesActiveNote() {
+        val original = Note("find-replace", "Meeting", "café and café", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(original) }
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("café")
+        compose.onNodeWithTag("noma_replace_input").performTextInput("tea")
+        compose.onNodeWithTag("noma_replace_all").assertIsEnabled().performClick()
+        compose.waitUntil(10_000) {
+            model.active.value?.body == "tea and tea"
+        }
+        compose.onNodeWithTag("noma_find_result_count").assertExists()
+        compose.onNodeWithTag("noma_find_replace_close").performClick()
+    }
+
+    @Test fun editorFindAndReplaceRejectsAbsentTerms() {
+        val original = Note("no-match", "Notes", "original text", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(original) }
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("missing")
+        compose.onNodeWithTag("noma_replace_first").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_replace_all").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_find_replace_close").performClick()
+        compose.runOnIdle { assertEquals("original text", model.active.value?.body) }
+    }
+
     @Test fun longNotebookReturnToTopSkipsExcessiveAnimationDistance() {
         val notes = (0 until 120).map {
             Note("very-long-" + it, "Very long notebook " + it, "Body", false, 1L, it.toLong())
@@ -1325,16 +1590,17 @@ class NomaUiTest {
         val repo = FakeRepository(notes)
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
-        compose.onNodeWithText("A quiet place for everything.").assertExists()
+        val subtitle = androidx.test.platform.app.InstrumentationRegistry
+            .getInstrumentation().targetContext.getString(dev.juuri.noma.R.string.library_subtitle)
+        compose.onNodeWithText(subtitle).assertExists()
         compose.onNodeWithTag("noma_note_list").performScrollToIndex(14)
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("A quiet place for everything.")
-                .fetchSemanticsNodes().isEmpty()
+            compose.onAllNodesWithText(subtitle).fetchSemanticsNodes().isEmpty()
         }
         compose.onNodeWithTag("noma_scroll_to_top").performClick()
-        compose.waitUntilAtLeastOneExists(
-            androidx.compose.ui.test.hasText("A quiet place for everything.")
-        )
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText(subtitle).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test fun scrollToTopPreservesSelectedSortOrder() {

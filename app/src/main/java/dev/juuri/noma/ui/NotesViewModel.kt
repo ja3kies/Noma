@@ -50,6 +50,8 @@ private sealed interface WriteOperation {
     data class Save(val note: Note, val editorRevision: Long? = null) : WriteOperation
     data class Delete(val note: Note) : WriteOperation
     data class Restore(val note: Note) : WriteOperation
+    data class UndoArchive(val previous: Note) : WriteOperation
+    data class TogglePin(val id: String) : WriteOperation
     data class Import(
         val notes: List<Note>,
         val result: CompletableDeferred<Int>? = null
@@ -95,8 +97,21 @@ class NotesViewModel(
     private var editorRevision = 0L
     private var quickNoteRequestedAfterSave = false
     private val operations = Channel<WriteOperation>(Channel.UNLIMITED)
-    private val eventChannel = Channel<NoteUiEvent>(Channel.BUFFERED)
+    // Retain undoable events while the UI is stopped. A bounded channel
+    // stalls the writer; DROP_OLDEST silently loses Delete/Archive undo.
+    private val eventChannel = Channel<NoteUiEvent>(Channel.UNLIMITED)
     val events = eventChannel.receiveAsFlow()
+
+    /**
+     * Resolve the latest committed version inside the serial write actor.
+     * List cards may be stale by the time a queued delete/archive is executed.
+     * Never resurrect an already deleted ID with a delayed archive action.
+     */
+    private fun storedNoteOrFallback(requested: Note): Note? {
+        val ready = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
+            ?: return requested
+        return ready.entries.firstOrNull { it.id == requested.id }
+    }
 
     init {
         // Serialize disk writes. A delete cannot be undone by an older queued save.
@@ -122,10 +137,43 @@ class NotesViewModel(
                             }
                         }
                         is WriteOperation.Delete -> {
-                            service.delete(operation.note)
-                            eventChannel.send(NoteUiEvent.Deleted(operation.note))
+                            val current = storedNoteOrFallback(operation.note)
+                            if (current != null) {
+                                service.delete(current)
+                                // Undo must restore the most recent committed note,
+                                // not the stale body from an earlier list card.
+                                eventChannel.send(NoteUiEvent.Deleted(current))
+                            }
                         }
-                        is WriteOperation.Restore -> service.restore(operation.note)
+                        is WriteOperation.Restore -> {
+                            // Undo must not overwrite a newer note imported or
+                            // created using the same identifier after deletion.
+                            val ready = repository.notes.value as?
+                                dev.juuri.noma.domain.NotesSnapshot.Ready
+                                ?: error("Notes not ready")
+                            if (ready.entries.none { it.id == operation.note.id }) {
+                                service.restore(operation.note)
+                            }
+                        }
+                        is WriteOperation.UndoArchive -> {
+                            // Restore only the archived state, not a stale snapshot
+                            // of body/title/pinning saved before the snackbar appeared.
+                            val current = (repository.notes.value as?
+                                dev.juuri.noma.domain.NotesSnapshot.Ready)
+                                ?.entries?.firstOrNull { it.id == operation.previous.id }
+                            if (current != null &&
+                                current.isArchived != operation.previous.isArchived) {
+                                service.save(current.copy(isArchived = operation.previous.isArchived))
+                            }
+                        }
+                        is WriteOperation.TogglePin -> {
+                            val current = (repository.notes.value as?
+                                dev.juuri.noma.domain.NotesSnapshot.Ready)
+                                ?.entries?.firstOrNull { it.id == operation.id }
+                            if (current != null && !current.isArchived) {
+                                service.save(current.copy(isPinned = !current.isPinned))
+                            }
+                        }
                         is WriteOperation.ExportSnapshot -> {
                             // Creation/share capture do not use the editor operations queue.
                             // An export must not silently omit a concurrently created note.
@@ -147,10 +195,11 @@ class NotesViewModel(
                             eventChannel.send(NoteUiEvent.Imported(added, operation.notes.size - added))
                         }
                         is WriteOperation.Archive -> {
-                            service.save(operation.previous.copy(
-                                isArchived = !operation.previous.isArchived
-                            ))
-                            eventChannel.send(NoteUiEvent.ArchiveChanged(operation.previous))
+                            val current = storedNoteOrFallback(operation.previous)
+                            if (current != null) {
+                                service.save(current.copy(isArchived = !current.isArchived))
+                                eventChannel.send(NoteUiEvent.ArchiveChanged(current))
+                            }
                         }
                     }
                 } catch (failure: Exception) {
@@ -394,12 +443,16 @@ class NotesViewModel(
         if (_active.value?.id == note.id) {
             updateActive(changed)
         } else {
-            operations.trySend(WriteOperation.Save(changed))
+            // A delayed list-card write must not replace newer editor
+            // text or other fields with this stale card snapshot.
+            operations.trySend(WriteOperation.TogglePin(note.id))
         }
     }
 
     private fun updateActive(note: Note) {
-        val updated = note.copy(updatedAt = System.currentTimeMillis())
+        val updated = note.copy(updatedAt = maxOf(
+            System.currentTimeMillis(), note.createdAt, note.updatedAt
+        ))
         _active.value = updated
         editorRevision++
         _saveState.value = EditorSaveState.Saving
@@ -438,7 +491,7 @@ class NotesViewModel(
     }
 
     fun undoArchive(note: Note) {
-        operations.trySend(WriteOperation.Restore(note))
+        operations.trySend(WriteOperation.UndoArchive(note))
     }
 
     fun importNotes(notes: List<Note>) { operations.trySend(WriteOperation.Import(notes)) }

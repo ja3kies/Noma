@@ -83,6 +83,22 @@ class NotesServiceTest {
         assertEquals(1L, repo.list().single().createdAt)
     }
 
+    @Test fun savingImportedFutureNoteNeverRegressesTimestamps() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo, { 100L })
+        val imported = Note("future", "Imported", "Draft", false, 4_102_444_800_000L, 4_102_444_800_010L)
+        service.save(imported.copy(body = "Edited here"))
+        assertEquals(4_102_444_800_010L, repo.list().single().updatedAt)
+        assertEquals(imported.createdAt, repo.list().single().createdAt)
+    }
+
+    @Test fun clockRollbackDoesNotMakeAnEditedNoteLookOlder() = runBlocking {
+        val repo = MemoryRepository()
+        val service = NotesService(repo, { 50L })
+        service.save(Note("clock", "", "A", false, 1L, 100L).copy(body = "B"))
+        assertEquals(100L, repo.list().single().updatedAt)
+    }
+
     @Test fun deleteAndRestoreKeepsOriginalData() = runBlocking {
         val repo = MemoryRepository()
         val service = NotesService(repo)

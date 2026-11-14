@@ -34,7 +34,9 @@ class NotesService(
     }
 
     suspend fun save(note: Note) {
-        repository.save(note.copy(updatedAt = clock()))
+        // Imported notes can carry timestamps from a device with a fast clock.
+        // A local edit must not make updatedAt precede the creation time.
+        repository.save(note.copy(updatedAt = maxOf(clock(), note.createdAt, note.updatedAt)))
     }
 
     suspend fun delete(note: Note) {

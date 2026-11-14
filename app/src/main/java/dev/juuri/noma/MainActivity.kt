@@ -26,6 +26,8 @@ import dev.juuri.noma.domain.NotesService
 import dev.juuri.noma.ui.NomaApp
 import dev.juuri.noma.ui.NotesViewModel
 import dev.juuri.noma.ui.theme.NomaAppearance
+import dev.juuri.noma.ui.theme.NomaAccent
+import dev.juuri.noma.ui.theme.NomaThemeFamily
 import dev.juuri.noma.ui.theme.NomaTheme
 import dev.juuri.noma.ui.theme.isNomaDark
 
@@ -113,6 +115,12 @@ class MainActivity : ComponentActivity() {
             var appearance by remember {
                 mutableStateOf(NomaAppearance.fromStorage(preferences.getString("mode", null)))
             }
+            var accent by remember {
+                mutableStateOf(NomaAccent.fromStorage(preferences.getString("accent", null)))
+            }
+            var family by remember {
+                mutableStateOf(NomaThemeFamily.fromStorage(preferences.getString("family", null)))
+            }
             var widgetStyle by remember {
                 mutableStateOf(NomaWidgetPreferences.read(applicationContext))
             }
@@ -123,27 +131,43 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = !dark
                 }
             }
-            NomaTheme(appearance) {
+            NomaTheme(appearance = appearance, accent = accent, family = family) {
                 NomaApp(
                     viewModel = notesViewModel,
                     appearance = appearance,
+                    accent = accent,
+                    family = family,
+                    onFamilyChange = { selected ->
+                        preferences.edit().putString("family", selected.name).apply()
+                        family = selected
+                    },
+                    onAccentChange = { selected ->
+                        preferences.edit().putString("accent", selected.name).apply()
+                        accent = selected
+                    },
                     widgetStyle = widgetStyle,
                     onWidgetStyleChange = { selected ->
-                        try {
-                            // Write first: never show a selection that cannot survive restart.
-                            NomaWidgetPreferences.save(applicationContext, selected)
-                            widgetStyle = selected
-                        } catch (failure: RuntimeException) {
-                            android.util.Log.e("NomaWidget", "Cannot save widget style", failure)
-                            android.widget.Toast.makeText(
-                                this, R.string.widget_style_save_error,
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        try {
-                            NomaQuickCaptureWidget.refreshAll(applicationContext)
-                        } catch (failure: RuntimeException) {
-                            android.util.Log.w("NomaWidget", "Widget host refused refresh", failure)
+                        if (selected != widgetStyle) {
+                            try {
+                                // Commit before applying UI state or refreshing a host.
+                                NomaWidgetPreferences.save(applicationContext, selected)
+                                widgetStyle = selected
+                                try {
+                                    NomaQuickCaptureWidget.refreshAll(applicationContext)
+                                } catch (failure: RuntimeException) {
+                                    // Persisted setting remains selected: the next
+                                    // widget update can recover a host failure.
+                                    android.util.Log.w("NomaWidget", "Widget host refused refresh", failure)
+                                }
+                            } catch (failure: RuntimeException) {
+                                // A failed write must not trigger a spurious widget
+                                // refresh or appear successfully selected.
+                                android.util.Log.e("NomaWidget", "Cannot save widget style", failure)
+                                android.widget.Toast.makeText(
+                                    this, R.string.widget_style_save_error,
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     },
                     onAppearanceChange = { selected ->
