@@ -109,10 +109,9 @@ class NomaUiTest {
         val imeVisible = mutableStateOf(false)
         compose.setContent {
             val density = androidx.compose.ui.platform.LocalDensity.current
-            androidx.compose.runtime.SideEffect {
-                imeVisible.value = androidx.compose.foundation.layout.WindowInsets.ime
-                    .getBottom(density) > 0
-            }
+            val imeNow = androidx.compose.foundation.layout.WindowInsets.ime
+                .getBottom(density) > 0
+            androidx.compose.runtime.SideEffect { imeVisible.value = imeNow }
             NomaTheme { NomaApp(model) }
         }
         compose.onNodeWithText("Evening notes").performClick()
