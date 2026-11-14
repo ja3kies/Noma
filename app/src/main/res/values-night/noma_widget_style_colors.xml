@@ -3,5 +3,11 @@
 <color name="noma_widget_material_outline">#50675C</color>
 <color name="noma_widget_material_text">#EAF4E9</color>
 <color name="noma_widget_frosted_text">#E9F7EC</color>
-<color name="noma_widget_glass_text">#F3F8FF</color>
+<color name="noma_widget_frosted_start">#D21F2D25</color>
+<color name="noma_widget_frosted_center">#B93D4B43</color>
+<color name="noma_widget_frosted_end">#C21B2922</color>
+<color name="noma_widget_frosted_stroke">#75FFFFFF</color>
+<color name="noma_widget_glass_fill">#B81D2827</color>
+<color name="noma_widget_glass_stroke">#75FFFFFF</color>
+<color name="noma_widget_glass_text">#F4F6F4</color>
 </resources>

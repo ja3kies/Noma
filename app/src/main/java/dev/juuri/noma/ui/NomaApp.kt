@@ -2379,8 +2379,8 @@ private fun WidgetStyleDialog(
                         })
                         Box(
                             modifier = Modifier.size(width = 116.dp, height = 36.dp)
-                                .background(previewBrush, RoundedCornerShape(12.dp))
-                                .border(1.dp, previewOutline, RoundedCornerShape(12.dp))
+                                .background(previewBrush, RoundedCornerShape(15.dp))
+                                .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
                                 .testTag("noma_widget_preview_${style.name}"),
                             contentAlignment = Alignment.CenterStart
                         ) {
@@ -2392,13 +2392,13 @@ private fun WidgetStyleDialog(
                                 Image(
                                     painter = painterResource(R.drawable.noma_launcher_foreground),
                                     contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(23.dp)
                                 )
                                 Text(
                                     stringResource(R.string.shortcut_new_note),
                                     color = previewText,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 8.sp,
+                                    fontSize = 9.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

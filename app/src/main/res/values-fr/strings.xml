@@ -147,7 +147,7 @@
     <string name="appearance_dark_detail">Surfaces sombres pour écrire le soir</string>
     <string name="widget_style_material_you_detail">Suit la palette de couleurs Noma</string>
     <string name="widget_style_frosted_green_detail">Aspect vert translucide discret</string>
-    <string name="widget_style_liquid_glass_detail">Style visuel inspiré du verre</string>
+    <string name="widget_style_liquid_glass_detail">Verre translucide sans flou ni réfraction en temps réel</string>
     <string name="body_accessibility_label">Contenu de la note</string>
     <string name="scroll_to_top">Retour en haut</string>
     <string name="section_count_description">%1$s : %2$s</string>

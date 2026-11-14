@@ -147,7 +147,7 @@
     <string name="appearance_dark_detail">Soft dark surfaces for evening notes</string>
     <string name="widget_style_material_you_detail">Adapts to the Noma color palette</string>
     <string name="widget_style_frosted_green_detail">Subtle green translucent look</string>
-    <string name="widget_style_liquid_glass_detail">Light glass-inspired visual style</string>
+    <string name="widget_style_liquid_glass_detail">Translucent glass style; no live blur or refraction</string>
     <string name="body_accessibility_label">Note content</string>
     <string name="scroll_to_top">Back to top</string>
     <string name="section_count_description">%1$s: %2$s</string>

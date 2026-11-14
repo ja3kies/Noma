@@ -61,8 +61,16 @@ class NomaWidgetStyleTest {
     @Test fun highContrastTextResourcesExist() {
         val colors = listOf(
             R.color.noma_widget_material_text,
+            R.color.noma_widget_material_background,
+            R.color.noma_widget_material_outline,
             R.color.noma_widget_frosted_text,
-            R.color.noma_widget_glass_text
+            R.color.noma_widget_frosted_start,
+            R.color.noma_widget_frosted_center,
+            R.color.noma_widget_frosted_end,
+            R.color.noma_widget_frosted_stroke,
+            R.color.noma_widget_glass_text,
+            R.color.noma_widget_glass_fill,
+            R.color.noma_widget_glass_stroke
         )
         colors.forEach { assertTrue(context.getColor(it) != 0) }
     }
