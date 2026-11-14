@@ -96,6 +96,9 @@ if [[ "${1:-}" == '--device' ]]; then
   mkdir -p "$QUALITY_DIR"
   printf 'Device: %s, revision: %s\n' "$SERIAL" "$(git rev-parse HEAD)"
   export ANDROID_SERIAL="$SERIAL"
+  # Never accept reports left by a prior commit or interrupted test run.
+  RESULTS_DIR="app/build/outputs/androidTest-results/connected"
+  rm -rf "$RESULTS_DIR"
   set +e
   "$GRADLE_HOME/bin/gradle" --no-daemon --console=plain --max-workers=2 \
     -Dorg.gradle.jvmargs='-Xmx1536m -Dfile.encoding=UTF-8' \
@@ -107,7 +110,6 @@ if [[ "${1:-}" == '--device' ]]; then
     printf 'FAILED: Android tests. See %s/connected-tests.log\n' "$QUALITY_DIR" >&2
     exit "$DEVICE_RESULT"
   fi
-  RESULTS_DIR="app/build/outputs/androidTest-results/connected"
   if [[ ! -d "$RESULTS_DIR" ]] ||
     ! find "$RESULTS_DIR" -type f -name '*.xml' -print -quit | grep -q .; then
     echo "FAILED: Gradle returned success but no Android instrumentation XML report exists." >&2
