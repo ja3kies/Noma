@@ -382,7 +382,7 @@ fun NomaApp(
                 val cornerRadius = nomaPaneCornerRadius(maxWidth)
                 val listWidth by animateDpAsState(
                     targetValue = responsiveListPaneWidth(maxWidth),
-                    animationSpec = tween(NomaMotion.quick),
+                    animationSpec = NomaMotion.spatialFast(),
                     label = "nomaResponsiveListPaneWidth"
                 )
                 Row(
@@ -1099,7 +1099,9 @@ private fun NotesListScreen(
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
                                         },
-                                        modifier = if (animateListItems) Modifier.animateItem()
+                                        modifier = if (animateListItems) Modifier.animateItem(
+                                            placementSpec = NomaMotion.spatialDefault()
+                                        )
                                             else Modifier
                                     )
                                 }
@@ -1144,7 +1146,9 @@ private fun NotesListScreen(
                                             focusManager.clearFocus()
                                             searchKeyboard?.hide()
                                         },
-                                        modifier = if (animateListItems) Modifier.animateItem()
+                                        modifier = if (animateListItems) Modifier.animateItem(
+                                            placementSpec = NomaMotion.spatialDefault()
+                                        )
                                             else Modifier
                                     )
                                 }

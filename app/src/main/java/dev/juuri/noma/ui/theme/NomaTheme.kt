@@ -11,6 +11,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import android.os.Build
@@ -80,6 +81,10 @@ object NomaSpacing {
 object NomaMotion {
     const val quick = 160
     const val standard = 230
+
+    fun <T> spatialFast() = spring<T>(dampingRatio = 0.90f, stiffness = 700f)
+    fun <T> spatialDefault() = spring<T>(dampingRatio = 0.86f, stiffness = 500f)
+    fun <T> spatialGentle() = spring<T>(dampingRatio = 0.92f, stiffness = 350f)
 }
 
 // Noma Reborn: botanical surfaces and warm paper, not a replica of another brand.
