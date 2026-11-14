@@ -62,9 +62,11 @@ class NomaUiTest {
         // Noma's MainActivity is adjustResize. The default Compose test host
         // otherwise pans the full-height window when Gboard appears, moving
         // the sticky save status and Retry button outside the visible viewport.
-        compose.activity.window.setSoftInputMode(
-            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-        )
+        compose.runOnIdle {
+            compose.activity.window.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            )
+        }
     }
 
     private class FakeRepository(
