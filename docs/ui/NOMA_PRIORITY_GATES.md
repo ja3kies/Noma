@@ -41,6 +41,34 @@ L'échec ou l'absence de `adb devices` ne doit jamais être rapporté comme « t
 
 Pour une correction, indiquer le fichier, le comportement avant/après, le test et le commit. Le commit et le push ne sont **pas** des preuves de validation. Ne jamais merger `main` automatiquement.
 
-## État courant après 91d11fc
+## Journal de clôture — novembre 2026
 
-La navigation tactile, la fidélité visuelle Smart Launcher, TalkBack, la capture réelle de widgets, les temps de frame, les tests instrumentés et la compilation de cette nouvelle révision restent à contrôler sur appareil. Tant que ces preuves manquent, les gates concernés sont **FAILED**, et non « partiels ».
+Dernière base revue avant ce journal : `ee206c1`. Le prochain commit de qualité ajoute l'instrumentation de preuve sans convertir artificiellement un statut FAILED en VALIDÉ.
+
+### Corrections intégrées sur la branche
+
+- P0 : épinglage de cartes obsolètes, archivage/désarchivage concurrent, annulation de suppression sans écraser un import plus récent, notifications UI bornées sans bloquer la file d'écritures, tests de régression des commandes concurrentes.
+- P0 : recherche/remplacement Unicode, plages non chevauchantes et recherche de l'occurrence sélectionnée ; 1 000 cas aléatoires ajoutés au projet. Une vérification Kotlin autonome de l'algorithme a réussi 6 118 788 assertions sur la copie de travail, **sans prétendre exécuter Gradle**.
+- P1 : couleurs système Material You sur API 31+ pour les widgets, étiquettes contraintes aux dimensions des RemoteViews, contrastes clair/sombre, rafraîchissement après mise à jour APK et sauvegarde robuste des préférences.
+- P2 : sortie anticipée de la recherche de correspondances, ressorts interruptibles et indication de sauvegarde différée afin d'éviter les déplacements de l'éditeur lors des frappes rapides.
+
+### Blocages mesurés et critères restants
+
+| Gate | Statut | Validation restant à obtenir |
+| --- | --- | --- |
+| P0 | **FAILED** | Compilation JVM/Android à jour, tests instrumentés réellement exécutés, migration SQLite, erreurs et reprise sur appareil |
+| P1 | **FAILED** | Tests de widgets installés, capture visuelle Material You/Frosted/Liquid Glass sur lanceurs réels, grands caractères et états contrastés |
+| P2 | **FAILED** | Mesures de frames et latence sur appareil, transitions avec Gboard et Back, parcours TalkBack et réduction des animations |
+
+Plusieurs exécutions GitHub Actions, dont `43597293750`, se sont terminées en environ 3–4 secondes, sans étapes de job exposées par l'API. Cela **ne démontre pas** une défaillance de compilation. Un blocage de runner/compte ou de facturation est plausible, mais sa cause ne doit être considérée comme prouvée que si une annotation GitHub ou un diagnostic de support la confirme.
+
+### Collecte reproductible de preuves sur Pixel
+
+```bash
+cd ~/projects/Noma
+git switch feature/noma-replica-notes-rebirth
+git pull --ff-only origin feature/noma-replica-notes-rebirth
+bash scripts/build-termux-noma.sh --device
+```
+
+Le mode `--device` refuse de déclarer l'instrumentation exécutée sans fichier de résultats XML, conserve le SHA de l'APK et crée un rapport daté `~/noma-device-validation-*/report.md`. Les statistiques `gfxinfo` n'équivalent pas à une mesure du 95e percentile de frame pacing. Ne pas considérer le passage des tests comme une preuve de rendu Smart Launcher, d'accessibilité TalkBack ou de fluidité.
