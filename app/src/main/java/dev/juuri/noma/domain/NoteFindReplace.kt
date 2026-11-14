@@ -26,8 +26,12 @@ object NoteFindReplace {
             last = found
             if (backwards) {
                 if (found <= from) selected = found
-            } else if (selected < 0 && found >= from) {
-                selected = found
+                // Once we pass the caret, no later match can be selected.
+                if (found > from && selected >= 0) break
+            } else if (found >= from) {
+                // The earliest non-overlapping match past the caret is final.
+                // Avoid walking thousands of unrelated later matches per tap.
+                return found until found + needle.length
             }
             offset = found + needle.length
         }

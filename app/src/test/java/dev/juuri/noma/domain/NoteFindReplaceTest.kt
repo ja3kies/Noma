@@ -21,6 +21,14 @@ class NoteFindReplaceTest {
         assertEquals(2..3, NoteFindReplace.nextMatch("aaaa", "aa", 1))
         assertEquals(0..1, NoteFindReplace.nextMatch("aaaa", "aa", 4))
     }
+    @Test fun veryLongRepeatedNoteNavigatesWithoutSkippingCanonicalMatches() {
+        val note = "cat ".repeat(25_000)
+        assertEquals(0..2, NoteFindReplace.nextMatch(note, "cat", 0))
+        assertEquals(4..6, NoteFindReplace.nextMatch(note, "cat", 1))
+        assertEquals(99996..99998, NoteFindReplace.nextMatch(note, "cat", 99996))
+        assertEquals(0..2, NoteFindReplace.nextMatch(note, "cat", note.length))
+        assertEquals(99996..99998, NoteFindReplace.nextMatch(note, "cat", -1, backwards = true))
+    }
     @Test fun backwardNavigationSkipsOverlapsAndWraps() {
         assertEquals(0..1, NoteFindReplace.nextMatch("aaaa", "aa", 1, backwards = true))
         assertEquals(2..3, NoteFindReplace.nextMatch("aaaa", "aa", -1, backwards = true))
