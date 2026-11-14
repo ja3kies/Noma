@@ -103,7 +103,13 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          script: gradle --no-daemon :app:connectedDebugAndroidTest
+          script: |
+            gradle --no-daemon :app:connectedDebugAndroidTest
+            mkdir -p app/build/reports/editor-snapshots
+            for name in 01-editor-light 02-editor-ime 03-editor-save-failure 04-editor-dark 05-editor-large-font; do
+              adb exec-out run-as dev.juuri.noma.designpreview cat "files/editor-snapshots/$name.png" > "app/build/reports/editor-snapshots/$name.png"
+              test -s "app/build/reports/editor-snapshots/$name.png"
+            done
       - name: Upload instrumentation diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -112,5 +118,6 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
+            app/build/reports/editor-snapshots/
           if-no-files-found: warn
           retention-days: 7
