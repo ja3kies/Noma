@@ -1895,7 +1895,9 @@ private fun NoteEditorScreen(
             }
         },
         topBar = {
-            Column(Modifier.animateContentSize(NomaMotion.spatialGentle())) {
+            // Save errors must be visible and tappable on the first rendered frame.
+            // Animating this parent's height clipped Retry during error transitions.
+            Column {
                 TopAppBar(
                     title = {
                         Text(
@@ -2097,7 +2099,6 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
             .semantics { liveRegion = LiveRegionMode.Polite }
-            .animateContentSize(tween(NomaMotion.quick))
     ) {
         when (saveState) {
             EditorSaveState.Saved -> {
