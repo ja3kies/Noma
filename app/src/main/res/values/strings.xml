@@ -142,9 +142,6 @@
     <string name="delete_confirm_body_named">Delete “%1$s”? You can undo this action briefly.</string>
     <string name="share_unavailable">No compatible sharing app is available.</string>
     <string name="creating_note">Creating note…</string>
-    <string name="appearance_system_detail">Uses the Android light or dark setting</string>
-    <string name="appearance_light_detail">Warm paper and clear text</string>
-    <string name="appearance_dark_detail">Soft dark surfaces for evening notes</string>
     <string name="widget_style_material_you_detail">Adapts to the Noma color palette</string>
     <string name="widget_style_frosted_green_detail">Subtle green translucent look</string>
     <string name="widget_style_liquid_glass_detail">Translucent glass style; no live blur or refraction</string>
