@@ -49,7 +49,8 @@ if [[ "${1:-}" == '--full' || "${1:-}" == '--device' ]]; then
 fi
 
 LOG="$HOME/noma-reborn-build.log"
-printf '\nNoma branch: %s\nSDK: %s\nAAPT2: %s\n' "$ACTUAL" "$ANDROID_HOME" "$AAPT2"
+printf '\nNoma branch: %s\nCommit: %s\nSDK: %s\nAAPT2: %s\n' \
+  "$ACTUAL" "$(git rev-parse HEAD)" "$ANDROID_HOME" "$AAPT2"
 echo "Running Gradle 8.13; see $LOG for diagnostics."
 set +e
 "$GRADLE_HOME/bin/gradle" --no-daemon --console=plain --max-workers=2 \
@@ -106,14 +107,26 @@ if [[ "${1:-}" == '--device' ]]; then
     printf 'FAILED: Android tests. See %s/connected-tests.log\n' "$QUALITY_DIR" >&2
     exit "$DEVICE_RESULT"
   fi
+  RESULTS_DIR="app/build/outputs/androidTest-results/connected"
+  if [[ ! -d "$RESULTS_DIR" ]] ||
+    ! find "$RESULTS_DIR" -type f -name '*.xml' -print -quit | grep -q .; then
+    echo "FAILED: Gradle returned success but no Android instrumentation XML report exists." >&2
+    echo "Check: $QUALITY_DIR/connected-tests.log" >&2
+    exit 4
+  fi
+  find "$RESULTS_DIR" -type f -name '*.xml' -print \
+    > "$QUALITY_DIR/instrumentation-report-files.txt"
+  sha256sum "$OUT" > "$QUALITY_DIR/apk-sha256.txt"
   adb -s "$SERIAL" shell dumpsys gfxinfo dev.juuri.noma.designpreview \
     > "$QUALITY_DIR/gfxinfo-diagnostic.txt" 2>&1 || true
   printf '# Noma quality validation\n\n' > "$QUALITY_DIR/report.md"
   printf 'Commit: %s  \nDevice: %s\n\n' "$(git rev-parse HEAD)" "$SERIAL" >> "$QUALITY_DIR/report.md"
   printf '| Priority | Status | Evidence |\n| --- | --- | --- |\n' >> "$QUALITY_DIR/report.md"
-  printf '| P0 | VALIDÉ | Full build, JVM tests, lint and connected Android tests passed |\n' >> "$QUALITY_DIR/report.md"
+  printf '| P0 | FAILED | Full build and connected Android tests completed. Review full migration, recovery and current device behavior before sign-off |\n' >> "$QUALITY_DIR/report.md"
   printf '| P1 | FAILED | Widget tests passed; launcher-specific visual comparison is not automatically proven |\n' >> "$QUALITY_DIR/report.md"
   printf '| P2 | FAILED | UI tests passed; frame-pacing analysis and TalkBack review not automatically proven |\n' >> "$QUALITY_DIR/report.md"
+  printf '\nAndroid instrumentation XML files: %s\n' "$(wc -l < "$QUALITY_DIR/instrumentation-report-files.txt")" >> "$QUALITY_DIR/report.md"
+  printf 'The gfxinfo dump is diagnostic only; it is not a frame-pacing benchmark.\n' >> "$QUALITY_DIR/report.md"
   echo "PASS: Android instrumentation on $SERIAL"
   echo "Evidence: $QUALITY_DIR/report.md"
 fi
