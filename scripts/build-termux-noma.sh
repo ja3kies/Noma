@@ -44,7 +44,7 @@ if [[ ! -x "$GRADLE_HOME/bin/gradle" ]]; then
 fi
 
 TASKS=(:app:testDebugUnitTest :app:assembleDebug)
-if [[ "${1:-}" == '--full' ]]; then
+if [[ "${1:-}" == '--full' || "${1:-}" == '--device' ]]; then
   TASKS=(:app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleDebug)
 fi
 
@@ -73,3 +73,47 @@ printf '\nPASS: %s\n' "$OUT"
 ls -lh "$OUT"
 sha256sum "$OUT"
 echo 'Preview uses a separate application ID and does not replace the release app.'
+
+# --device adds executed Android instrumentation, not merely compilation.
+# It uses the debug preview application ID and never installs over release.
+if [[ "${1:-}" == '--device' ]]; then
+  command -v adb >/dev/null || { echo 'FAILED: adb is unavailable' >&2; exit 2; }
+  mapfile -t DEVICES < <(adb devices | awk 'NR>1 && $2=="device" {print $1}')
+  SERIAL="${ANDROID_SERIAL:-}"
+  if [[ -z "$SERIAL" ]]; then
+    if [[ ${#DEVICES[@]} -ne 1 ]]; then
+      echo "FAILED: expected exactly one authorized Android device, found ${#DEVICES[@]}" >&2
+      exit 2
+    fi
+    SERIAL="${DEVICES[0]}"
+  fi
+  if ! adb -s "$SERIAL" get-state | grep -qx device; then
+    echo "FAILED: Android device $SERIAL is unavailable or unauthorized" >&2
+    exit 2
+  fi
+  QUALITY_DIR="$HOME/noma-device-validation-$(date -u +%Y%m%dT%H%M%SZ)"
+  mkdir -p "$QUALITY_DIR"
+  printf 'Device: %s, revision: %s\n' "$SERIAL" "$(git rev-parse HEAD)"
+  export ANDROID_SERIAL="$SERIAL"
+  set +e
+  "$GRADLE_HOME/bin/gradle" --no-daemon --console=plain --max-workers=2 \
+    -Dorg.gradle.jvmargs='-Xmx1536m -Dfile.encoding=UTF-8' \
+    "-Pandroid.aapt2FromMavenOverride=$AAPT2" \
+    :app:connectedDebugAndroidTest > "$QUALITY_DIR/connected-tests.log" 2>&1
+  DEVICE_RESULT=$?
+  set -e
+  if [[ "$DEVICE_RESULT" -ne 0 ]]; then
+    printf 'FAILED: Android tests. See %s/connected-tests.log\n' "$QUALITY_DIR" >&2
+    exit "$DEVICE_RESULT"
+  fi
+  adb -s "$SERIAL" shell dumpsys gfxinfo dev.juuri.noma.designpreview \
+    > "$QUALITY_DIR/gfxinfo-diagnostic.txt" 2>&1 || true
+  printf '# Noma quality validation\n\n' > "$QUALITY_DIR/report.md"
+  printf 'Commit: %s  \nDevice: %s\n\n' "$(git rev-parse HEAD)" "$SERIAL" >> "$QUALITY_DIR/report.md"
+  printf '| Priority | Status | Evidence |\n| --- | --- | --- |\n' >> "$QUALITY_DIR/report.md"
+  printf '| P0 | VALIDÉ | Full build, JVM tests, lint and connected Android tests passed |\n' >> "$QUALITY_DIR/report.md"
+  printf '| P1 | FAILED | Widget tests passed; launcher-specific visual comparison is not automatically proven |\n' >> "$QUALITY_DIR/report.md"
+  printf '| P2 | FAILED | UI tests passed; frame-pacing analysis and TalkBack review not automatically proven |\n' >> "$QUALITY_DIR/report.md"
+  echo "PASS: Android instrumentation on $SERIAL"
+  echo "Evidence: $QUALITY_DIR/report.md"
+fi
