@@ -92,6 +92,51 @@ class NoteFindReplaceTest {
     @Test fun noOpReplacementReturnsOriginalText() {
         assertEquals("Hello", NoteFindReplace.replaceFirst("Hello", "hello", "Hello"))
     }
+    @Test fun randomizedUnicodeNavigationMatchesNonOverlappingReference() {
+        val random = kotlin.random.Random(1093)
+        val alphabet = listOf("a", "b", "A", "B", " ", "ø", "😀", "c")
+        repeat(1_000) {
+            val body = buildString {
+                repeat(random.nextInt(0, 50)) { append(alphabet.random(random)) }
+            }
+            val query = buildString {
+                repeat(random.nextInt(0, 6)) { append(alphabet.random(random)) }
+            }
+            val replacement = buildString {
+                repeat(random.nextInt(0, 5)) { append(alphabet.random(random)) }
+            }
+            val canonical = ArrayList<IntRange>()
+            if (query.isNotBlank()) {
+                var index = 0
+                while (index <= body.length - query.length) {
+                    val found = body.indexOf(query, startIndex = index, ignoreCase = true)
+                    if (found < 0) break
+                    canonical.add(found until found + query.length)
+                    index = found + query.length
+                }
+            }
+            assertEquals("count for query=$query", canonical.size,
+                NoteFindReplace.count(body, query))
+            for (from in -1..body.length + 1) {
+                val next = canonical.firstOrNull { it.first >= from } ?: canonical.firstOrNull()
+                val prev = canonical.lastOrNull { it.first <= from } ?: canonical.lastOrNull()
+                assertEquals("next: from=$from query=$query body=$body",
+                    next, NoteFindReplace.nextMatch(body, query, from))
+                assertEquals("prev: from=$from query=$query body=$body",
+                    prev, NoteFindReplace.nextMatch(body, query, from, backwards = true))
+                val ordinal = canonical.indexOfFirst { it.first == from }.let {
+                    if (it < 0) 0 else it + 1
+                }
+                assertEquals("ordinal: from=$from query=$query body=$body",
+                    ordinal, NoteFindReplace.matchOrdinal(body, query, from))
+                val expected = if (next == null) body else
+                    body.substring(0, next.first) + replacement + body.substring(next.last + 1)
+                assertEquals("replace: from=$from query=$query body=$body",
+                    expected, NoteFindReplace.replaceAtOrNext(body, query, replacement, from))
+            }
+        }
+    }
+
     @Test fun longBodyReplacementStaysBoundedAndCorrect() {
         val body = "word ".repeat(10_000)
         val output = NoteFindReplace.replaceAll(body, "word", "note")
