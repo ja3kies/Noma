@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: noma-validation-${{ github.ref }}
+  # Push and PR checks for the same head branch share one group.
+  group: noma-validation-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
