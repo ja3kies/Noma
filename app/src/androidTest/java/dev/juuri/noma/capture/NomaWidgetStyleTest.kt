@@ -1,6 +1,7 @@
 package dev.juuri.noma.capture
 
 import android.content.Context
+import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.TextView
@@ -14,6 +15,20 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NomaWidgetStyleTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test fun widgetProviderReceivesOwnPackageReplacementBroadcast() {
+        val intent = Intent(Intent.ACTION_MY_PACKAGE_REPLACED).setPackage(context.packageName)
+        @Suppress("DEPRECATION")
+        val matches = context.packageManager.queryBroadcastReceivers(intent, 0)
+        assertTrue(matches.any {
+            it.activityInfo.name == NomaQuickCaptureWidget::class.java.name
+        })
+    }
+
+    @Test fun packageReplacementSafelyRefreshesWithNoInstalledWidgets() {
+        NomaQuickCaptureWidget().onReceive(context,
+            Intent(Intent.ACTION_MY_PACKAGE_REPLACED))
+    }
 
     @Test fun unknownAndMissingSettingsUseMaterialYou() {
         assertEquals(NomaWidgetStyle.MATERIAL_YOU, NomaWidgetStyle.fromStorage(null))
