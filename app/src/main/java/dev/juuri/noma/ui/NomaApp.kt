@@ -1079,7 +1079,8 @@ private fun NotesListScreen(
                                     SectionHeader(
                                         title = stringResource(R.string.pinned_section),
                                         count = pinned.size,
-                                        icon = Icons.Outlined.PushPin
+                                        icon = Icons.Outlined.PushPin,
+                                        showBadge = others.isNotEmpty()
                                     )
                                 }
                                 items(pinned, key = { it.id }, contentType = { "note_card" }) { note ->
@@ -1121,6 +1122,7 @@ private fun NotesListScreen(
                                             }
                                         ),
                                         count = others.size,
+                                        showBadge = pinned.isNotEmpty(),
                                         icon = when {
                                             archivedOnly -> Icons.Outlined.Archive
                                             query.isNotBlank() -> Icons.Outlined.Search
@@ -1278,7 +1280,7 @@ private fun BottomSearchPill(
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
+private fun SectionHeader(title: String, count: Int, icon: ImageVector, showBadge: Boolean = true) {
     val accessibleCount = stringResource(
         R.string.section_count_description, title,
         pluralStringResource(R.plurals.note_total, count, count)
@@ -1304,7 +1306,9 @@ private fun SectionHeader(title: String, count: Int, icon: ImageVector) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Surface(
+        // The library already displays the total above the list. Only add
+        // per-section badges when pinned and unpinned groups both exist.
+        if (showBadge) Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh
         ) {
