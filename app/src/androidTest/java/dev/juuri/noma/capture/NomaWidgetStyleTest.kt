@@ -66,4 +66,19 @@ class NomaWidgetStyleTest {
         )
         colors.forEach { assertTrue(context.getColor(it) != 0) }
     }
+
+    @Test fun captureLabelFitsSmallestSupportedWidgetWidth() {
+        val width = (180 * context.resources.displayMetrics.density).toInt()
+        val height = (56 * context.resources.displayMetrics.density).toInt()
+        for (style in NomaWidgetStyle.entries) {
+            val view = LayoutInflater.from(context).inflate(style.layoutId, null, false)
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+            )
+            view.layout(0, 0, width, height)
+            val label = (view as android.view.ViewGroup).getChildAt(1) as TextView
+            assertEquals("${style.name} at 180dp", 0, label.layout.getEllipsisCount(0))
+        }
+    }
 }

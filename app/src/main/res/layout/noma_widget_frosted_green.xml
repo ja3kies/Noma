@@ -3,13 +3,13 @@
     android:id="@+id/noma_widget_capture" android:layout_width="match_parent"
     android:layout_height="match_parent" android:minHeight="56dp"
     android:orientation="horizontal" android:gravity="center_vertical"
-    android:paddingHorizontal="16dp" android:background="@drawable/noma_widget_frosted_surface"
+    android:paddingHorizontal="12dp" android:background="@drawable/noma_widget_frosted_surface"
     android:importantForAccessibility="yes"
     android:contentDescription="@string/shortcut_new_note_detail">
-    <ImageView android:layout_width="40dp" android:layout_height="40dp"
+    <ImageView android:layout_width="36dp" android:layout_height="36dp"
         android:src="@drawable/noma_launcher_foreground" android:contentDescription="@null"/>
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_marginStart="12dp" android:text="@string/shortcut_new_note"
-        android:textColor="@color/noma_widget_frosted_text" android:textSize="16sp" android:textStyle="bold"
+        android:layout_marginStart="8dp" android:text="@string/shortcut_new_note"
+        android:textColor="@color/noma_widget_frosted_text" android:textSize="14sp" android:textStyle="bold"
         android:ellipsize="end" android:singleLine="true"/>
 </LinearLayout>
