@@ -15,9 +15,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -132,6 +135,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -591,6 +595,13 @@ private fun NotesListScreen(
     val newNoteLabel = stringResource(R.string.new_note)
     val creatingNoteLabel = stringResource(R.string.creating_note)
     val creatingOrCapturing = creating || capturingShare
+    val fabInteractionSource = remember { MutableInteractionSource() }
+    val fabPressed by fabInteractionSource.collectIsPressedAsState()
+    val fabScale by animateFloatAsState(
+        targetValue = if (fabPressed && !creatingOrCapturing) 0.965f else 1f,
+        animationSpec = NomaMotion.spatialFast(),
+        label = "nomaFabPressResponse"
+    )
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val sortButtonBackground by animateColorAsState(
         targetValue = if (sort == NoteSort.RECENT) Color.Transparent
@@ -758,6 +769,7 @@ private fun NotesListScreen(
                                 }
                             },
                             modifier = Modifier.size(if (imeVisible) 48.dp else 56.dp)
+                                .graphicsLayer { scaleX = fabScale; scaleY = fabScale }
                                 .testTag("noma_new_note")
                                 .semantics {
                                     contentDescription = if (creatingOrCapturing) creatingNoteLabel
@@ -771,7 +783,8 @@ private fun NotesListScreen(
                             contentColor = if (creatingOrCapturing)
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             else MaterialTheme.colorScheme.onPrimary,
-                            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp)
+                            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp),
+                            interactionSource = fabInteractionSource
                         ) {
                             if (creatingOrCapturing) {
                                 CircularProgressIndicator(
@@ -1188,7 +1201,7 @@ private fun BottomSearchPill(
     var focused by remember { mutableStateOf(false) }
     val elevation by animateDpAsState(
         targetValue = if (focused) 6.dp else 2.dp,
-        animationSpec = tween(NomaMotion.quick),
+        animationSpec = NomaMotion.spatialGentle(),
         label = "nomaBottomSearchElevation"
     )
     val pillColor by animateColorAsState(
@@ -1204,7 +1217,7 @@ private fun BottomSearchPill(
     )
     Row(
         modifier = modifier.fillMaxWidth().animateContentSize(
-            tween(NomaMotion.quick)
+            NomaMotion.spatialGentle()
         ),
         verticalAlignment = Alignment.CenterVertically
     ) {
