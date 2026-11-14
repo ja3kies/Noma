@@ -98,6 +98,17 @@ class NotesViewModel(
     private val eventChannel = Channel<NoteUiEvent>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
+    /**
+     * Resolve the latest committed version inside the serial write actor.
+     * List cards may be stale by the time a queued delete/archive is executed.
+     * Never resurrect an already deleted ID with a delayed archive action.
+     */
+    private fun storedNoteOrFallback(requested: Note): Note? {
+        val ready = repository.notes.value as? dev.juuri.noma.domain.NotesSnapshot.Ready
+            ?: return requested
+        return ready.entries.firstOrNull { it.id == requested.id }
+    }
+
     init {
         // Serialize disk writes. A delete cannot be undone by an older queued save.
         // Only the latest editor revision can be marked as saved.
@@ -122,8 +133,13 @@ class NotesViewModel(
                             }
                         }
                         is WriteOperation.Delete -> {
-                            service.delete(operation.note)
-                            eventChannel.send(NoteUiEvent.Deleted(operation.note))
+                            val current = storedNoteOrFallback(operation.note)
+                            if (current != null) {
+                                service.delete(current)
+                                // Undo must restore the most recent committed note,
+                                // not the stale body from an earlier list card.
+                                eventChannel.send(NoteUiEvent.Deleted(current))
+                            }
                         }
                         is WriteOperation.Restore -> service.restore(operation.note)
                         is WriteOperation.ExportSnapshot -> {
@@ -147,10 +163,11 @@ class NotesViewModel(
                             eventChannel.send(NoteUiEvent.Imported(added, operation.notes.size - added))
                         }
                         is WriteOperation.Archive -> {
-                            service.save(operation.previous.copy(
-                                isArchived = !operation.previous.isArchived
-                            ))
-                            eventChannel.send(NoteUiEvent.ArchiveChanged(operation.previous))
+                            val current = storedNoteOrFallback(operation.previous)
+                            if (current != null) {
+                                service.save(current.copy(isArchived = !current.isArchived))
+                                eventChannel.send(NoteUiEvent.ArchiveChanged(current))
+                            }
                         }
                     }
                 } catch (failure: Exception) {

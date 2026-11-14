@@ -533,6 +533,50 @@ class NotesViewModelTest {
         assertEquals("id", model.active.value?.id)
     }
 
+    @Test fun archivedCardCannotDropPinPersistedByEarlierQueuedWrite() = runTest {
+        val original = Note("id", "Title", "Body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.togglePin(original)
+        model.toggleArchive(original) // List card still describes unpinned note.
+        advanceUntilIdle()
+        val stored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(true, stored.isPinned)
+        assertEquals(true, stored.isArchived)
+        val event = model.events.first() as NoteUiEvent.ArchiveChanged
+        assertEquals(true, event.previous.isPinned)
+        model.undoArchive(event.previous)
+        advanceUntilIdle()
+        val restored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(true, restored.isPinned)
+        assertEquals(false, restored.isArchived)
+    }
+
+    @Test fun deleteUndoPreservesLatestQueuedPinInsteadOfStaleCard() = runTest {
+        val original = Note("id", "Title", "Body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.togglePin(original)
+        model.deleteNote(original)
+        advanceUntilIdle()
+        val deleted = model.events.first() as NoteUiEvent.Deleted
+        assertEquals(true, deleted.note.isPinned)
+        assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+        model.undoDelete(deleted.note)
+        advanceUntilIdle()
+        assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
+    }
+
+    @Test fun queuedArchiveCannotRecreateAlreadyDeletedNote() = runTest {
+        val original = Note("id", "Title", "Body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.deleteNote(original)
+        model.toggleArchive(original)
+        advanceUntilIdle()
+        assertEquals(0, (repo.notes.value as NotesSnapshot.Ready).entries.size)
+    }
+
     @Test fun deletingStaleCardRestoresLatestSavedEditorContentOnUndo() = runTest {
         val old = Note("id", "Title", "Old content", false, 1L, 1L)
         val repo = FakeRepository(old)
