@@ -9,6 +9,7 @@ import dev.juuri.noma.domain.NotesSnapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -433,6 +434,13 @@ class NotesViewModelTest {
         advanceUntilIdle()
         assertEquals(100, repo.saveCallCount)
         assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.single().isArchived)
+        // Data safety: every event carrying an undo operation must survive,
+        // even when the UI collector was detached during the writes.
+        withTimeout(1_000) {
+            repeat(100) {
+                assertTrue(model.events.first() is NoteUiEvent.ArchiveChanged)
+            }
+        }
     }
 
     @Test fun staleListPinCannotBypassUnsavedEditorProtection() = runTest {
