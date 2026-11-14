@@ -176,7 +176,7 @@ class NomaUiTest {
      * stress review. Uses synthetic notes only; no person's private text.
      */
     @Test fun premiumEditorCapturesAdversarialScreenStates() {
-        val initialBody = ("A quiet place for ideas. Every paragraph should remain easy to read.\\n").repeat(18)
+        val initialBody = ("A quiet place for ideas. Every paragraph should remain easy to read.\n").repeat(18)
         val note = Note("premium-visual", "Visual draft", initialBody, false, 1L, 2L)
         val repo = FakeRepository(listOf(note))
         val model = NotesViewModel(repo, NotesService(repo))
