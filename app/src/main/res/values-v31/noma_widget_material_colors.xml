@@ -1,0 +1,6 @@
+<resources>
+    <!-- Android 12+ wallpaper-derived system colors; older devices use Noma fallbacks. -->
+    <color name="noma_widget_material_background">@android:color/system_neutral1_50</color>
+    <color name="noma_widget_material_outline">@android:color/system_neutral1_400</color>
+    <color name="noma_widget_material_text">@android:color/system_neutral1_900</color>
+</resources>

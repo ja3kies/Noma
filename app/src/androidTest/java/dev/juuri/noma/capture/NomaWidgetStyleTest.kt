@@ -126,6 +126,29 @@ class NomaWidgetStyleTest {
         }
     }
 
+    @Test fun materialYouColorResourcesFollowSystemPaletteOnAndroid12Plus() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return
+        for (mode in listOf(
+            Configuration.UI_MODE_NIGHT_NO to
+                intArrayOf(android.R.color.system_neutral1_50, android.R.color.system_neutral1_400,
+                    android.R.color.system_neutral1_900),
+            Configuration.UI_MODE_NIGHT_YES to
+                intArrayOf(android.R.color.system_neutral1_900, android.R.color.system_neutral1_600,
+                    android.R.color.system_neutral1_100)
+        )) {
+            val config = Configuration(context.resources.configuration).apply {
+                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or mode.first
+            }
+            val themed = context.createConfigurationContext(config)
+            val ours = intArrayOf(R.color.noma_widget_material_background,
+                R.color.noma_widget_material_outline, R.color.noma_widget_material_text)
+            ours.indices.forEach { index ->
+                assertEquals("Material You dynamic palette mode=${mode.first} index=$index",
+                    themed.getColor(mode.second[index]), themed.getColor(ours[index]))
+            }
+        }
+    }
+
     @Test fun captureLabelFitsSmallestSupportedWidgetWidth() {
         val width = (180 * context.resources.displayMetrics.density).toInt()
         val height = (56 * context.resources.displayMetrics.density).toInt()
