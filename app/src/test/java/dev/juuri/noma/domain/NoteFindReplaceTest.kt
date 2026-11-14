@@ -16,6 +16,23 @@ class NoteFindReplaceTest {
     @Test fun countUsesNonOverlappingMatches() {
         assertEquals(2, NoteFindReplace.count("aaaa", "aa"))
     }
+    @Test fun forwardNavigationSkipsOverlapsAndWraps() {
+        assertEquals(0..1, NoteFindReplace.nextMatch("aaaa", "aa", 0))
+        assertEquals(2..3, NoteFindReplace.nextMatch("aaaa", "aa", 1))
+        assertEquals(0..1, NoteFindReplace.nextMatch("aaaa", "aa", 4))
+    }
+    @Test fun backwardNavigationSkipsOverlapsAndWraps() {
+        assertEquals(0..1, NoteFindReplace.nextMatch("aaaa", "aa", 1, backwards = true))
+        assertEquals(2..3, NoteFindReplace.nextMatch("aaaa", "aa", -1, backwards = true))
+        assertEquals(2..3, NoteFindReplace.nextMatch("aaaa", "aa", 3, backwards = true))
+    }
+    @Test fun navigationRespectsCaseAndNonOverlappingCounts() {
+        assertEquals(5..8, NoteFindReplace.nextMatch("Note note NOTE", "note", 4))
+        assertEquals(10..13, NoteFindReplace.nextMatch("Note note NOTE", "note", 9))
+        assertEquals(3, NoteFindReplace.count("Note note NOTE", "note"))
+        assertNull(NoteFindReplace.nextMatch("text", "missing", 0))
+        assertNull(NoteFindReplace.nextMatch("text", " ", 0))
+    }
     @Test fun replaceFirstChangesOnlyFirstMatch() {
         assertEquals("New old OLD", NoteFindReplace.replaceFirst("old old OLD", "old", "New"))
     }

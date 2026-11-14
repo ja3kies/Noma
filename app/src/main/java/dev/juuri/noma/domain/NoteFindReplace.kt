@@ -7,17 +7,32 @@ package dev.juuri.noma.domain
  * no regular expressions or special replacement syntax are evaluated.
  */
 object NoteFindReplace {
-    /** Navigate literal matches without allocating all positions in a long document. */
+    /**
+     * Find only non-overlapping occurrences, just like count() and replaceAll().
+     * Starting a search in the middle of a match must not return a phantom
+     * overlapping occurrence (for example "aa" at offset 1 in "aaaa").
+     * Wrap to the first/last match when there is no match beyond the caret.
+     */
     fun nextMatch(text: String, needle: String, from: Int, backwards: Boolean = false): IntRange? {
-        if (needle.isBlank()) return null
-        val found = if (backwards) {
-            text.lastIndexOf(needle, startIndex = from.coerceAtMost(text.length), ignoreCase = true)
-                .takeIf { it >= 0 } ?: text.lastIndexOf(needle, ignoreCase = true)
-        } else {
-            text.indexOf(needle, startIndex = from.coerceAtLeast(0), ignoreCase = true)
-                .takeIf { it >= 0 } ?: text.indexOf(needle, ignoreCase = true)
+        if (needle.isBlank() || needle.length > text.length) return null
+        var first = -1
+        var last = -1
+        var selected = -1
+        var offset = 0
+        while (offset <= text.length - needle.length) {
+            val found = text.indexOf(needle, startIndex = offset, ignoreCase = true)
+            if (found < 0) break
+            if (first < 0) first = found
+            last = found
+            if (backwards) {
+                if (found <= from) selected = found
+            } else if (selected < 0 && found >= from) {
+                selected = found
+            }
+            offset = found + needle.length
         }
-        return if (found < 0) null else found until found + needle.length
+        val chosen = if (selected >= 0) selected else if (backwards) last else first
+        return if (chosen < 0) null else chosen until chosen + needle.length
     }
 
     fun count(text: String, needle: String): Int {
