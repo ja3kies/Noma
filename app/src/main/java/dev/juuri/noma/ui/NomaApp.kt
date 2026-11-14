@@ -1948,15 +1948,6 @@ private fun NoteEditorScreen(
                         }
                     },
                     actions = {
-                        if (saveState is EditorSaveState.Failed) {
-                            TextButton(
-                                onClick = viewModel::retrySave,
-                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                    .testTag("noma_retry_save")
-                            ) {
-                                Text(stringResource(R.string.retry))
-                            }
-                        }
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
@@ -1981,48 +1972,60 @@ private fun NoteEditorScreen(
                         }
                     }
                 )
-                // A save failure must stay actionable even while the editor has
-                // scrolled and the IME is visible; never bury Retry in the document.
+                // Failed writes remain actionable in one sticky, stable surface.
+                // Retry belongs to the failure itself, not to the navigation bar.
                 if (saveState is EditorSaveState.Failed ||
                     (saveState == EditorSaveState.Saving && (showSlowSaveStatus || closeWhenSaved))
                 ) Surface(
                     color = saveBarColor,
                     tonalElevation = 1.dp
                 ) {
-                    Box(
+                    Column(
                         Modifier.fillMaxWidth()
-                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.tiny)
                             .testTag("noma_editor_save_bar")
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.tiny)
                     ) {
-                        EditorSaveStatus(saveState = saveState)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                EditorSaveStatus(saveState = saveState)
+                            }
+                            if (saveState is EditorSaveState.Failed) {
+                                TextButton(
+                                    onClick = viewModel::retrySave,
+                                    modifier = Modifier.defaultMinSize(minHeight = NomaSpacing.touchTarget)
+                                        .testTag("noma_retry_save")
+                                ) {
+                                    Text(stringResource(R.string.retry))
+                                }
+                            }
+                        }
+                        if (saveState is EditorSaveState.Failed) {
+                            Text(
+                                stringResource(R.string.save_failure_guidance),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(bottom = NomaSpacing.small)
+                                    .testTag("noma_save_failure_guidance")
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
+                            )
+                        }
+                        if (closeWhenSaved && saveState == EditorSaveState.Saving) {
+                            Text(
+                                stringResource(R.string.wait_for_save_before_exit),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(bottom = NomaSpacing.small)
+                                    .testTag("noma_pending_exit")
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
+                            )
+                        }
                     }
-                }
-                AnimatedVisibility(
-                    visible = saveState is EditorSaveState.Failed,
-                    enter = fadeIn(tween(NomaMotion.quick)) + expandVertically(),
-                    exit = fadeOut(tween(NomaMotion.quick)) + shrinkVertically()
-                ) {
-                    Text(
-                        stringResource(R.string.save_failure_guidance),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.errorContainer)
-                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
-                            .testTag("noma_save_failure_guidance")
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                    )
-                }
-                if (closeWhenSaved && saveState == EditorSaveState.Saving) {
-                    Text(
-                        stringResource(R.string.wait_for_save_before_exit),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
-                            .testTag("noma_pending_exit")
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                    )
                 }
             }
         }
