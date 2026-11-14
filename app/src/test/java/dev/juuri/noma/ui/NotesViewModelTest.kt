@@ -567,6 +567,68 @@ class NotesViewModelTest {
         assertEquals(true, (repo.notes.value as NotesSnapshot.Ready).entries.single().isPinned)
     }
 
+    @Test fun staleListPinDoesNotRestoreOldEditorText() = runTest {
+        val original = Note("id", "Title", "Old body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(original)
+        model.changeBody("Newly saved body")
+        advanceUntilIdle()
+        model.closeNote()
+        model.togglePin(original)
+        advanceUntilIdle()
+        val stored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals("Newly saved body", stored.body)
+        assertEquals(true, stored.isPinned)
+    }
+
+    @Test fun queuedPinDoesNotPinAlreadyArchivedNote() = runTest {
+        val original = Note("id", "Title", "Body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.toggleArchive(original)
+        model.togglePin(original) // Queued from a now-stale list card.
+        advanceUntilIdle()
+        val stored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals(true, stored.isArchived)
+        assertEquals(false, stored.isPinned)
+    }
+
+    @Test fun undoArchiveDoesNotRollBackLaterTextEdits() = runTest {
+        val original = Note("id", "Title", "Original body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.toggleArchive(original)
+        advanceUntilIdle()
+        val event = model.events.first() as NoteUiEvent.ArchiveChanged
+        val archived = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        model.openNote(archived)
+        model.changeBody("Edited after archive")
+        advanceUntilIdle()
+        model.closeNote()
+        model.undoArchive(event.previous)
+        advanceUntilIdle()
+        val stored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals("Edited after archive", stored.body)
+        assertEquals(false, stored.isArchived)
+    }
+
+    @Test fun undoDeleteDoesNotOverwriteNewerImportedId() = runTest {
+        val original = Note("id", "Original", "Deleted", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.deleteNote(original)
+        advanceUntilIdle()
+        val deleted = model.events.first() as NoteUiEvent.Deleted
+        val imported = original.copy(title = "Imported while awaiting undo", body = "Keep me")
+        model.importNotes(listOf(imported))
+        model.undoDelete(deleted.note)
+        advanceUntilIdle()
+        val stored = (repo.notes.value as NotesSnapshot.Ready).entries.single()
+        assertEquals("Imported while awaiting undo", stored.title)
+        assertEquals("Keep me", stored.body)
+    }
+
     @Test fun queuedArchiveCannotRecreateAlreadyDeletedNote() = runTest {
         val original = Note("id", "Title", "Body", false, 1L, 1L)
         val repo = FakeRepository(original)
