@@ -186,6 +186,7 @@ import dev.juuri.noma.ui.theme.NomaMotion
 import dev.juuri.noma.ui.theme.NomaSpacing
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 
@@ -1598,6 +1599,17 @@ private fun NoteEditorScreen(
     var confirmDiscard by rememberSaveable(note.id) { mutableStateOf(false) }
     var findReplaceOpen by rememberSaveable(note.id) { mutableStateOf(false) }
     var focusBodyAfterFind by remember(note.id) { mutableStateOf(false) }
+    // A fast autosave should not move the title/body on every keystroke.
+    // Errors remain visible immediately, while slow writes get a delayed status.
+    var showSlowSaveStatus by remember(note.id) { mutableStateOf(false) }
+    LaunchedEffect(note.id, saveState) {
+        if (saveState == EditorSaveState.Saving) {
+            delay(450)
+            showSlowSaveStatus = true
+        } else {
+            showSlowSaveStatus = false
+        }
+    }
     var findQuery by rememberSaveable(note.id) { mutableStateOf("") }
     var replaceWith by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
@@ -1930,7 +1942,9 @@ private fun NoteEditorScreen(
                 )
                 // A save failure must stay actionable even while the editor has
                 // scrolled and the IME is visible; never bury Retry in the document.
-                if (saveState != EditorSaveState.Saved) Surface(
+                if (saveState is EditorSaveState.Failed ||
+                    (saveState == EditorSaveState.Saving && (showSlowSaveStatus || closeWhenSaved))
+                ) Surface(
                     color = saveBarColor,
                     tonalElevation = 1.dp
                 ) {
