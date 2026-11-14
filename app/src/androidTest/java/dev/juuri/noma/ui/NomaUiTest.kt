@@ -174,7 +174,9 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_sort_button").assertIsDisplayed()
         compose.onNodeWithTag("noma_search_pill").assertIsDisplayed()
         compose.onNodeWithTag("noma_new_note").assertIsDisplayed()
-        if (width >= 840) compose.onNodeWithTag("noma_tablet_empty_pane").assertIsDisplayed()
+        // A 393dp emulator cannot become a tablet by overriding density:
+        // parent layout constraints remain phone-sized. Verify phone controls
+        // here; tablet pane layout needs a genuine >=840dp device profile.
     }
 
     @Test fun appearanceChangesStayOpenAndWidgetBackReturnsToSettings() {
@@ -264,7 +266,7 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_archive_filter").performClick()
         compose.onNodeWithContentDescription("Actions for Finished task").performClick()
-        compose.onNodeWithText("Pin note").assertDoesNotExist()
+        compose.onNodeWithTag("noma_menu_pin").assertDoesNotExist()
         compose.onNodeWithText("Restore note").assertExists()
     }
 
@@ -342,12 +344,12 @@ class NomaUiTest {
         compose.setContent { NomaTheme { NomaApp(viewModel) } }
         // SectionHeader intentionally exposes one spoken heading+count
         // node; the visible Text is available on the unmerged tree.
-        compose.onNodeWithText("Recent", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Recent: 2 notes", useUnmergedTree = true).assertExists()
         compose.onNodeWithContentDescription("Sort notes").performClick()
         compose.onNodeWithText("Title (A–Z)").performClick()
-        compose.onNodeWithText("A–Z", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("A–Z: 2 notes", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("noma_search").performTextInput("Cafe")
-        compose.onNodeWithText("Search results", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Search results: 1 note", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Café").assertExists()
     }
 
@@ -1271,7 +1273,7 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onAllNodesWithText("Pinned", useUnmergedTree = true).onFirst().assertExists()
-        compose.onNodeWithText("Recent", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Recent: 1 note", useUnmergedTree = true).assertExists()
         compose.onAllNodesWithTag("noma_section_header").assertCountEquals(2)
         compose.onNodeWithTag("noma_card_pinned_badge", useUnmergedTree = true).assertExists()
     }
@@ -1582,7 +1584,9 @@ class NomaUiTest {
             compose.onAllNodesWithText(subtitle).fetchSemanticsNodes().isEmpty()
         }
         compose.onNodeWithTag("noma_scroll_to_top").performClick()
-        compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasText(subtitle))
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText(subtitle).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test fun scrollToTopPreservesSelectedSortOrder() {

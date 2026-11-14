@@ -1920,6 +1920,15 @@ private fun NoteEditorScreen(
                         }
                     },
                     actions = {
+                        if (saveState is EditorSaveState.Failed) {
+                            TextButton(
+                                onClick = viewModel::retrySave,
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                    .testTag("noma_retry_save")
+                            ) {
+                                Text(stringResource(R.string.retry))
+                            }
+                        }
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
@@ -1957,7 +1966,7 @@ private fun NoteEditorScreen(
                             .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.tiny)
                             .testTag("noma_editor_save_bar")
                     ) {
-                        EditorSaveStatus(saveState = saveState, onRetry = viewModel::retrySave)
+                        EditorSaveStatus(saveState = saveState)
                     }
                 }
                 AnimatedVisibility(
@@ -2094,7 +2103,7 @@ private fun NoteEditorScreen(
 }
 
 @Composable
-private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
+private fun EditorSaveStatus(saveState: EditorSaveState) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -2136,10 +2145,8 @@ private fun EditorSaveStatus(saveState: EditorSaveState, onRetry: () -> Unit) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
-                TextButton(onClick = onRetry,
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("noma_retry_save")) {
-                    Text(stringResource(R.string.retry))
-                }
+                // Retry is kept in the top app bar so it stays accessible
+                // even when the IME obscures the document and status region.
             }
         }
     }
