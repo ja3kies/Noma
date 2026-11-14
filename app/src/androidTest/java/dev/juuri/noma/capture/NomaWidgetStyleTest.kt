@@ -1,6 +1,9 @@
 package dev.juuri.noma.capture
 
 import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Color
+import androidx.core.graphics.ColorUtils
 import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
@@ -89,6 +92,38 @@ class NomaWidgetStyleTest {
             R.color.noma_widget_glass_stroke
         )
         colors.forEach { assertTrue(context.getColor(it) != 0) }
+    }
+
+    @Test fun widgetLabelsMeetBodyTextContrastInBothModesAndWallpaperExtremes() {
+        for (nightMode in listOf(Configuration.UI_MODE_NIGHT_NO, Configuration.UI_MODE_NIGHT_YES)) {
+            val config = Configuration(context.resources.configuration).apply {
+                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightMode
+            }
+            val themed = context.createConfigurationContext(config)
+            val palettes = listOf(
+                R.color.noma_widget_material_text to listOf(R.color.noma_widget_material_background),
+                R.color.noma_widget_frosted_text to listOf(
+                    R.color.noma_widget_frosted_start,
+                    R.color.noma_widget_frosted_center,
+                    R.color.noma_widget_frosted_end
+                ),
+                R.color.noma_widget_glass_text to listOf(R.color.noma_widget_glass_fill)
+            )
+            for ((foregroundRes, backgroundResources) in palettes) {
+                val foreground = themed.getColor(foregroundRes)
+                for (backgroundRes in backgroundResources) {
+                    val translucentBackground = themed.getColor(backgroundRes)
+                    for (wallpaper in listOf(Color.BLACK, Color.WHITE)) {
+                        val effectiveBackground = ColorUtils.compositeColors(translucentBackground, wallpaper)
+                        val contrast = ColorUtils.calculateContrast(foreground, effectiveBackground)
+                        assertTrue(
+                            "night=$nightMode fg=$foregroundRes bg=$backgroundRes wallpaper=$wallpaper ratio=$contrast",
+                            contrast >= 4.5
+                        )
+                    }
+                }
+            }
+        }
     }
 
     @Test fun captureLabelFitsSmallestSupportedWidgetWidth() {

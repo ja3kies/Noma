@@ -4,7 +4,8 @@
 <color name="noma_widget_material_text">#EAF4E9</color>
 <color name="noma_widget_frosted_text">#E9F7EC</color>
 <color name="noma_widget_frosted_start">#D21F2D25</color>
-<color name="noma_widget_frosted_center">#B93D4B43</color>
+<!-- Keeps dark-mode widget label at >=4.5:1 even over bright wallpapers. -->
+<color name="noma_widget_frosted_center">#DA3D4B43</color>
 <color name="noma_widget_frosted_end">#C21B2922</color>
 <color name="noma_widget_frosted_stroke">#75FFFFFF</color>
 <color name="noma_widget_glass_fill">#C21D2323</color>
