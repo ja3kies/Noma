@@ -1589,7 +1589,6 @@ private fun NoteEditorScreen(
         label = "nomaEditorSaveStatusSurface"
     )
     val editorScrollState = rememberSaveable(note.id, saver = ScrollState.Saver) { ScrollState(0) }
-    val pinStateDescription = stringResource(if (note.isPinned) R.string.unpin_note else R.string.pin_note)
     LaunchedEffect(findReplaceOpen, focusBodyAfterFind) {
         if (!findReplaceOpen && focusBodyAfterFind) {
             bodyFocus.requestFocus()
@@ -1822,24 +1821,6 @@ private fun NoteEditorScreen(
                                 contentDescription = stringResource(R.string.find_replace)
                             )
                         }
-                        IconButton(
-                            onClick = { viewModel.togglePin(note) },
-                            enabled = saveState == EditorSaveState.Saved && !note.isArchived,
-                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
-                                .semantics { stateDescription = pinStateDescription }
-                                .testTag("noma_editor_pin")
-                        ) {
-                            Icon(
-                                Icons.Outlined.PushPin,
-                                contentDescription = stringResource(
-                                    if (note.isPinned) R.string.unpin_note else R.string.pin_note
-                                ),
-                                tint = if (saveState != EditorSaveState.Saved || note.isArchived)
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                    else if (note.isPinned) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     IconButton(
                         onClick = {
                             val edit = toggleBulletLine(currentBody)
@@ -1907,7 +1888,6 @@ private fun NoteEditorScreen(
                                 onArchive = { viewModel.toggleArchive(note) },
                                 onDelete = { confirmDelete = true },
                                 onShare = { shareNote(context, note) },
-                                showPinAction = false,
                                 destructiveEnabled = saveState == EditorSaveState.Saved
                             )
                         }

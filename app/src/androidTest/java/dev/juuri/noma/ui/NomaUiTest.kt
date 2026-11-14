@@ -603,14 +603,15 @@ class NomaUiTest {
         }
     }
 
-    @Test fun archivedNoteCannotBePinnedFromEditorToolbar() {
+    @Test fun archivedNoteHasNoPinActionInEditorMenu() {
         val note = Note("archive", "Archived text", "Saved", false, 1L, 1L, true)
         val repo = FakeRepository(listOf(note))
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_archive_filter").performClick()
         compose.onNodeWithText("Archived text").performClick()
-        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertDoesNotExist()
     }
 
     @Test fun savingNoteDisablesEditorPinArchiveDeleteAndShare() {
@@ -623,8 +624,8 @@ class NomaUiTest {
         compose.onNodeWithText("Working draft").performClick()
         compose.onNodeWithTag("noma_body_input").performTextInput(" pending")
         compose.runOnIdle { assertEquals(EditorSaveState.Saving, model.saveState.value) }
-        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
         compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertIsNotEnabled()
         compose.onNodeWithText("Archive note").assertIsNotEnabled()
         compose.onNodeWithText("Delete").assertIsNotEnabled()
         compose.onNodeWithText("Share note").assertIsNotEnabled()
@@ -775,7 +776,8 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_retry_save").performClick()
         compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saving }
         compose.onNodeWithTag("noma_retry_save").assertDoesNotExist()
-        compose.onNodeWithTag("noma_editor_pin").assertIsNotEnabled()
+        compose.onNodeWithTag("noma_editor_actions").performClick()
+        compose.onNodeWithTag("noma_menu_pin").assertIsNotEnabled()
         compose.runOnIdle { gate.complete(Unit) }
         compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
     }
