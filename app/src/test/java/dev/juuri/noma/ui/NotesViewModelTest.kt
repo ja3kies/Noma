@@ -422,6 +422,19 @@ class NotesViewModelTest {
     }
 
 
+    @Test fun queuedActionsCannotDeadlockWhenUiEventCollectorIsAbsent() = runTest {
+        val original = Note("id", "Long-running edits", "Body", false, 1L, 1L)
+        val repo = FakeRepository(original)
+        val model = NotesViewModel(repo, NotesService(repo))
+        // Emulate a backgrounded UI with no active snackbar/event collector.
+        // More than Channel.BUFFERED notifications previously suspended the
+        // single writer actor, leaving subsequent changes uncommitted.
+        repeat(100) { model.toggleArchive(original) }
+        advanceUntilIdle()
+        assertEquals(100, repo.saveCallCount)
+        assertEquals(false, (repo.notes.value as NotesSnapshot.Ready).entries.single().isArchived)
+    }
+
     @Test fun staleListPinCannotBypassUnsavedEditorProtection() = runTest {
         val original = Note("id", "Original", "Before", false, 1L, 1L)
         val repo = FakeRepository(original)

@@ -8,6 +8,7 @@ import dev.juuri.noma.domain.NotesRepository
 import dev.juuri.noma.domain.NotesService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,7 +98,11 @@ class NotesViewModel(
     private var editorRevision = 0L
     private var quickNoteRequestedAfterSave = false
     private val operations = Channel<WriteOperation>(Channel.UNLIMITED)
-    private val eventChannel = Channel<NoteUiEvent>(Channel.BUFFERED)
+    // UI notifications must never stall the serialized storage writer when
+    // the activity is stopped or no snackbar collector is attached.
+    private val eventChannel = Channel<NoteUiEvent>(
+        capacity = Channel.BUFFERED, onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val events = eventChannel.receiveAsFlow()
 
     /**
