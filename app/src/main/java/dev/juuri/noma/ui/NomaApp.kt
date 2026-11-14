@@ -1841,22 +1841,40 @@ private fun NoteEditorScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
         bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().imePadding().navigationBarsPadding()
-                        .padding(horizontal = NomaSpacing.small)
-                        .testTag("noma_editor_toolbar"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceEvenly
+            // The floating dock follows the keyboard; it never takes the width
+            // of the writing canvas or competes with the editable text.
+            val dockColor by animateColorAsState(
+                targetValue = if (keyboardVisible) MaterialTheme.colorScheme.surfaceContainerHigh
+                    else MaterialTheme.colorScheme.surfaceContainer,
+                animationSpec = tween(NomaMotion.quick),
+                label = "nomaEditorDockSurface"
+            )
+            Box(
+                modifier = Modifier.fillMaxWidth().imePadding().navigationBarsPadding()
+                    .padding(horizontal = NomaSpacing.comfortable, vertical = NomaSpacing.small),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
+                        .testTag("noma_editor_dock"),
+                    shape = RoundedCornerShape(28.dp),
+                    color = dockColor,
+                    tonalElevation = 2.dp,
+                    shadowElevation = 3.dp
                 ) {
-                    val exportScope = rememberCoroutineScope()
-                    // Document export stays available when reading, but does not compete
-                    // with the writing tools or Gboard while the IME is visible.
-                    if (!keyboardVisible) {
-                        PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
-                            exportScope.launch { snackbar.showSnackbar(message) }
-                        })
-                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = NomaSpacing.tiny)
+                            .testTag("noma_editor_toolbar"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        val exportScope = rememberCoroutineScope()
+                        if (!keyboardVisible) {
+                            PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
+                                exportScope.launch { snackbar.showSnackbar(message) }
+                            })
+                        }
                         IconButton(
                             onClick = {
                                 menuExpanded = false
@@ -1866,29 +1884,38 @@ private fun NoteEditorScreen(
                                 .testTag("noma_editor_find_replace")
                         ) {
                             Icon(
-                                Icons.Outlined.Search,
+                                painter = painterResource(R.drawable.noma_huge_search),
                                 contentDescription = stringResource(R.string.find_replace)
                             )
                         }
-                    IconButton(
-                        onClick = {
-                            val edit = toggleBulletLine(currentBody)
-                            bodyValue = edit
-                            closeWhenSaved = false
-                            viewModel.changeBody(edit.text)
-                            bodyFocus.requestFocus()
-                            keyboard?.show()
-                        },
-                        modifier = Modifier.testTag("noma_editor_bullet")
-                    ) {
-                        Icon(Icons.AutoMirrored.Outlined.FormatListBulleted,
-                            contentDescription = stringResource(R.string.toggle_bullet))
-                    }
-                    if (keyboardVisible) {
-                        IconButton(onClick = { keyboard?.hide() },
-                            modifier = Modifier.testTag("noma_editor_hide_keyboard")) {
-                            Icon(Icons.Outlined.KeyboardHide,
-                                contentDescription = stringResource(R.string.hide_keyboard))
+                        IconButton(
+                            onClick = {
+                                val edit = toggleBulletLine(currentBody)
+                                bodyValue = edit
+                                closeWhenSaved = false
+                                viewModel.changeBody(edit.text)
+                                bodyFocus.requestFocus()
+                                keyboard?.show()
+                            },
+                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
+                                .testTag("noma_editor_bullet")
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.noma_huge_list),
+                                contentDescription = stringResource(R.string.toggle_bullet)
+                            )
+                        }
+                        if (keyboardVisible) {
+                            IconButton(
+                                onClick = { keyboard?.hide() },
+                                modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
+                                    .testTag("noma_editor_hide_keyboard")
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.noma_huge_keyboard),
+                                    contentDescription = stringResource(R.string.hide_keyboard)
+                                )
+                            }
                         }
                     }
                 }
@@ -1915,7 +1942,7 @@ private fun NoteEditorScreen(
                                 .testTag("noma_editor_back")
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                                painter = painterResource(R.drawable.noma_huge_arrow_left),
                                 contentDescription = stringResource(R.string.back_to_notes)
                             )
                         }
@@ -1937,7 +1964,7 @@ private fun NoteEditorScreen(
                                     .testTag("noma_editor_actions")
                             ) {
                                 Icon(
-                                    Icons.Outlined.MoreHoriz,
+                                    painter = painterResource(R.drawable.noma_huge_more_horizontal),
                                     contentDescription = stringResource(R.string.note_actions)
                                 )
                             }
