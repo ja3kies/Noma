@@ -1722,9 +1722,7 @@ private fun NoteEditorScreen(
         }
         val findFocus = remember { FocusRequester() }
         val selectedRange = currentBody.selection
-        val currentOccurrence = if (findQuery.isNotBlank() && selectedRange.min < note.body.length &&
-            note.body.regionMatches(selectedRange.min, findQuery, 0, findQuery.length, ignoreCase = true))
-            NoteFindReplace.count(note.body.substring(0, selectedRange.min), findQuery) + 1 else 0
+        val currentOccurrence = NoteFindReplace.matchOrdinal(note.body, findQuery, selectedRange.min)
         fun navigate(backwards: Boolean) {
             val from = if (backwards) currentBody.selection.min - 1 else currentBody.selection.max
             val range = NoteFindReplace.nextMatch(note.body, findQuery, from, backwards) ?: return

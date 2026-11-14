@@ -35,6 +35,21 @@ object NoteFindReplace {
         return if (chosen < 0) null else chosen until chosen + needle.length
     }
 
+    /** One-based ordinal for an actual non-overlapping match start; zero otherwise. */
+    fun matchOrdinal(text: String, needle: String, at: Int): Int {
+        if (needle.isBlank() || at < 0 || at > text.length - needle.length) return 0
+        var index = 0
+        var ordinal = 0
+        while (index <= text.length - needle.length) {
+            val found = text.indexOf(needle, startIndex = index, ignoreCase = true)
+            if (found < 0 || found > at) return 0
+            ordinal++
+            if (found == at) return ordinal
+            index = found + needle.length
+        }
+        return 0
+    }
+
     fun count(text: String, needle: String): Int {
         if (needle.isBlank()) return 0
         var matches = 0

@@ -33,6 +33,16 @@ class NoteFindReplaceTest {
         assertNull(NoteFindReplace.nextMatch("text", "missing", 0))
         assertNull(NoteFindReplace.nextMatch("text", " ", 0))
     }
+    @Test fun ordinalUsesOnlyCanonicalNonOverlappingMatchStarts() {
+        assertEquals(1, NoteFindReplace.matchOrdinal("aaaa", "aa", 0))
+        assertEquals(0, NoteFindReplace.matchOrdinal("aaaa", "aa", 1))
+        assertEquals(2, NoteFindReplace.matchOrdinal("aaaa", "aa", 2))
+        assertEquals(0, NoteFindReplace.matchOrdinal("aaaa", "aa", 3))
+        assertEquals(0, NoteFindReplace.matchOrdinal("aaaa", "aa", -1))
+        assertEquals(0, NoteFindReplace.matchOrdinal("aaaa", "", 0))
+        assertEquals(3, NoteFindReplace.matchOrdinal("Note note NOTE", "note", 10))
+    }
+
     @Test fun replaceAtOrNextTargetsCurrentMatchInsteadOfAlwaysFirst() {
         assertEquals("cat one X", NoteFindReplace.replaceAtOrNext("cat one cat", "cat", "X", 8))
         assertEquals("X one cat", NoteFindReplace.replaceAtOrNext("cat one cat", "cat", "X", 0))
