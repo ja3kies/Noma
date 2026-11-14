@@ -48,6 +48,16 @@ object NoteFindReplace {
         return matches
     }
 
+    /** Replace the selected match, or the next non-overlapping match after the caret. */
+    fun replaceAtOrNext(text: String, needle: String, replacement: String, from: Int): String {
+        val range = nextMatch(text, needle, from) ?: return text
+        return buildString(text.length - needle.length + replacement.length) {
+            append(text, 0, range.first)
+            append(replacement)
+            append(text, range.last + 1, text.length)
+        }
+    }
+
     fun replaceFirst(text: String, needle: String, replacement: String): String {
         if (needle.isBlank()) return text
         val index = text.indexOf(needle, ignoreCase = true)

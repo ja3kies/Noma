@@ -151,7 +151,7 @@
     <string name="find_replace">Find and replace</string>
     <string name="find_text">Find text</string>
     <string name="replacement_text">Replace with</string>
-    <string name="replace_first">Replace first</string>
+    <string name="replace_first">Replace current match</string>
     <string name="replace_all">Replace all</string>
     <string name="no_search_matches">No matches found</string>
     <string name="find_replace_close">Close search</string>

@@ -1438,6 +1438,25 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_menu_share").assertExists()
     }
 
+    @Test fun editorReplacesSelectedSearchOccurrence() {
+        val original = Note("selected-match", "Example note", "cat one cat", false, 1L, 1L)
+        val repo = FakeRepository(listOf(original))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.runOnIdle { model.openNote(original) }
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_input").performTextInput("cat")
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_find_next").performClick()
+        compose.onNodeWithTag("noma_body_input").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.TextSelectionRange, androidx.compose.ui.text.TextRange(8, 11)))
+        compose.onNodeWithTag("noma_editor_find_replace").performClick()
+        compose.onNodeWithTag("noma_replace_input").performTextInput("X")
+        compose.onNodeWithTag("noma_replace_first").performClick()
+        compose.waitUntil(10_000) { model.active.value?.body == "cat one X" }
+    }
+
     @Test fun editorFindAndReplaceAllUpdatesActiveNote() {
         val original = Note("find-replace", "Meeting", "café and café", false, 1L, 1L)
         val repo = FakeRepository(listOf(original))

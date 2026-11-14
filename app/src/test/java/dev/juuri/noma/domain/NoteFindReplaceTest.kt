@@ -33,6 +33,20 @@ class NoteFindReplaceTest {
         assertNull(NoteFindReplace.nextMatch("text", "missing", 0))
         assertNull(NoteFindReplace.nextMatch("text", " ", 0))
     }
+    @Test fun replaceAtOrNextTargetsCurrentMatchInsteadOfAlwaysFirst() {
+        assertEquals("cat one X", NoteFindReplace.replaceAtOrNext("cat one cat", "cat", "X", 8))
+        assertEquals("X one cat", NoteFindReplace.replaceAtOrNext("cat one cat", "cat", "X", 0))
+    }
+    @Test fun replaceAtOrNextWrapsAndUsesNonOverlappingRanges() {
+        assertEquals("aaX", NoteFindReplace.replaceAtOrNext("aaaa", "aa", "X", 1))
+        assertEquals("Xaa", NoteFindReplace.replaceAtOrNext("aaaa", "aa", "X", 4))
+        assertEquals("😀 x", NoteFindReplace.replaceAtOrNext("😀 😀", "😀", "x", 3))
+    }
+    @Test fun replaceAtOrNextNoMatchPreservesText() {
+        assertEquals("hello", NoteFindReplace.replaceAtOrNext("hello", "xyz", "X", 0))
+        assertEquals("hello", NoteFindReplace.replaceAtOrNext("hello", "", "X", 0))
+    }
+
     @Test fun replaceFirstChangesOnlyFirstMatch() {
         assertEquals("New old OLD", NoteFindReplace.replaceFirst("old old OLD", "old", "New"))
     }

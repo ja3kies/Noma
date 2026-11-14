@@ -151,7 +151,7 @@
     <string name="find_replace">Rechercher et remplacer</string>
     <string name="find_text">Texte à rechercher</string>
     <string name="replacement_text">Remplacer par</string>
-    <string name="replace_first">Remplacer la première occurrence</string>
+    <string name="replace_first">Remplacer cette occurrence</string>
     <string name="replace_all">Tout remplacer</string>
     <string name="no_search_matches">Aucune occurrence</string>
     <string name="find_replace_close">Fermer la recherche</string>

@@ -1785,11 +1785,14 @@ private fun NoteEditorScreen(
                         enabled = matches > 0,
                         onClick = {
                             closeWhenSaved = false
-                            val updated = NoteFindReplace.replaceFirst(note.body, findQuery, replaceWith)
-                            val replacedAt = note.body.indexOf(findQuery, ignoreCase = true)
-                            val range = NoteFindReplace.nextMatch(updated, findQuery,
-                                replacedAt.coerceAtLeast(0) + replaceWith.length)
-                            bodyValue = TextFieldValue(updated, TextRange(range?.first ?: 0))
+                            val start = currentBody.selection.min
+                            val match = NoteFindReplace.nextMatch(note.body, findQuery, start)
+                                ?: return@TextButton
+                            val updated = NoteFindReplace.replaceAtOrNext(note.body, findQuery, replaceWith, start)
+                            val afterReplacement = match.first + replaceWith.length
+                            val next = NoteFindReplace.nextMatch(updated, findQuery, afterReplacement)
+                            val caret = next?.first ?: afterReplacement.coerceIn(0, updated.length)
+                            bodyValue = TextFieldValue(updated, TextRange(caret))
                             viewModel.changeBody(updated)
                         },
                         modifier = Modifier.fillMaxWidth().testTag("noma_replace_first")
