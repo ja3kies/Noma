@@ -6,8 +6,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import dev.juuri.noma.R
@@ -27,7 +24,7 @@ import kotlinx.coroutines.withContext
 
 /** Export a snapshot of the current note to the user-selected document destination. */
 @Composable
-internal fun PortableNoteExport(note: Note, enabled: Boolean, onMessage: (String) -> Unit) {
+internal fun PortableNoteExport(note: Note, onMessage: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
@@ -65,10 +62,14 @@ internal fun PortableNoteExport(note: Note, enabled: Boolean, onMessage: (String
         ActivityResultContracts.CreateDocument("text/markdown")
     ) { uri -> write(uri, true) }
     Box {
-        IconButton(onClick = { expanded = true }, enabled = !busy && enabled) {
-            Icon(painter = painterResource(R.drawable.noma_huge_download),
-                contentDescription = stringResource(R.string.portable_export_note))
-        }
+        // This exports the current editor snapshot, including an unsaved draft.
+        // It neither reads the database nor changes the autosave state.
+        EditorToolButton(
+            icon = R.drawable.noma_huge_download,
+            description = stringResource(R.string.portable_export_note),
+            onClick = { expanded = true },
+            enabled = !busy
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.portable_export_txt)) },

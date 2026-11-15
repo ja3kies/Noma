@@ -197,6 +197,14 @@ class NomaUiTest {
         val fontScale = mutableStateOf(1f)
         val imeVisible = mutableStateOf(false)
         compose.setContent {
+            androidx.compose.runtime.SideEffect {
+                androidx.core.view.WindowCompat.getInsetsController(
+                    compose.activity.window, compose.activity.window.decorView
+                ).apply {
+                    isAppearanceLightStatusBars = !dark.value
+                    isAppearanceLightNavigationBars = !dark.value
+                }
+            }
             val baseDensity = androidx.compose.ui.platform.LocalDensity.current
             val actualIme = androidx.compose.foundation.layout.WindowInsets.ime
                 .getBottom(baseDensity) > 0
@@ -223,11 +231,13 @@ class NomaUiTest {
 
         compose.onNodeWithTag("noma_body_input").performClick()
         compose.waitUntil(10_000) { imeVisible.value }
+        compose.onNodeWithTag("noma_body_input").performTextInputSelection(TextRange(initialBody.length))
         compose.onNodeWithTag("noma_body_input").performTextInput(" Writing with the keyboard.")
         compose.waitUntil(10_000) {
             model.saveState.value == EditorSaveState.Saved &&
                 model.active.value?.body?.contains("Writing with") == true
         }
+        compose.waitUntil(5_000) { editorCaretIsVisible() }
         savePremiumScreenshot("02-editor-ime")
 
         compose.runOnIdle { repo.failWrites = true }
@@ -238,6 +248,7 @@ class NomaUiTest {
         val globalFailurePrefix = compose.activity.getString(dev.juuri.noma.R.string.error_prefix)
         compose.waitForIdle()
         compose.onNodeWithText(globalFailurePrefix, substring = true).assertDoesNotExist()
+        compose.waitUntil(5_000) { editorCaretIsVisible() }
         savePremiumScreenshot("03-editor-save-failure")
 
         compose.runOnIdle { repo.failWrites = false }
@@ -248,9 +259,17 @@ class NomaUiTest {
         compose.runOnIdle { dark.value = true }
         savePremiumScreenshot("04-editor-dark")
 
-        compose.runOnIdle { fontScale.value = 1.6f }
+        compose.runOnIdle { fontScale.value = 2f }
         compose.onNodeWithTag("noma_editor_toolbar").assertIsDisplayed()
+        compose.waitUntil(5_000) { editorCaretIsVisible() }
         savePremiumScreenshot("05-editor-large-font")
+
+        compose.runOnIdle { repo.failWrites = true }
+        compose.onNodeWithTag("noma_body_input").performTextInput(" Still editing at large text size.")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_retry_save").assertIsDisplayed().assertIsEnabled()
+        compose.waitUntil(5_000) { editorCaretIsVisible() }
+        savePremiumScreenshot("06-editor-large-font-failure")
     }
 
     private fun savePremiumScreenshot(name: String) {
@@ -1400,11 +1419,25 @@ class NomaUiTest {
     @Test fun clearFiltersRemainsDirectlyAboveBottomSearchWhenKeyboardOpen() {
         val repo = FakeRepository()
         val model = NotesViewModel(repo, NotesService(repo))
-        compose.setContent { NomaTheme { NomaApp(model) } }
+        val imeVisible = mutableStateOf(false)
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val bottom = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(density)
+            androidx.compose.runtime.SideEffect { imeVisible.value = bottom > 0 }
+            NomaTheme { NomaApp(model) }
+        }
+        compose.onNodeWithTag("noma_search").performClick()
+        compose.waitUntil(10_000) { imeVisible.value }
         compose.onNodeWithTag("noma_search").performTextInput("missing note")
         compose.waitUntil(5_000) { model.query.value == "missing note" }
         val reset = compose.onNodeWithTag("noma_clear_filters")
         reset.assertIsDisplayed()
+        // Model changes are synchronous; platform IME/inset animation is not.
+        // Keep the geometric requirement, but observe its settled layout.
+        compose.waitUntil(5_000) {
+            reset.fetchSemanticsNode().boundsInRoot.bottom <=
+                compose.onNodeWithTag("noma_search_pill").fetchSemanticsNode().boundsInRoot.top
+        }
         val resetBounds = reset.fetchSemanticsNode().boundsInRoot
         val pillBounds = compose.onNodeWithTag("noma_search_pill")
             .fetchSemanticsNode().boundsInRoot
