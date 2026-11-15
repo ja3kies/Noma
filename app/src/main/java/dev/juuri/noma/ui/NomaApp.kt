@@ -2468,8 +2468,6 @@ private fun WidgetStyleDialog(
     onSelect: (NomaWidgetStyle) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val compactPreview = LocalConfiguration.current.screenWidthDp < 420 ||
-        LocalDensity.current.fontScale >= 1.25f
     val styles = listOf(
         NomaWidgetStyle.MATERIAL_YOU to R.string.widget_style_material_you,
         NomaWidgetStyle.FROSTED_GREEN to R.string.widget_style_frosted_green,
@@ -2542,7 +2540,7 @@ private fun WidgetStyleDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                         Box(
-                            modifier = Modifier.size(width = if (compactPreview) 76.dp else 116.dp, height = 36.dp)
+                            modifier = Modifier.size(width = 136.dp, height = 36.dp)
                                 .background(previewBrush, RoundedCornerShape(15.dp))
                                 .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
                                 .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
