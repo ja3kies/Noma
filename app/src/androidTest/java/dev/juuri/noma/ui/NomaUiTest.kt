@@ -414,6 +414,15 @@ class NomaUiTest {
         compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
         compose.onNodeWithContentDescription("Export this note")
             .assertIsDisplayed().assertIsEnabled().performClick()
+        // DropdownMenu is a Popup with an entry animation and may open
+        // above a still-visible IME. Wait for actual on-screen visibility:
+        // checking mere existence would hide a clipped menu regression.
+        compose.waitUntil(5_000) {
+            runCatching {
+                compose.onNodeWithText("Export as TXT").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
         compose.onNodeWithText("Export as TXT").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(model.active.value!!.body.contains("unsaved"))
