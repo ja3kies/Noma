@@ -850,6 +850,18 @@ class NomaUiTest {
         }
     }
 
+    @Test fun appearancePaletteExposesInkAndNeverReintroducesViolet() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithTag("noma_accent_INK").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_accent_INK").assertIsSelected()
+        compose.onNodeWithTag("noma_accent_LILAC").assertDoesNotExist()
+        compose.onNodeWithTag("noma_appearance_modes").assertExists()
+        compose.onNodeWithTag("noma_accent_grid").assertExists()
+    }
+
     @Test fun appearanceSettingsExposeThreeWidgetStyles() {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))

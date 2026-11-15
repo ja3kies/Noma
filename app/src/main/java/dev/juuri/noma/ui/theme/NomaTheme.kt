@@ -56,12 +56,13 @@ enum class NomaAccent(
     SAGE(Color(0xFF5E6D45), Color(0xFFE3E9D5), Color(0xFFCAD8AB), Color(0xFF3B4932)),
     HONEY(Color(0xFF80601B), Color(0xFFF9EDC2), Color(0xFFEFCB79), Color(0xFF655023)),
     CORAL(Color(0xFF8D533F), Color(0xFFFBE5DB), Color(0xFFE8B6A3), Color(0xFF674338)),
-    LILAC(Color(0xFF755681), Color(0xFFEFE4F2), Color(0xFFD7B9E2), Color(0xFF533C5C)),
+    INK(Color(0xFF46575C), Color(0xFFE4E9EB), Color(0xFFD0DDDF), Color(0xFF33464B)),
     SKY(Color(0xFF4E6687), Color(0xFFE0EAF8), Color(0xFFB6CEF1), Color(0xFF364B66));
 
     companion object {
         fun fromStorage(value: String?): NomaAccent =
-            entries.firstOrNull { it.name == value } ?: FOREST
+            if (value == "LILAC") INK // Restore legacy preferences without reintroducing violet.
+            else entries.firstOrNull { it.name == value } ?: FOREST
     }
 }
 

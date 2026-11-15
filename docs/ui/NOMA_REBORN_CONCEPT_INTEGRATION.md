@@ -7,7 +7,7 @@
 | Area | UI concept | Compose integration |
 | --- | --- | --- |
 | Semantic theme | botanical / warm paper palette | New light and dark Material 3 roles in `NomaTheme.kt`; all existing surfaces inherit them |
-| Appearance | six visible accent swatches | Forest, Sage, Honey, Coral, Lilac, Sky; persisted in `MainActivity` and applied live to primary tokens |
+| Appearance | six visible accent swatches | Forest, Sage, Honey, Coral, Ink, Sky; persisted in `MainActivity` and applied live to primary tokens |
 | Library | “Mes notes”, light supporting subtitle | Localized EN/FR titles; archive heading remains context-aware |
 | Filters | clear selected pill state | “Toutes”/“All notes” resets archive or pinned scope without clearing typed search; pinned chip precedes archive |
 | Note cards | compact paper cards and colored markers | Rounded cards, 44dp glyph tile, selected state, preserved pinned/archive semantics and contextual menu |
@@ -36,7 +36,7 @@ Light selected accent versus white text: > 5.5:1 across all six accent colors.
 Dark accent versus dark selected text: > 8.5:1 across all six accent colors.
 Main light background versus text: > 13:1. Contrast values are based on declared sRGB tokens; these checks are also encoded as JVM unit tests.
 
-All accent controls have 52dp targets, localized accessible labels, radio-button semantics, and a checked state. The picker uses two rows of three, rather than a horizontally clipped row that would hide choices on small screens.
+All accent controls have 52dp targets, localized accessible labels, radio-button semantics, and a checked state. The picker wraps to three swatches per row on compact phones and six on wide screens. The old Lilac preference migrates to Ink, so no violet accent remains.
 
 ## Test gates / current limitations
 

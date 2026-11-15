@@ -484,6 +484,16 @@ internal fun shouldAnimateNomaListItems(noteCount: Int): Boolean =
 internal fun nomaThemeFamilyColumns(availableWidth: Dp, fontScale: Float): Int =
     if (availableWidth < 380.dp || fontScale >= 1.3f) 1 else 2
 
+/** Full labels must remain readable at compact widths and large font scales. */
+internal fun nomaAppearanceColumns(availableWidth: Dp, fontScale: Float): Int = when {
+    fontScale >= 1.35f || availableWidth < 440.dp -> 1
+    availableWidth < 520.dp -> 2
+    else -> 3
+}
+
+internal fun nomaAccentColumns(availableWidth: Dp, fontScale: Float): Int =
+    if (availableWidth < 420.dp || fontScale >= 1.4f) 3 else 6
+
 internal fun nomaPaneGutter(windowWidth: Dp): Dp =
     if (windowWidth >= 1200.dp) 16.dp else 8.dp
 
@@ -2272,8 +2282,8 @@ private fun AppearanceDialog(
                     title = { Text(stringResource(R.string.appearance)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.close))
+                            Icon(painter = painterResource(R.drawable.noma_huge_arrow_left),
+                                contentDescription = stringResource(R.string.back_to_notes))
                         }
                     }
                 )
@@ -2303,7 +2313,7 @@ private fun AppearanceDialog(
                                     })
                                     val preview = resolveNomaColorScheme(isNomaDark(selected), selectedAccent, option)
                                     Surface(
-                                        modifier = Modifier.weight(1f).heightIn(min = 64.dp)
+                                        modifier = Modifier.weight(1f).heightIn(min = 76.dp)
                                             .selectable(selected = selectedFamily == option, role = Role.RadioButton,
                                                 onClick = { onFamilySelect(option) })
                                             .testTag("noma_family_${option.name}"),
@@ -2347,31 +2357,48 @@ private fun AppearanceDialog(
                         }
                         }
                     }
-                    Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small)) {
-                        NomaAppearance.entries.forEach { mode ->
-                            val checked = mode == selected
-                            FilterChip(
-                                selected = checked,
-                                onClick = { onSelect(mode) },
-                                modifier = Modifier.weight(1f).defaultMinSize(minHeight = NomaSpacing.touchTarget)
-                                    .testTag("noma_theme_preview_${mode.name}"),
-                                label = {
-                                    Text(stringResource(when (mode) {
-                                        NomaAppearance.SYSTEM -> R.string.appearance_system
-                                        NomaAppearance.LIGHT -> R.string.appearance_light
-                                        NomaAppearance.DARK -> R.string.appearance_dark
-                                    }))
-                                },
-                                leadingIcon = if (checked) ({ Icon(Icons.Outlined.Check, null, Modifier.size(16.dp)) }) else null,
-                                shape = MaterialTheme.shapes.small
-                            )
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val modeColumns = nomaAppearanceColumns(maxWidth, LocalDensity.current.fontScale)
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth().selectableGroup()
+                                .testTag("noma_appearance_modes"),
+                            maxItemsInEachRow = modeColumns,
+                            horizontalArrangement = Arrangement.spacedBy(NomaSpacing.small),
+                            verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)
+                        ) {
+                            NomaAppearance.entries.forEach { mode ->
+                                val checked = mode == selected
+                                FilterChip(
+                                    selected = checked,
+                                    onClick = { onSelect(mode) },
+                                    modifier = Modifier.weight(1f)
+                                        .defaultMinSize(minHeight = NomaSpacing.touchTarget)
+                                        .testTag("noma_theme_preview_${mode.name}"),
+                                    label = {
+                                        Text(stringResource(when (mode) {
+                                            NomaAppearance.SYSTEM -> R.string.appearance_system
+                                            NomaAppearance.LIGHT -> R.string.appearance_light
+                                            NomaAppearance.DARK -> R.string.appearance_dark
+                                        }))
+                                    },
+                                    leadingIcon = if (checked) ({ Icon(Icons.Outlined.Check, null, Modifier.size(16.dp)) }) else null,
+                                    shape = MaterialTheme.shapes.small
+                                )
+                            }
                         }
                     }
                     if (selectedFamily == NomaThemeFamily.BW_ACCENT || selectedFamily == NomaThemeFamily.ACCENT_WHITE) Text(stringResource(R.string.accent_color_title),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = NomaSpacing.small).semantics { heading() })
                     if (selectedFamily == NomaThemeFamily.BW_ACCENT || selectedFamily == NomaThemeFamily.ACCENT_WHITE) {
-                        Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth().selectableGroup()
+                                    .testTag("noma_accent_grid"),
+                                maxItemsInEachRow = nomaAccentColumns(maxWidth, LocalDensity.current.fontScale),
+                                horizontalArrangement = Arrangement.spacedBy(NomaSpacing.medium),
+                                verticalArrangement = Arrangement.spacedBy(NomaSpacing.small)
+                            ) {
                                 NomaAccent.entries.forEach { swatch ->
                                     val checked = swatch == selectedAccent
                                     val label = stringResource(when (swatch) {
@@ -2379,12 +2406,12 @@ private fun AppearanceDialog(
                                         NomaAccent.SAGE -> R.string.accent_sage
                                         NomaAccent.HONEY -> R.string.accent_honey
                                         NomaAccent.CORAL -> R.string.accent_coral
-                                        NomaAccent.LILAC -> R.string.accent_lilac
+                                        NomaAccent.INK -> R.string.accent_ink
                                         NomaAccent.SKY -> R.string.accent_sky
                                     })
                                     val colors = resolveNomaColorScheme(isNomaDark(selected), swatch, selectedFamily)
                                     Box(
-                                        Modifier.size(NomaSpacing.touchTarget)
+                                        Modifier.size(52.dp)
                                             .selectable(selected = checked, role = Role.RadioButton,
                                                 onClick = { onAccentSelect(swatch) })
                                             .semantics { contentDescription = label }
@@ -2392,9 +2419,10 @@ private fun AppearanceDialog(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Box(
-                                            Modifier.size(28.dp)
+                                            Modifier.size(30.dp)
                                                 .background(colors.primary, CircleShape)
-                                                .then(if (checked) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier),
+                                                .then(if (checked) Modifier.border(2.dp,
+                                                    MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             if (checked) Icon(Icons.Outlined.Check, null,
@@ -2402,6 +2430,7 @@ private fun AppearanceDialog(
                                         }
                                     }
                                 }
+                            }
                         }
                     }
                     OutlinedButton(onClick = onWidgetStyles,
@@ -2420,6 +2449,8 @@ private fun WidgetStyleDialog(
     onSelect: (NomaWidgetStyle) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val compactPreview = LocalConfiguration.current.screenWidthDp < 420 ||
+        LocalDensity.current.fontScale >= 1.25f
     val styles = listOf(
         NomaWidgetStyle.MATERIAL_YOU to R.string.widget_style_material_you,
         NomaWidgetStyle.FROSTED_GREEN to R.string.widget_style_frosted_green,
@@ -2462,13 +2493,9 @@ private fun WidgetStyleDialog(
                             .padding(horizontal = NomaSpacing.medium),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Spacer(Modifier.width(NomaSpacing.small))
                         val previewBrush = when (style) {
-                            NomaWidgetStyle.MATERIAL_YOU -> Brush.linearGradient(
-                                listOf(
-                                    colorResource(R.color.noma_widget_material_background),
-                                    colorResource(R.color.noma_widget_material_background)
-                                )
+                            NomaWidgetStyle.MATERIAL_YOU -> SolidColor(
+                                colorResource(R.color.noma_widget_material_background)
                             )
                             NomaWidgetStyle.FROSTED_GREEN -> Brush.linearGradient(
                                 listOf(
@@ -2477,11 +2504,8 @@ private fun WidgetStyleDialog(
                                     colorResource(R.color.noma_widget_frosted_end)
                                 )
                             )
-                            NomaWidgetStyle.LIQUID_GLASS -> Brush.linearGradient(
-                                listOf(
-                                    colorResource(R.color.noma_widget_glass_fill),
-                                    colorResource(R.color.noma_widget_glass_fill)
-                                )
+                            NomaWidgetStyle.LIQUID_GLASS -> SolidColor(
+                                colorResource(R.color.noma_widget_glass_fill)
                             )
                         }
                         val previewOutline = colorResource(when (style) {
@@ -2495,7 +2519,7 @@ private fun WidgetStyleDialog(
                             NomaWidgetStyle.LIQUID_GLASS -> R.color.noma_widget_glass_text
                         })
                         Box(
-                            modifier = Modifier.size(width = 116.dp, height = 36.dp)
+                            modifier = Modifier.size(width = if (compactPreview) 76.dp else 116.dp, height = 36.dp)
                                 .background(previewBrush, RoundedCornerShape(15.dp))
                                 .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
                                 .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
@@ -2519,13 +2543,13 @@ private fun WidgetStyleDialog(
                                     stringResource(R.string.shortcut_new_note),
                                     color = previewText,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 9.sp,
+                                    fontSize = 11.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
-                        Spacer(Modifier.width(NomaSpacing.comfortable))
+                        Spacer(Modifier.width(NomaSpacing.small))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 stringResource(label),
