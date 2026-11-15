@@ -31,6 +31,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import dev.juuri.noma.domain.Note
@@ -283,6 +288,124 @@ class NomaUiTest {
         } finally {
             image.recycle()
         }
+    }
+
+    @Test fun editorToolsKeepTheirPositionsWhenKeyboardOpens() {
+        val repo = FakeRepository(listOf(Note("stable-tools", "Stable tools", "Body", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val imeVisible = mutableStateOf(false)
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val bottom = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(density)
+            androidx.compose.runtime.SideEffect { imeVisible.value = bottom > 0 }
+            NomaTheme { NomaApp(model) }
+        }
+        compose.onNodeWithText("Stable tools").performClick()
+        compose.runOnUiThread {
+            (compose.activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                .hideSoftInputFromWindow(compose.activity.window.decorView.windowToken, 0)
+        }
+        compose.waitUntil(10_000) { !imeVisible.value }
+        val search = compose.onNodeWithTag("noma_editor_find_replace")
+        val bullet = compose.onNodeWithTag("noma_editor_bullet")
+        val searchX = search.fetchSemanticsNode().boundsInRoot.center.x
+        val bulletX = bullet.fetchSemanticsNode().boundsInRoot.center.x
+        compose.onNodeWithTag("noma_body_input").performClick()
+        compose.waitUntil(10_000) { imeVisible.value }
+        compose.waitForIdle()
+        assertEquals(searchX, search.fetchSemanticsNode().boundsInRoot.center.x, 1f)
+        assertEquals(bulletX, bullet.fetchSemanticsNode().boundsInRoot.center.x, 1f)
+        compose.onNodeWithContentDescription("Export this note").assertIsDisplayed().assertIsEnabled()
+    }
+
+    @Test fun editorFailedDraftCanOpenPortableExportWithoutDiscardingText() {
+        val repo = FakeRepository(listOf(Note("rescue", "Rescue draft", "Stored", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Rescue draft").performClick()
+        compose.runOnIdle { repo.failWrites = true }
+        compose.onNodeWithTag("noma_body_input").performTextInput(" unsaved")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithContentDescription("Export this note")
+            .assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithText("Export as TXT").assertIsDisplayed()
+        compose.runOnIdle {
+            assertTrue(model.active.value!!.body.contains("unsaved"))
+            assertTrue(model.saveState.value is EditorSaveState.Failed)
+        }
+    }
+
+    @Test fun editorSaveFailureHasOneLiveAnnouncementAndReachableRetry() {
+        val repo = FakeRepository(listOf(Note("announcement", "Save announcement", "Body", false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithText("Save announcement").performClick()
+        compose.runOnIdle { repo.failWrites = true }
+        compose.onNodeWithTag("noma_body_input").performTextInput(" changed")
+        compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+        val banner = compose.onNodeWithTag("noma_editor_save_bar").fetchSemanticsNode()
+        fun liveRegions(node: androidx.compose.ui.semantics.SemanticsNode): Int =
+            (if (node.config.contains(SemanticsProperties.LiveRegion)) 1 else 0) +
+                node.children.sumOf { liveRegions(it) }
+        assertEquals("One coherent announcement for each save failure", 1, liveRegions(banner))
+        compose.onNodeWithTag("noma_retry_save").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.waitUntil(10_000) { repo.saveAttempts >= 2 && model.saveState.value is EditorSaveState.Failed }
+        compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+    }
+
+    @Test fun editorKeepsCaretVisibleWhenFailureBannerAppears() {
+        checkEditorCaretAfterResize(failSave = true)
+    }
+
+    @Test fun editorKeepsCaretVisibleWhenTextSizeChanges() {
+        checkEditorCaretAfterResize(failSave = false)
+    }
+
+    private fun checkEditorCaretAfterResize(failSave: Boolean) {
+        val body = ("A quiet place for ideas. Every paragraph should remain easy to read.\n").repeat(30)
+        val repo = FakeRepository(listOf(Note("caret", "Caret visibility", body, false, 1L, 2L)))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val fontScale = mutableStateOf(1f)
+        val imeVisible = mutableStateOf(false)
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val bottom = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(density)
+            androidx.compose.runtime.SideEffect { imeVisible.value = bottom > 0 }
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, fontScale.value)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithText("Caret visibility").performClick()
+        val input = compose.onNodeWithTag("noma_body_input")
+        input.performClick()
+        compose.waitUntil(10_000) { imeVisible.value }
+        input.performTextInputSelection(TextRange(body.length - 100))
+        compose.waitUntil(5_000) { editorCaretIsVisible() }
+        compose.runOnIdle {
+            if (failSave) repo.failWrites = true else fontScale.value = 2f
+        }
+        if (failSave) {
+            input.performTextInput(" unsaved")
+            compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
+            compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+        }
+        compose.waitUntil(5_000) { editorCaretIsVisible() }
+        input.assert(SemanticsMatcher.expectValue(SemanticsProperties.Focused, true))
+    }
+
+    private fun editorCaretIsVisible(): Boolean {
+        val input = compose.onNodeWithTag("noma_body_input")
+        val layouts = mutableListOf<TextLayoutResult>()
+        input.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val node = input.fetchSemanticsNode()
+        val selection = node.config[SemanticsProperties.TextSelectionRange]
+        val caret = layouts.single().getCursorRect(selection.end)
+        val top = node.positionInRoot.y + caret.top
+        val bottom = node.positionInRoot.y + caret.bottom
+        val viewport = node.boundsInRoot
+        val dockTop = compose.onNodeWithTag("noma_editor_dock").fetchSemanticsNode().boundsInRoot.top
+        return top >= viewport.top - 1f && bottom <= minOf(viewport.bottom, dockTop) + 1f
     }
 
     @Test fun compactLibraryKeepsEveryFilterVisibleWithLargeText() {
