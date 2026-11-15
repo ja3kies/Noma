@@ -2283,7 +2283,7 @@ private fun AppearanceDialog(
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
                             Icon(painter = painterResource(R.drawable.noma_huge_arrow_left),
-                                contentDescription = stringResource(R.string.back_to_notes))
+                                contentDescription = stringResource(R.string.close))
                         }
                     }
                 )
