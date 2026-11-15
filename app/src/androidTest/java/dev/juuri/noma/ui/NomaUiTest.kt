@@ -873,7 +873,7 @@ class NomaUiTest {
             preview.bottom <= title.top + 2f
         )
         compose.onNodeWithText("Liquid Glass").performClick()
-        compose.onNodeWithText("Liquid Glass").assertIsSelected()
+        compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS").assertExists()
     }
 
     @Test fun appearanceSettingsExposeThreeWidgetStyles() {
