@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -213,11 +214,17 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_body_input").performTextInput(" offline draft")
         compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
         compose.onNodeWithTag("noma_retry_save").assertIsDisplayed()
+        // One actionable failure surface only: no competing transient snackbar.
+        val globalFailurePrefix = compose.activity.getString(dev.juuri.noma.R.string.error_prefix)
+        compose.waitForIdle()
+        compose.onNodeWithText(globalFailurePrefix, substring = true).assertDoesNotExist()
         savePremiumScreenshot("03-editor-save-failure")
 
         compose.runOnIdle { repo.failWrites = false }
         compose.onNodeWithTag("noma_retry_save").performClick()
         compose.waitUntil(10_000) { model.saveState.value == EditorSaveState.Saved }
+        compose.waitForIdle()
+        compose.onNodeWithText(globalFailurePrefix, substring = true).assertDoesNotExist()
         compose.runOnIdle { dark.value = true }
         savePremiumScreenshot("04-editor-dark")
 
