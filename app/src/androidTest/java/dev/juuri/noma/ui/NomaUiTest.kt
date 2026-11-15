@@ -49,8 +49,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import android.graphics.Bitmap
+import android.content.ContentValues
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
 import org.junit.Rule
 import org.junit.Test
 
@@ -229,12 +231,36 @@ class NomaUiTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val image = instrumentation.uiAutomation.takeScreenshot()
             ?: throw AssertionError("Android UiAutomation could not capture $name")
-        val directory = File(instrumentation.targetContext.filesDir, "editor-snapshots")
-        assertTrue("Cannot create screenshot directory", directory.isDirectory || directory.mkdirs())
-        File(directory, "$name.png").outputStream().use { stream ->
-            assertTrue("Screenshot bitmap encoding failed", image.compress(Bitmap.CompressFormat.PNG, 100, stream))
+        // connectedDebugAndroidTest uninstalls the debug target package before
+        // the workflow's shell can run. App-private screenshots then disappear.
+        // Shared MediaStore pictures survive uninstall and remain accessible to adb.
+        val resolver = instrumentation.targetContext.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/NomaEditor")
+            put(MediaStore.Images.Media.IS_PENDING, 1)
         }
-        image.recycle()
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: throw AssertionError("Cannot create MediaStore screenshot for $name")
+        try {
+            val stream = resolver.openOutputStream(uri)
+                ?: throw AssertionError("Cannot open screenshot output for $name")
+            stream.use {
+                assertTrue("Screenshot bitmap encoding failed",
+                    image.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+            val published = ContentValues().apply {
+                put(MediaStore.Images.Media.IS_PENDING, 0)
+            }
+            assertTrue("Cannot publish screenshot $name",
+                resolver.update(uri, published, null, null) == 1)
+        } catch (error: Throwable) {
+            resolver.delete(uri, null, null)
+            throw error
+        } finally {
+            image.recycle()
+        }
     }
 
     @Test fun compactLibraryKeepsEveryFilterVisibleWithLargeText() {
