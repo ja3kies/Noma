@@ -1286,12 +1286,28 @@ private fun BottomSearchPill(
             enter = expandHorizontally() + fadeIn(),
             exit = shrinkHorizontally() + fadeOut()
         ) {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    .testTag("noma_search_dismiss")
-            ) {
-                Text(stringResource(R.string.cancel))
+            if (LocalDensity.current.fontScale >= 1.5f) {
+                // At large text sizes a full "Cancel" label squeezes the
+                // bottom search field next to the always-present capture FAB.
+                // Keep a 48dp native control, with a descriptive TalkBack label.
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(NomaSpacing.touchTarget)
+                        .testTag("noma_search_dismiss")
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.cancel)
+                    )
+                }
+            } else {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.defaultMinSize(minHeight = NomaSpacing.touchTarget)
+                        .testTag("noma_search_dismiss")
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         }
     }
