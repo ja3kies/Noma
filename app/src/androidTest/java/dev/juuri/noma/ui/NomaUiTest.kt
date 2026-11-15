@@ -887,6 +887,9 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_search").performTextInput("nothing matches")
+        // Wait until input has been committed before tapping Clear. Without
+        // this gate an in-flight IME edit may arrive after the reset.
+        compose.waitUntil(5_000) { model.query.value == "nothing matches" }
         compose.onNodeWithTag("noma_new_note").assertExists()
         compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
         compose.waitUntil(5_000) { model.query.value.isEmpty() }
