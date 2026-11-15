@@ -1309,7 +1309,7 @@ private fun BottomSearchPill(
                         .testTag("noma_search_dismiss")
                 ) {
                     Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
+                        painter = painterResource(R.drawable.noma_huge_arrow_left),
                         contentDescription = stringResource(R.string.cancel)
                     )
                 }
