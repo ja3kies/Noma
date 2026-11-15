@@ -3,6 +3,7 @@ package dev.juuri.noma.ui
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -304,6 +305,23 @@ class NomaUiTest {
      * Real emulator screenshots for Noma's entire visual surface, not only
      * the editor. Synthetic data keeps personal notes out of CI artifacts.
      */
+    @Test fun tabletEditorOwnsTheOnlySnackbarHost() {
+        val note = Note("tablet-feedback", "Selected note", "Body", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        model.openNote(note)
+        compose.setContent {
+            NomaTheme {
+                // Force a real two-pane Compose layout even on the phone CI emulator.
+                androidx.compose.foundation.layout.Box(
+                    Modifier.requiredWidth(1000.dp).height(700.dp)
+                ) { NomaApp(model) }
+            }
+        }
+        compose.onNodeWithTag("noma_editor_snackbar").assertExists()
+        compose.onNodeWithTag("noma_list_snackbar").assertDoesNotExist()
+    }
+
     @Test fun premiumLibraryAndAppearanceCaptureScreenStates() {
         val repo = FakeRepository(listOf(
             Note("visual-pinned", "Morning pages", "A place for thoughts worth keeping.", true, 1L, 3L),
