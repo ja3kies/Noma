@@ -103,7 +103,11 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          script: gradle --no-daemon :app:connectedDebugAndroidTest
+          # The Gradle test task uninstalls the target package on completion:
+          # run-as would emit "unknown package" instead of a PNG. Screenshots
+          # are published by the instrumentation test into shared MediaStore.
+          # Check the *file signature*, not just a nonzero byte count.
+          script: 'gradle --no-daemon :app:connectedDebugAndroidTest && mkdir -p app/build/reports/editor-snapshots && for name in 01-editor-light 02-editor-ime 03-editor-save-failure 04-editor-dark 05-editor-large-font 06-editor-large-font-failure; do adb pull "/sdcard/Pictures/NomaEditor/$name.png" "app/build/reports/editor-snapshots/$name.png" >/dev/null && test "$(file -b --mime-type "app/build/reports/editor-snapshots/$name.png")" = "image/png" || exit 1; done'
       - name: Upload instrumentation diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -112,5 +116,6 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
+            app/build/reports/editor-snapshots/
           if-no-files-found: warn
           retention-days: 7

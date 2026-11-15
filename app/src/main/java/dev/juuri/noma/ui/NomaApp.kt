@@ -59,6 +59,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -70,8 +72,6 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.KeyboardHide
-import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -125,12 +125,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.juuri.noma.ui.theme.nomaColorScheme
 import dev.juuri.noma.ui.theme.isNomaDark
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -1613,7 +1617,25 @@ private fun NoteEditorScreen(
     var findQuery by rememberSaveable(note.id) { mutableStateOf("") }
     var replaceWith by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
-    var bodyValue by rememberSaveable(note.id, stateSaver = TextFieldValue.Saver) {
+    // A document may be hundreds of KB; activity saved state has a strict
+    // Binder budget. Keep only the caret/selection in the Bundle. The body
+    // comes from the active NotesViewModel, which survives rotation.
+    val selectionSaver = remember(note.id) {
+        androidx.compose.runtime.saveable.Saver<TextFieldValue, List<Int>>(
+            save = { listOf(it.selection.start, it.selection.end) },
+            restore = { positions ->
+                val body = note.body
+                TextFieldValue(
+                    body,
+                    TextRange(
+                        positions[0].coerceIn(0, body.length),
+                        positions[1].coerceIn(0, body.length)
+                    )
+                )
+            }
+        )
+    }
+    var bodyValue by rememberSaveable(note.id, stateSaver = selectionSaver) {
         mutableStateOf(TextFieldValue(note.body))
     }
     // External replacements use the same document; keep the caret clamped to it.
@@ -1629,6 +1651,21 @@ private fun NoteEditorScreen(
         label = "nomaEditorSaveStatusSurface"
     )
     val editorScrollState = rememberSaveable(note.id, saver = ScrollState.Saver) { ScrollState(0) }
+    val bodyVisibility = remember(note.id) { BringIntoViewRequester() }
+    var bodyFocused by remember(note.id) { mutableStateOf(false) }
+    var bodyLayout by remember(note.id) { mutableStateOf<TextLayoutResult?>(null) }
+    var editorViewportSize by remember(note.id) { mutableStateOf(IntSize.Zero) }
+    LaunchedEffect(bodyFocused, bodyLayout, currentBody.selection, editorViewportSize) {
+        val layout = bodyLayout ?: return@LaunchedEffect
+        if (bodyFocused && editorViewportSize.height > 0 &&
+            layout.layoutInput.text.text == currentBody.text
+        ) {
+            // Relocate the active line, not the entire unbounded document.
+            // Layout/selection changes trigger this; manual scrolling does not.
+            withFrameNanos { }
+            bodyVisibility.bringIntoView(layout.getCursorRect(currentBody.selection.end))
+        }
+    }
     LaunchedEffect(findReplaceOpen, focusBodyAfterFind) {
         if (!findReplaceOpen && focusBodyAfterFind) {
             bodyFocus.requestFocus()
@@ -1841,55 +1878,68 @@ private fun NoteEditorScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
         bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().imePadding().navigationBarsPadding()
-                        .padding(horizontal = NomaSpacing.small)
-                        .testTag("noma_editor_toolbar"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceEvenly
+            // The floating dock follows the keyboard; it never takes the width
+            // of the writing canvas or competes with the editable text.
+            val dockColor by animateColorAsState(
+                targetValue = if (keyboardVisible) MaterialTheme.colorScheme.surfaceContainerHigh
+                    else MaterialTheme.colorScheme.surfaceContainer,
+                animationSpec = tween(NomaMotion.quick),
+                label = "nomaEditorDockSurface"
+            )
+            Box(
+                modifier = Modifier.fillMaxWidth().imePadding().navigationBarsPadding()
+                    .padding(horizontal = NomaSpacing.comfortable, vertical = NomaSpacing.small),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.widthIn(max = 256.dp).fillMaxWidth()
+                        .testTag("noma_editor_dock"),
+                    shape = RoundedCornerShape(28.dp),
+                    color = dockColor,
+                    tonalElevation = 2.dp,
+                    shadowElevation = 1.dp
                 ) {
-                    val exportScope = rememberCoroutineScope()
-                    // Document export stays available when reading, but does not compete
-                    // with the writing tools or Gboard while the IME is visible.
-                    if (!keyboardVisible) {
-                        PortableNoteExport(note, enabled = saveState == EditorSaveState.Saved, onMessage = { message ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = NomaSpacing.tiny)
+                            .testTag("noma_editor_toolbar"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        val exportScope = rememberCoroutineScope()
+                        PortableNoteExport(note, onMessage = { message ->
                             exportScope.launch { snackbar.showSnackbar(message) }
                         })
-                    }
-                        IconButton(
+                        EditorToolButton(
+                            icon = R.drawable.noma_huge_search,
+                            description = stringResource(R.string.find_replace),
                             onClick = {
                                 menuExpanded = false
                                 findReplaceOpen = true
                             },
-                            modifier = Modifier.defaultMinSize(minWidth = NomaSpacing.touchTarget, minHeight = NomaSpacing.touchTarget)
-                                .testTag("noma_editor_find_replace")
-                        ) {
-                            Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = stringResource(R.string.find_replace)
-                            )
-                        }
-                    IconButton(
-                        onClick = {
-                            val edit = toggleBulletLine(currentBody)
-                            bodyValue = edit
-                            closeWhenSaved = false
-                            viewModel.changeBody(edit.text)
-                            bodyFocus.requestFocus()
-                            keyboard?.show()
-                        },
-                        modifier = Modifier.testTag("noma_editor_bullet")
-                    ) {
-                        Icon(Icons.AutoMirrored.Outlined.FormatListBulleted,
-                            contentDescription = stringResource(R.string.toggle_bullet))
-                    }
-                    if (keyboardVisible) {
-                        IconButton(onClick = { keyboard?.hide() },
-                            modifier = Modifier.testTag("noma_editor_hide_keyboard")) {
-                            Icon(Icons.Outlined.KeyboardHide,
-                                contentDescription = stringResource(R.string.hide_keyboard))
-                        }
+                            modifier = Modifier.testTag("noma_editor_find_replace")
+                        )
+                        EditorToolButton(
+                            icon = R.drawable.noma_huge_list,
+                            description = stringResource(R.string.toggle_bullet),
+                            onClick = {
+                                val edit = toggleBulletLine(currentBody)
+                                bodyValue = edit
+                                closeWhenSaved = false
+                                viewModel.changeBody(edit.text)
+                                bodyFocus.requestFocus()
+                                keyboard?.show()
+                            },
+                            modifier = Modifier.testTag("noma_editor_bullet")
+                        )
+                        EditorToolButton(
+                            icon = R.drawable.noma_huge_arrow_left,
+                            iconModifier = Modifier.graphicsLayer(rotationZ = -90f),
+                            description = stringResource(R.string.hide_keyboard),
+                            enabled = keyboardVisible,
+                            onClick = { keyboard?.hide() },
+                            modifier = Modifier.testTag("noma_editor_hide_keyboard")
+                        )
                     }
                 }
             }
@@ -1901,8 +1951,9 @@ private fun NoteEditorScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            if (expanded) note.displayTitle.ifBlank { stringResource(R.string.untitled) } else safeTitle,
-                            style = MaterialTheme.typography.titleMedium,
+                            safeTitle,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1914,21 +1965,12 @@ private fun NoteEditorScreen(
                                 .testTag("noma_editor_back")
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                                painter = painterResource(R.drawable.noma_huge_arrow_left),
                                 contentDescription = stringResource(R.string.back_to_notes)
                             )
                         }
                     },
                     actions = {
-                        if (saveState is EditorSaveState.Failed) {
-                            TextButton(
-                                onClick = viewModel::retrySave,
-                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                    .testTag("noma_retry_save")
-                            ) {
-                                Text(stringResource(R.string.retry))
-                            }
-                        }
                         Box {
                             IconButton(
                                 onClick = { menuExpanded = true },
@@ -1936,7 +1978,7 @@ private fun NoteEditorScreen(
                                     .testTag("noma_editor_actions")
                             ) {
                                 Icon(
-                                    Icons.Outlined.MoreHoriz,
+                                    painter = painterResource(R.drawable.noma_huge_more_horizontal),
                                     contentDescription = stringResource(R.string.note_actions)
                                 )
                             }
@@ -1953,54 +1995,66 @@ private fun NoteEditorScreen(
                         }
                     }
                 )
-                // A save failure must stay actionable even while the editor has
-                // scrolled and the IME is visible; never bury Retry in the document.
+                // Failed writes remain actionable in one sticky, stable surface.
+                // Retry belongs to the failure itself, not to the navigation bar.
                 if (saveState is EditorSaveState.Failed ||
                     (saveState == EditorSaveState.Saving && (showSlowSaveStatus || closeWhenSaved))
                 ) Surface(
                     color = saveBarColor,
                     tonalElevation = 1.dp
                 ) {
-                    Box(
+                    Column(
                         Modifier.fillMaxWidth()
-                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.tiny)
                             .testTag("noma_editor_save_bar")
+                            .semantics { liveRegion = LiveRegionMode.Polite }
+                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.tiny)
                     ) {
-                        EditorSaveStatus(saveState = saveState)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                EditorSaveStatus(saveState = saveState)
+                            }
+                            if (saveState is EditorSaveState.Failed) {
+                                TextButton(
+                                    onClick = viewModel::retrySave,
+                                    modifier = Modifier.defaultMinSize(minHeight = NomaSpacing.touchTarget)
+                                        .testTag("noma_retry_save")
+                                ) {
+                                    Text(stringResource(R.string.retry))
+                                }
+                            }
+                        }
+                        if (saveState is EditorSaveState.Failed) {
+                            Text(
+                                stringResource(R.string.save_failure_guidance),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(bottom = NomaSpacing.small)
+                                    .testTag("noma_save_failure_guidance")
+                            )
+                        }
+                        if (closeWhenSaved && saveState == EditorSaveState.Saving) {
+                            Text(
+                                stringResource(R.string.wait_for_save_before_exit),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(bottom = NomaSpacing.small)
+                                    .testTag("noma_pending_exit")
+                            )
+                        }
                     }
-                }
-                AnimatedVisibility(
-                    visible = saveState is EditorSaveState.Failed,
-                    enter = fadeIn(tween(NomaMotion.quick)) + expandVertically(),
-                    exit = fadeOut(tween(NomaMotion.quick)) + shrinkVertically()
-                ) {
-                    Text(
-                        stringResource(R.string.save_failure_guidance),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.errorContainer)
-                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
-                            .testTag("noma_save_failure_guidance")
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                    )
-                }
-                if (closeWhenSaved && saveState == EditorSaveState.Saving) {
-                    Text(
-                        stringResource(R.string.wait_for_save_before_exit),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = NomaSpacing.page, vertical = NomaSpacing.small)
-                            .testTag("noma_pending_exit")
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                    )
                 }
             }
         }
     ) { insets ->
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets),
+            modifier = Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets)
+                .onSizeChanged { editorViewportSize = it },
             contentAlignment = Alignment.TopCenter
         ) {
             val maxReadingWidth = NomaSpacing.editorMaxWidth
@@ -2050,7 +2104,7 @@ private fun NoteEditorScreen(
                 )
                 // Preserve a continuous writing surface. Metadata is read-only
                 // and never participates in the editable or exported note text.
-                if (!keyboardVisible && (note.title.isNotBlank() || note.body.isNotBlank())) {
+                if (note.title.isNotBlank() || note.body.isNotBlank()) {
                     Spacer(Modifier.height(NomaSpacing.small))
                     Text(
                         text = stringResource(
@@ -2066,6 +2120,7 @@ private fun NoteEditorScreen(
                 Spacer(Modifier.height(NomaSpacing.medium))
                 BasicTextField(
                     value = currentBody,
+                    onTextLayout = { bodyLayout = it },
                     onValueChange = {
                         bodyValue = it
                         if (it.text != note.body) {
@@ -2081,7 +2136,9 @@ private fun NoteEditorScreen(
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                         .defaultMinSize(minHeight = writingHeight)
+                        .bringIntoViewRequester(bodyVisibility)
                         .focusRequester(bodyFocus)
+                        .onFocusChanged { bodyFocused = it.isFocused }
                         .semantics { contentDescription = bodyFieldLabel }
                         .testTag("noma_body_input"),
                     decorationBox = { input ->
@@ -2107,7 +2164,6 @@ private fun EditorSaveStatus(saveState: EditorSaveState) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
-            .semantics { liveRegion = LiveRegionMode.Polite }
     ) {
         when (saveState) {
             EditorSaveState.Saved -> {
@@ -2145,8 +2201,8 @@ private fun EditorSaveStatus(saveState: EditorSaveState) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
-                // Retry is kept in the top app bar so it stays accessible
-                // even when the IME obscures the document and status region.
+                // Retry and guidance live together in the sticky status surface,
+                // above the document and IME, not in the navigation bar.
             }
         }
     }

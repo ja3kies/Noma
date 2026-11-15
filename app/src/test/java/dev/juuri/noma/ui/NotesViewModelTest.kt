@@ -779,7 +779,7 @@ class NotesViewModelTest {
     }
 
 
-    @Test fun supersededFailedAutosavesEmitOnlyLatestError() = runTest {
+    @Test fun supersededFailedAutosavesOnlyUseStickyEditorFeedback() = runTest {
         val original = Note("id", "Original", "Body", false, 1L, 1L)
         val repo = FakeRepository(original)
         repo.failWrites = true
@@ -791,7 +791,10 @@ class NotesViewModelTest {
         model.changeTitle("Draft title")
         model.changeBody("Draft body")
         advanceUntilIdle()
-        assertEquals(1, events.filterIsInstance<NoteUiEvent.Failure>().size)
+        // The editor owns save failures via EditorSaveState.Failed.
+        // Global failure snackbars duplicate the sticky Retry surface and can
+        // remain visible after a later successful retry.
+        assertTrue(events.none { it is NoteUiEvent.Failure })
         assertTrue(model.saveState.value is EditorSaveState.Failed)
         assertEquals("Draft body", model.active.value?.body)
         observer.cancel()
@@ -908,10 +911,8 @@ class NotesViewModelTest {
         model.changeBody("Failed edit")
         advanceUntilIdle()
         assertTrue(model.saveState.value is EditorSaveState.Failed)
-        // Consume the editor write error so only the export's own UI handles its failure.
-        val existing = async { model.events.first() }
-        runCurrent()
-        assertTrue(existing.await() is NoteUiEvent.Failure)
+        // The failed editor write must not emit a global snackbar. A blocked
+        // export still reports its own result without a second failure event.
         val extraEvents = mutableListOf<NoteUiEvent>()
         val observer = launch { model.events.collect { extraEvents.add(it) } }
         runCurrent()
@@ -1654,6 +1655,21 @@ class NotesViewModelTest {
         model.requestQuickNote()
         assertEquals(NoteUiEvent.StorageNotReady, model.events.first())
         assertEquals(0, repo.saveCallCount)
+    }
+
+    @Test fun nonEditorWriteFailureStillEmitsGlobalFailureEvent() = runTest {
+        val note = Note("id", "Stored", "Body", false, 1L, 1L)
+        val repo = FakeRepository(note)
+        repo.failWrites = true
+        val model = NotesViewModel(repo, NotesService(repo))
+        val events = mutableListOf<NoteUiEvent>()
+        val observer = launch { model.events.collect { events.add(it) } }
+        runCurrent()
+        // Pinning from the library is not an active editor autosave.
+        model.togglePin(note)
+        advanceUntilIdle()
+        assertEquals(1, events.filterIsInstance<NoteUiEvent.Failure>().size)
+        observer.cancel()
     }
 
     @Test fun diskFailureNeverShowsSaved() = runTest {
