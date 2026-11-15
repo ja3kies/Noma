@@ -1215,7 +1215,7 @@ private fun BottomSearchPill(
 ) {
     var focused by remember { mutableStateOf(false) }
     val elevation by animateDpAsState(
-        targetValue = if (focused) 6.dp else 2.dp,
+        targetValue = if (focused) 4.dp else 0.dp,
         animationSpec = NomaMotion.spatialGentle(),
         label = "nomaBottomSearchElevation"
     )
@@ -1240,9 +1240,9 @@ private fun BottomSearchPill(
             modifier = Modifier.weight(1f).testTag("noma_search_pill"),
             shape = CircleShape,
             color = pillColor,
-            tonalElevation = if (focused) 3.dp else 2.dp,
+            tonalElevation = if (focused) 3.dp else 1.dp,
             shadowElevation = elevation,
-            border = BorderStroke(1.dp, strokeColor)
+            border = if (focused) BorderStroke(1.dp, strokeColor) else null
         ) {
             TextField(
                 value = query,
@@ -1250,7 +1250,7 @@ private fun BottomSearchPill(
                 enabled = enabled,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 58.dp)
+                    .defaultMinSize(minHeight = 56.dp)
                     .onFocusChanged {
                         if (it.isFocused && !focused) onSearchFocus()
                         focused = it.isFocused
@@ -1263,7 +1263,7 @@ private fun BottomSearchPill(
                 placeholder = { Text(hint, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = {
                     Icon(
-                        Icons.Outlined.Search,
+                        painter = painterResource(R.drawable.noma_huge_search),
                         contentDescription = null,
                         tint = if (focused) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant
@@ -1493,7 +1493,7 @@ private fun NoteCard(
                         .testTag("noma_note_actions_${note.id}")
                 ) {
                     Icon(
-                        Icons.Outlined.MoreHoriz,
+                        painter = painterResource(R.drawable.noma_huge_more_horizontal),
                         contentDescription = stringResource(R.string.note_actions_for, title)
                     )
                 }
@@ -1655,7 +1655,7 @@ private fun NoteEditorScreen(
     val bodyFocus = remember(note.id) { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val saveBarColor by animateColorAsState(
-        targetValue = if (saveState is EditorSaveState.Failed) MaterialTheme.colorScheme.errorContainer
+        targetValue = if (saveState is EditorSaveState.Failed) MaterialTheme.colorScheme.surfaceContainerHigh
             else MaterialTheme.colorScheme.surfaceContainerLow,
         animationSpec = tween(NomaMotion.standard),
         label = "nomaEditorSaveStatusSurface"
@@ -1886,7 +1886,7 @@ private fun NoteEditorScreen(
         containerColor = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow
             else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
-        snackbarHost = if (!expanded) ({ SnackbarHost(snackbar) }) else ({ }),
+        snackbarHost = { SnackbarHost(snackbar, modifier = Modifier.testTag("noma_editor_snackbar")) },
         bottomBar = {
             // The floating dock follows the keyboard; it never takes the width
             // of the writing canvas or competes with the editable text.
@@ -2011,7 +2011,7 @@ private fun NoteEditorScreen(
                     (saveState == EditorSaveState.Saving && (showSlowSaveStatus || closeWhenSaved))
                 ) Surface(
                     color = saveBarColor,
-                    tonalElevation = 1.dp
+                    tonalElevation = 0.dp
                 ) {
                     Column(
                         Modifier.fillMaxWidth()
@@ -2041,9 +2041,9 @@ private fun NoteEditorScreen(
                             Text(
                                 stringResource(R.string.save_failure_guidance),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.fillMaxWidth()
-                                    .padding(bottom = NomaSpacing.small)
+                                    .padding(bottom = NomaSpacing.tiny)
                                     .testTag("noma_save_failure_guidance")
                             )
                         }
