@@ -10,6 +10,8 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.activity.ComponentActivity
 import android.view.WindowManager
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -189,8 +191,12 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         val dark = mutableStateOf(false)
         val fontScale = mutableStateOf(1f)
+        val imeVisible = mutableStateOf(false)
         compose.setContent {
             val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+            val actualIme = androidx.compose.foundation.layout.WindowInsets.ime
+                .getBottom(baseDensity) > 0
+            androidx.compose.runtime.SideEffect { imeVisible.value = actualIme }
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides
                     androidx.compose.ui.unit.Density(baseDensity.density, fontScale.value)
@@ -201,8 +207,18 @@ class NomaUiTest {
             }
         }
         compose.onNodeWithText("Visual draft").performClick()
+        // Each screenshot must represent its claimed keyboard state, even if
+        // a previous test left the emulator IME visible.
+        compose.runOnUiThread {
+            val ime = compose.activity.getSystemService(Context.INPUT_METHOD_SERVICE)
+                as InputMethodManager
+            ime.hideSoftInputFromWindow(compose.activity.window.decorView.windowToken, 0)
+        }
+        compose.waitUntil(10_000) { !imeVisible.value }
         savePremiumScreenshot("01-editor-light")
 
+        compose.onNodeWithTag("noma_body_input").performClick()
+        compose.waitUntil(10_000) { imeVisible.value }
         compose.onNodeWithTag("noma_body_input").performTextInput(" Writing with the keyboard.")
         compose.waitUntil(10_000) {
             model.saveState.value == EditorSaveState.Saved &&
