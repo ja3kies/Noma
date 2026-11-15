@@ -216,12 +216,17 @@ class NotesViewModel(
                     if (currentEditorWrite) {
                         _saveState.value = EditorSaveState.Failed(message)
                     }
-                    // Superseded autosaves can fail while a newer revision is queued.
-                    // Only the newest editor failure should interrupt the user.
-                    val relevantFailure = operation !is WriteOperation.Save ||
-                        operation.editorRevision == null || currentEditorWrite
-                    if (relevantFailure && operation !is WriteOperation.ExportSnapshot &&
-                        (operation !is WriteOperation.Import || operation.result == null)) {
+                    // The current editor revision already exposes its failure
+                    // through EditorSaveState.Failed and the sticky Retry surface.
+                    // Emitting a generic snackbar here duplicates the error and
+                    // leaves obsolete failure copy visible after a successful retry.
+                    // Keep global events for non-editor operations (pin, archive,
+                    // creation/import), but never for superseded editor writes.
+                    val needsGlobalFeedback = !currentEditorWrite &&
+                        (operation !is WriteOperation.Save || operation.editorRevision == null) &&
+                        operation !is WriteOperation.ExportSnapshot &&
+                        (operation !is WriteOperation.Import || operation.result == null)
+                    if (needsGlobalFeedback) {
                         eventChannel.send(NoteUiEvent.Failure(message))
                     }
                 }
