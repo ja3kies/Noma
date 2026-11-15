@@ -1514,7 +1514,12 @@ class NomaUiTest {
     @Test fun allSixAccentSwatchesFitInBalancedRows() {
         val repo = FakeRepository()
         val model = NotesViewModel(repo, NotesService(repo))
-        compose.setContent { NomaTheme { NomaApp(model) } }
+        val chosen = mutableStateOf(NomaAccent.FOREST)
+        compose.setContent {
+            NomaTheme(accent = chosen.value) {
+                NomaApp(model, accent = chosen.value, onAccentChange = { chosen.value = it })
+            }
+        }
         compose.onNodeWithContentDescription("Appearance").performClick()
         compose.onNodeWithTag("noma_accent_SKY").performScrollTo()
         compose.waitForIdle()
@@ -1531,13 +1536,17 @@ class NomaUiTest {
     @Test fun appearanceModesRemainReachableAtDoubleFontScale() {
         val repo = FakeRepository()
         val model = NotesViewModel(repo, NotesService(repo))
-        val base = androidx.compose.ui.platform.LocalDensity
+        val chosen = mutableStateOf(NomaAppearance.SYSTEM)
         compose.setContent {
-            val systemDensity = base.current
+            val systemDensity = androidx.compose.ui.platform.LocalDensity.current
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides
                     androidx.compose.ui.unit.Density(systemDensity.density, 2f)
-            ) { NomaTheme { NomaApp(model) } }
+            ) {
+                NomaTheme(appearance = chosen.value) {
+                    NomaApp(model, appearance = chosen.value, onAppearanceChange = { chosen.value = it })
+                }
+            }
         }
         compose.onNodeWithContentDescription("Appearance").performClick()
         compose.onNodeWithTag("noma_theme_preview_SYSTEM").performScrollTo().assertIsDisplayed()
