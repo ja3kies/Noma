@@ -850,6 +850,32 @@ class NomaUiTest {
         }
     }
 
+    @Test fun widgetStylePreviewAndTitleDoNotCollideAtLargeText() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, 2f)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS").performScrollTo()
+        compose.waitForIdle()
+        val preview = compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS")
+            .fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithText("Liquid Glass")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "The widget preview must not compete with the label at 200% font scale",
+            preview.bottom <= title.top + 2f
+        )
+        compose.onNodeWithText("Liquid Glass").performClick()
+        compose.onNodeWithText("Liquid Glass").assertIsSelected()
+    }
+
     @Test fun appearanceSettingsExposeThreeWidgetStyles() {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))
