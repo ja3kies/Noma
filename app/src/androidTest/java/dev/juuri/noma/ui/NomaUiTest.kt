@@ -880,7 +880,12 @@ class NomaUiTest {
     @Test fun appearancePaletteExposesInkAndNeverReintroducesViolet() {
         val repo = FakeRepository()
         val model = NotesViewModel(repo, NotesService(repo))
-        compose.setContent { NomaTheme { NomaApp(model) } }
+        val chosen = mutableStateOf(NomaAccent.FOREST)
+        compose.setContent {
+            NomaTheme(accent = chosen.value) {
+                NomaApp(model, accent = chosen.value, onAccentChange = { chosen.value = it })
+            }
+        }
         compose.onNodeWithContentDescription("Appearance").performClick()
         compose.onNodeWithTag("noma_accent_INK").performScrollTo().performClick()
         compose.onNodeWithTag("noma_accent_INK").assertIsSelected()
