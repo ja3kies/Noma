@@ -114,6 +114,34 @@ class NomaUiTest {
     }
 
 
+    @Test fun longEditorDocumentIsNotCopiedIntoAndroidSavedInstanceState() {
+        // The active document already lives in NotesViewModel and the database.
+        // Only caret/selection metadata belongs in Android's saved-state Bundle:
+        // saving a full note can exceed Binder's activity-state transaction budget.
+        val body = "A long draft line.\\n".repeat(4_000)
+        val note = Note("large-saved-state", "Large draft", body, false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val registry = androidx.compose.runtime.saveable.SaveableStateRegistry(
+            restoredValues = null, canBeSaved = { true }
+        )
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.runtime.saveable.LocalSaveableStateRegistry provides registry
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithText("Large draft").performClick()
+        compose.onNodeWithTag("noma_body_input").assertIsDisplayed()
+        compose.runOnIdle {
+            val saved = registry.performSave()
+            val serializedLength = saved.toString().length
+            assertTrue(
+                "Android saved-state must contain selection, not the entire $serializedLength-character document",
+                serializedLength < 16_384
+            )
+        }
+    }
+
     @Test fun premiumEditorKeepsMetadataInWritingFlowWhenImeOpens() {
         val note = Note("premium-metadata", "Evening notes", "Opening words", false, 1L, 2L)
         val repo = FakeRepository(listOf(note))
@@ -859,6 +887,9 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithTag("noma_search").performTextInput("nothing matches")
+        // Wait until input has been committed before tapping Clear. Without
+        // this gate an in-flight IME edit may arrive after the reset.
+        compose.waitUntil(5_000) { model.query.value == "nothing matches" }
         compose.onNodeWithTag("noma_new_note").assertExists()
         compose.onNodeWithTag("noma_clear_filters").assertIsDisplayed().performClick()
         compose.waitUntil(5_000) { model.query.value.isEmpty() }

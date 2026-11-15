@@ -1617,7 +1617,25 @@ private fun NoteEditorScreen(
     var findQuery by rememberSaveable(note.id) { mutableStateOf("") }
     var replaceWith by rememberSaveable(note.id) { mutableStateOf("") }
     var closeWhenSaved by rememberSaveable(note.id) { mutableStateOf(false) }
-    var bodyValue by rememberSaveable(note.id, stateSaver = TextFieldValue.Saver) {
+    // A document may be hundreds of KB; activity saved state has a strict
+    // Binder budget. Keep only the caret/selection in the Bundle. The body
+    // comes from the active NotesViewModel, which survives rotation.
+    val selectionSaver = remember(note.id) {
+        androidx.compose.runtime.saveable.Saver<TextFieldValue, List<Int>>(
+            save = { listOf(it.selection.start, it.selection.end) },
+            restore = { positions ->
+                val body = note.body
+                TextFieldValue(
+                    body,
+                    TextRange(
+                        positions[0].coerceIn(0, body.length),
+                        positions[1].coerceIn(0, body.length)
+                    )
+                )
+            }
+        )
+    }
+    var bodyValue by rememberSaveable(note.id, stateSaver = selectionSaver) {
         mutableStateOf(TextFieldValue(note.body))
     }
     // External replacements use the same document; keep the caret clamped to it.
