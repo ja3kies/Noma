@@ -4,8 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -17,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import dev.juuri.noma.R
@@ -67,7 +66,8 @@ internal fun PortableNoteExport(note: Note, enabled: Boolean, onMessage: (String
     ) { uri -> write(uri, true) }
     Box {
         IconButton(onClick = { expanded = true }, enabled = !busy && enabled) {
-            Icon(Icons.Outlined.FileDownload, contentDescription = stringResource(R.string.portable_export_note))
+            Icon(painter = painterResource(R.drawable.noma_huge_download),
+                contentDescription = stringResource(R.string.portable_export_note))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
