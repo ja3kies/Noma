@@ -1302,12 +1302,25 @@ private fun BottomSearchPill(
             enter = expandHorizontally() + fadeIn(),
             exit = shrinkHorizontally() + fadeOut()
         ) {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    .testTag("noma_search_dismiss")
-            ) {
-                Text(stringResource(R.string.cancel))
+            if (LocalDensity.current.fontScale >= 1.5f) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(NomaSpacing.touchTarget)
+                        .testTag("noma_search_dismiss")
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.cancel)
+                    )
+                }
+            } else {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.defaultMinSize(minHeight = NomaSpacing.touchTarget)
+                        .testTag("noma_search_dismiss")
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         }
     }
@@ -2485,7 +2498,7 @@ private fun WidgetStyleDialog(
                         animationSpec = tween(NomaMotion.standard),
                         label = "nomaWidgetChoiceStroke"
                     )
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth()
                             .padding(vertical = NomaSpacing.tiny)
                             .background(choiceColor, RoundedCornerShape(20.dp))
@@ -2497,7 +2510,7 @@ private fun WidgetStyleDialog(
                                 onClick = { onSelect(style) }
                             )
                             .padding(horizontal = NomaSpacing.medium),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
                     ) {
                         val previewBrush = when (style) {
                             NomaWidgetStyle.MATERIAL_YOU -> SolidColor(
@@ -2524,6 +2537,10 @@ private fun WidgetStyleDialog(
                             NomaWidgetStyle.FROSTED_GREEN -> R.color.noma_widget_frosted_text
                             NomaWidgetStyle.LIQUID_GLASS -> R.color.noma_widget_glass_text
                         })
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                         Box(
                             modifier = Modifier.size(width = if (compactPreview) 76.dp else 116.dp, height = 36.dp)
                                 .background(previewBrush, RoundedCornerShape(15.dp))
@@ -2555,8 +2572,10 @@ private fun WidgetStyleDialog(
                                 )
                             }
                         }
-                        Spacer(Modifier.width(NomaSpacing.small))
-                        Column(Modifier.weight(1f)) {
+                        Spacer(Modifier.weight(1f))
+                        RadioButton(selected = isSelected, onClick = null)
+                        }
+                        Column(Modifier.fillMaxWidth()) {
                             Text(
                                 stringResource(label),
                                 style = MaterialTheme.typography.bodyLarge,
@@ -2574,7 +2593,6 @@ private fun WidgetStyleDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        RadioButton(selected = isSelected, onClick = null)
                     }
                 }
                 Spacer(Modifier.height(NomaSpacing.small))
