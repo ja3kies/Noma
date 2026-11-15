@@ -1516,13 +1516,12 @@ class NomaUiTest {
         val model = NotesViewModel(repo, NotesService(repo))
         compose.setContent { NomaTheme { NomaApp(model) } }
         compose.onNodeWithContentDescription("Appearance").performClick()
-        val forest = compose.onNodeWithTag("noma_accent_FOREST").performScrollTo()
-            .fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("noma_accent_SKY").performScrollTo()
+        compose.waitForIdle()
+        val forest = compose.onNodeWithTag("noma_accent_FOREST").fetchSemanticsNode().boundsInRoot
         val honey = compose.onNodeWithTag("noma_accent_HONEY").fetchSemanticsNode().boundsInRoot
-        val coral = compose.onNodeWithTag("noma_accent_CORAL").performScrollTo()
-            .fetchSemanticsNode().boundsInRoot
-        val sky = compose.onNodeWithTag("noma_accent_SKY").performScrollTo()
-            .fetchSemanticsNode().boundsInRoot
+        val coral = compose.onNodeWithTag("noma_accent_CORAL").fetchSemanticsNode().boundsInRoot
+        val sky = compose.onNodeWithTag("noma_accent_SKY").fetchSemanticsNode().boundsInRoot
         assertTrue("Swatches 1–3 should share a row", kotlin.math.abs(forest.top - honey.top) < 3f)
         assertTrue("Swatches 4–6 should occupy a second row", coral.top > forest.top + 24f)
         assertTrue("All choices must remain operable", sky.width > 0 && coral.width > 0)
