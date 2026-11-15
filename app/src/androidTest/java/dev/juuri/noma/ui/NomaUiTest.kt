@@ -119,8 +119,12 @@ class NomaUiTest {
         }
         compose.onNodeWithText("Evening notes").performClick()
         compose.onNodeWithTag("noma_editor_metadata").assertIsDisplayed()
+        // SetText alone is a semantics action and does not guarantee that the
+        // native Android IME opens. A real tap starts an input connection.
+        compose.onNodeWithTag("noma_body_input").performClick()
         compose.onNodeWithTag("noma_body_input").performTextInput(" continued")
         compose.waitUntil(10_000) { imeVisible.value }
+        compose.onNodeWithTag("noma_editor_hide_keyboard").assertIsDisplayed()
         compose.onNodeWithTag("noma_editor_metadata").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(model.active.value?.body?.contains("continued") == true)
