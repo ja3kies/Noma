@@ -2176,8 +2176,8 @@ private fun EditorSaveStatus(saveState: EditorSaveState) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
-                // Retry is kept in the top app bar so it stays accessible
-                // even when the IME obscures the document and status region.
+                // Retry and guidance live together in the sticky status surface,
+                // above the document and IME, not in the navigation bar.
             }
         }
     }
