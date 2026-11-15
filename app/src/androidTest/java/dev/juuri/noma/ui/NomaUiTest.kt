@@ -1605,10 +1605,11 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_search").performTextInput("notes")
         val cancel = compose.onNodeWithTag("noma_search_dismiss")
         cancel.assertIsDisplayed()
-        compose.runOnIdle {
-            val bounds = cancel.fetchSemanticsNode().boundsInRoot
-            assertTrue("Keyboard cancel must not squeeze the search pill at 200% font", bounds.width <= 64f * compose.activity.resources.displayMetrics.density)
-        }
+        val bounds = cancel.fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Keyboard cancel must not squeeze the search pill at 200% font",
+            bounds.width <= 64f * compose.activity.resources.displayMetrics.density
+        )
         cancel.performClick()
         compose.waitUntil(5_000) { model.query.value == "notes" }
         compose.onNodeWithTag("noma_search").assertExists()
