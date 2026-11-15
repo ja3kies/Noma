@@ -1592,6 +1592,28 @@ class NomaUiTest {
     }
 
 
+    @Test fun bottomSearchCancelKeepsCompactTouchTargetAtLargeText() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, 2f)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithTag("noma_search").performTextInput("notes")
+        val cancel = compose.onNodeWithTag("noma_search_dismiss")
+        cancel.assertIsDisplayed()
+        compose.runOnIdle {
+            val bounds = cancel.fetchSemanticsNode().boundsInRoot
+            assertTrue("Keyboard cancel must not squeeze the search pill at 200% font", bounds.width <= 64f * compose.activity.resources.displayMetrics.density)
+        }
+        cancel.performClick()
+        compose.waitUntil(5_000) { model.query.value == "notes" }
+        compose.onNodeWithTag("noma_search").assertExists()
+    }
+
     @Test fun searchFocusShowsSeparateCancelAndPreservesTypedQuery() {
         val repo = FakeRepository()
         val model = NotesViewModel(repo, NotesService(repo))
