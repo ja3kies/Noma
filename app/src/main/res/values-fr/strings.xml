@@ -65,7 +65,7 @@
     <string name="wait_for_save_before_exit">Enregistrement des modifications avant de quitter…</string>
     <string name="leave_unsaved">Quitter quand même</string>
     <string name="error_recovery">Noma ne parvient pas à lire vos notes. Réessayez. Si le problème persiste, vérifiez une sauvegarde avant toute modification.</string>
-    <string name="save_failure_guidance">Ces modifications ne sont pas encore enregistrées. Réessayez avant de quitter l’éditeur.</string>
+    <string name="save_failure_guidance">Réessayez avant de quitter pour conserver vos modifications.</string>
     <plurals name="note_total">
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>

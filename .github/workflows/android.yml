@@ -107,7 +107,7 @@ jobs:
           # run-as would emit "unknown package" instead of a PNG. Screenshots
           # are published by the instrumentation test into shared MediaStore.
           # Check the *file signature*, not just a nonzero byte count.
-          script: 'adb shell settings put secure show_ime_with_hard_keyboard 1 && adb shell ime list -s && adb shell settings get secure default_input_method && gradle --no-daemon :app:connectedDebugAndroidTest && mkdir -p app/build/reports/editor-snapshots && for name in 01-editor-light 02-editor-ime 03-editor-save-failure 04-editor-dark 05-editor-large-font 06-editor-large-font-failure; do adb pull "/sdcard/Pictures/NomaEditor/$name.png" "app/build/reports/editor-snapshots/$name.png" >/dev/null && test "$(file -b --mime-type "app/build/reports/editor-snapshots/$name.png")" = "image/png" || exit 1; done'
+          script: 'adb shell settings put secure show_ime_with_hard_keyboard 1 && adb shell ime list -s && adb shell settings get secure default_input_method && gradle --no-daemon :app:connectedDebugAndroidTest && mkdir -p app/build/reports/editor-snapshots && for name in 01-editor-light 02-editor-ime 03-editor-save-failure 04-editor-dark 05-editor-large-font 06-editor-large-font-failure 07-library-light 08-appearance-ink 09-widget-appearance; do adb pull "/sdcard/Pictures/NomaEditor/$name.png" "app/build/reports/editor-snapshots/$name.png" >/dev/null && test "$(file -b --mime-type "app/build/reports/editor-snapshots/$name.png")" = "image/png" || exit 1; done'
       - name: Upload instrumentation diagnostics
         if: always()
         uses: actions/upload-artifact@v4

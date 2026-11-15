@@ -75,7 +75,7 @@ object NomaSpacing {
     val section = 24.dp
     val page = 16.dp
     val listPaneWidth = 400.dp
-    val editorMaxWidth = 640.dp
+    val editorMaxWidth = 608.dp
     val touchTarget = 48.dp
 }
 

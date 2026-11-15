@@ -65,7 +65,7 @@
     <string name="wait_for_save_before_exit">Saving your changes before leaving…</string>
     <string name="leave_unsaved">Leave anyway</string>
     <string name="error_recovery">Noma could not read your notes. Try again. If the problem persists, verify a backup before making changes.</string>
-    <string name="save_failure_guidance">These changes are not stored yet. Retry saving before leaving the editor.</string>
+    <string name="save_failure_guidance">Retry before leaving to keep your latest changes.</string>
     <plurals name="note_total">
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>

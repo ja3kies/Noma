@@ -300,6 +300,45 @@ class NomaUiTest {
         savePremiumScreenshot("06-editor-large-font-failure")
     }
 
+    /**
+     * Real emulator screenshots for Noma's entire visual surface, not only
+     * the editor. Synthetic data keeps personal notes out of CI artifacts.
+     */
+    @Test fun phoneNavigationKeepsOneSnackbarHostAtATime() {
+        val note = Note("phone-feedback", "Selected note", "Body", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithTag("noma_list_snackbar").assertExists()
+        compose.onNodeWithTag("noma_editor_snackbar").assertDoesNotExist()
+        compose.onNodeWithText("Selected note").performClick()
+        compose.onNodeWithTag("noma_editor_snackbar").assertExists()
+        compose.onNodeWithTag("noma_list_snackbar").assertDoesNotExist()
+    }
+
+    @Test fun premiumLibraryAndAppearanceCaptureScreenStates() {
+        val repo = FakeRepository(listOf(
+            Note("visual-pinned", "Morning pages", "A place for thoughts worth keeping.", true, 1L, 3L),
+            Note("visual-ordinary", "Weekend plans", "Read a few pages and go for a walk.", false, 1L, 2L)
+        ))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val accent = mutableStateOf(NomaAccent.INK)
+        compose.setContent {
+            NomaTheme(appearance = NomaAppearance.LIGHT, accent = accent.value) {
+                NomaApp(model, accent = accent.value, onAccentChange = { accent.value = it })
+            }
+        }
+        compose.onNodeWithText("Morning pages").assertIsDisplayed()
+        compose.onNodeWithTag("noma_search_pill").assertExists()
+        savePremiumScreenshot("07-library-light")
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithTag("noma_accent_INK").performScrollTo().assertIsSelected()
+        savePremiumScreenshot("08-appearance-ink")
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
+        compose.onNodeWithTag("noma_widget_preview_FROSTED_GREEN", useUnmergedTree = true).assertExists()
+        savePremiumScreenshot("09-widget-appearance")
+    }
+
     private fun savePremiumScreenshot(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -375,6 +414,15 @@ class NomaUiTest {
         compose.waitUntil(10_000) { model.saveState.value is EditorSaveState.Failed }
         compose.onNodeWithContentDescription("Export this note")
             .assertIsDisplayed().assertIsEnabled().performClick()
+        // DropdownMenu is a Popup with an entry animation and may open
+        // above a still-visible IME. Wait for actual on-screen visibility:
+        // checking mere existence would hide a clipped menu regression.
+        compose.waitUntil(5_000) {
+            runCatching {
+                compose.onNodeWithText("Export as TXT").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
         compose.onNodeWithText("Export as TXT").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(model.active.value!!.body.contains("unsaved"))
