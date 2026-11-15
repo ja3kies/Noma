@@ -1511,6 +1511,41 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_accent_SAGE").assertIsSelected()
     }
 
+    @Test fun allSixAccentSwatchesFitInBalancedRows() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent { NomaTheme { NomaApp(model) } }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        val forest = compose.onNodeWithTag("noma_accent_FOREST").performScrollTo()
+            .fetchSemanticsNode().boundsInRoot
+        val honey = compose.onNodeWithTag("noma_accent_HONEY").fetchSemanticsNode().boundsInRoot
+        val coral = compose.onNodeWithTag("noma_accent_CORAL").performScrollTo()
+            .fetchSemanticsNode().boundsInRoot
+        val sky = compose.onNodeWithTag("noma_accent_SKY").performScrollTo()
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Swatches 1–3 should share a row", kotlin.math.abs(forest.top - honey.top) < 3f)
+        assertTrue("Swatches 4–6 should occupy a second row", coral.top > forest.top + 24f)
+        assertTrue("All choices must remain operable", sky.width > 0 && coral.width > 0)
+        compose.onNodeWithTag("noma_accent_SKY").performClick().assertIsSelected()
+    }
+
+    @Test fun appearanceModesRemainReachableAtDoubleFontScale() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        val base = androidx.compose.ui.platform.LocalDensity
+        compose.setContent {
+            val systemDensity = base.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(systemDensity.density, 2f)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithTag("noma_theme_preview_SYSTEM").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("noma_theme_preview_DARK").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("noma_theme_preview_DARK").assertIsSelected()
+    }
+
     @Test fun newAppearanceChoicesRemainAccessibleAfterTheVisualRedesign() {
         val repo = FakeRepository()
         val model = NotesViewModel(repo, NotesService(repo))
