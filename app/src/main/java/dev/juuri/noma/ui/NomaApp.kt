@@ -637,7 +637,13 @@ private fun NotesListScreen(
         containerColor = if (isTabletList) MaterialTheme.colorScheme.surfaceContainerLow
             else MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
-        snackbarHost = { SnackbarHost(snackbar) },
+        // In two-pane mode the active editor owns feedback; never render the
+        // same SnackbarHostState in both the library and the editor.
+        snackbarHost = {
+            if (selectedId == null) {
+                SnackbarHost(snackbar, modifier = Modifier.testTag("noma_list_snackbar"))
+            }
+        },
         // Like a bottom-toolbar search field on iOS, but implemented with
         // Compose insets and native Material colors. The Scaffold reserves
         // room for this bar and positions its FAB above it automatically.
