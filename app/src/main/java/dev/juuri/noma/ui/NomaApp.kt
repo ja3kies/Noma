@@ -1302,12 +1302,25 @@ private fun BottomSearchPill(
             enter = expandHorizontally() + fadeIn(),
             exit = shrinkHorizontally() + fadeOut()
         ) {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    .testTag("noma_search_dismiss")
-            ) {
-                Text(stringResource(R.string.cancel))
+            if (LocalDensity.current.fontScale >= 1.5f) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(NomaSpacing.touchTarget)
+                        .testTag("noma_search_dismiss")
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.noma_huge_arrow_left),
+                        contentDescription = stringResource(R.string.cancel)
+                    )
+                }
+            } else {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.defaultMinSize(minHeight = NomaSpacing.touchTarget)
+                        .testTag("noma_search_dismiss")
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         }
     }
@@ -2455,8 +2468,6 @@ private fun WidgetStyleDialog(
     onSelect: (NomaWidgetStyle) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val compactPreview = LocalConfiguration.current.screenWidthDp < 420 ||
-        LocalDensity.current.fontScale >= 1.25f
     val styles = listOf(
         NomaWidgetStyle.MATERIAL_YOU to R.string.widget_style_material_you,
         NomaWidgetStyle.FROSTED_GREEN to R.string.widget_style_frosted_green,
@@ -2485,7 +2496,7 @@ private fun WidgetStyleDialog(
                         animationSpec = tween(NomaMotion.standard),
                         label = "nomaWidgetChoiceStroke"
                     )
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth()
                             .padding(vertical = NomaSpacing.tiny)
                             .background(choiceColor, RoundedCornerShape(20.dp))
@@ -2497,7 +2508,7 @@ private fun WidgetStyleDialog(
                                 onClick = { onSelect(style) }
                             )
                             .padding(horizontal = NomaSpacing.medium),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
                     ) {
                         val previewBrush = when (style) {
                             NomaWidgetStyle.MATERIAL_YOU -> SolidColor(
@@ -2524,39 +2535,48 @@ private fun WidgetStyleDialog(
                             NomaWidgetStyle.FROSTED_GREEN -> R.color.noma_widget_frosted_text
                             NomaWidgetStyle.LIQUID_GLASS -> R.color.noma_widget_glass_text
                         })
-                        Box(
-                            modifier = Modifier.size(width = if (compactPreview) 76.dp else 116.dp, height = 36.dp)
-                                .background(previewBrush, RoundedCornerShape(15.dp))
-                                .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
-                                .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
-                                    Modifier.padding(1.dp).border(1.dp,
-                                        colorResource(R.color.noma_widget_glass_stroke), RoundedCornerShape(14.dp))
-                                    else Modifier)
-                                .testTag("noma_widget_preview_${style.name}"),
-                            contentAlignment = Alignment.CenterStart
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Box(
+                                modifier = Modifier.size(width = 136.dp, height = 36.dp)
+                                    .background(previewBrush, RoundedCornerShape(15.dp))
+                                    .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
+                                    .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
+                                        Modifier.padding(1.dp).border(1.dp,
+                                            colorResource(R.color.noma_widget_glass_stroke), RoundedCornerShape(14.dp))
+                                        else Modifier)
+                                    .testTag("noma_widget_preview_${style.name}"),
+                                contentAlignment = Alignment.CenterStart
                             ) {
-                                Image(
-                                    painter = painterResource(R.drawable.noma_launcher_foreground),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(23.dp)
-                                )
-                                Text(
-                                    stringResource(R.string.shortcut_new_note),
-                                    color = previewText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Image(
+                                        painter = painterResource(R.drawable.noma_launcher_foreground),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(23.dp)
+                                    )
+                                    Text(
+                                        stringResource(R.string.shortcut_new_note),
+                                        color = previewText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
+                            Spacer(Modifier.weight(1f))
+                            RadioButton(selected = isSelected, onClick = null)
                         }
-                        Spacer(Modifier.width(NomaSpacing.small))
-                        Column(Modifier.weight(1f)) {
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+                        ) {
                             Text(
                                 stringResource(label),
                                 style = MaterialTheme.typography.bodyLarge,
@@ -2574,7 +2594,6 @@ private fun WidgetStyleDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        RadioButton(selected = isSelected, onClick = null)
                     }
                 }
                 Spacer(Modifier.height(NomaSpacing.small))

@@ -915,6 +915,61 @@ class NomaUiTest {
         compose.onNodeWithTag("noma_accent_grid").assertExists()
     }
 
+    @Test fun widgetStylePreviewAndTitleDoNotCollideAtLargeText() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, 2f)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithContentDescription("Appearance").performClick()
+        compose.onNodeWithText("Widget appearance").performScrollTo().performClick()
+        // The selectable widget card merges child semantics. The visual
+        // miniature and title remain in the unmerged tree for geometry tests.
+        // Scroll the actual child into view rather than querying the merged card.
+        compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS", useUnmergedTree = true)
+            .performScrollTo()
+        compose.waitForIdle()
+        val preview = compose.onNodeWithTag(
+            "noma_widget_preview_LIQUID_GLASS", useUnmergedTree = true
+        ).fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithText("Liquid Glass", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "The widget preview must not compete with the label at 200% font scale",
+            preview.bottom <= title.top + 2f
+        )
+        compose.onNodeWithText("Liquid Glass").performClick()
+        compose.onNodeWithTag("noma_widget_preview_LIQUID_GLASS", useUnmergedTree = true)
+            .assertExists()
+    }
+
+    @Test fun bottomSearchCancelKeepsCompactTouchTargetAtLargeText() {
+        val repo = FakeRepository()
+        val model = NotesViewModel(repo, NotesService(repo))
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides
+                    androidx.compose.ui.unit.Density(density.density, 2f)
+            ) { NomaTheme { NomaApp(model) } }
+        }
+        compose.onNodeWithTag("noma_search").performTextInput("notes")
+        val cancel = compose.onNodeWithTag("noma_search_dismiss")
+        cancel.assertIsDisplayed()
+        val bounds = cancel.fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Keyboard cancel must not squeeze the search pill at 200% font",
+            bounds.width <= 64f * compose.activity.resources.displayMetrics.density
+        )
+        cancel.performClick()
+        compose.waitUntil(5_000) { model.query.value == "notes" }
+        compose.onNodeWithTag("noma_search").assertExists()
+    }
+
     @Test fun appearanceSettingsExposeThreeWidgetStyles() {
         val repo = FakeRepository()
         val viewModel = NotesViewModel(repo, NotesService(repo))
