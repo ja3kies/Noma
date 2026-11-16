@@ -1220,6 +1220,16 @@ private fun BottomSearchPill(
     modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
+    val searchKeyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(focused, enabled) {
+        if (focused && enabled) {
+            // Compose may request the IME before the focused editor is served
+            // by the Android window. Retry on the next frame after focus settles.
+            // This runs only on focus gain, never after the user hides the IME.
+            withFrameNanos { }
+            searchKeyboard?.show()
+        }
+    }
     val elevation by animateDpAsState(
         targetValue = if (focused) 4.dp else 0.dp,
         animationSpec = NomaMotion.spatialGentle(),
@@ -1682,6 +1692,14 @@ private fun NoteEditorScreen(
     val editorScrollState = rememberSaveable(note.id, saver = ScrollState.Saver) { ScrollState(0) }
     val bodyVisibility = remember(note.id) { BringIntoViewRequester() }
     var bodyFocused by remember(note.id) { mutableStateOf(false) }
+    LaunchedEffect(note.id, bodyFocused) {
+        if (bodyFocused) {
+            // Wait for a focused Compose input connection before requesting IME.
+            // A manual Hide does not change body focus, so it stays hidden.
+            withFrameNanos { }
+            keyboard?.show()
+        }
+    }
     var bodyLayout by remember(note.id) { mutableStateOf<TextLayoutResult?>(null) }
     var editorViewportSize by remember(note.id) { mutableStateOf(IntSize.Zero) }
     LaunchedEffect(bodyFocused, bodyLayout, currentBody.selection, editorViewportSize) {

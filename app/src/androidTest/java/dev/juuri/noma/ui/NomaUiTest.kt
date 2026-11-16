@@ -404,6 +404,26 @@ class NomaUiTest {
         compose.onNodeWithContentDescription("Export this note").assertIsDisplayed().assertIsEnabled()
     }
 
+    @Test fun manuallyHiddenKeyboardStaysClosedWhileEditorRetainsFocus() {
+        val note = Note("hide-ime", "Keyboard control", "Editing", false, 1L, 2L)
+        val repo = FakeRepository(listOf(note))
+        val model = NotesViewModel(repo, NotesService(repo))
+        val visible = mutableStateOf(false)
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val bottom = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(density)
+            androidx.compose.runtime.SideEffect { visible.value = bottom > 0 }
+            NomaTheme { NomaApp(model) }
+        }
+        compose.onNodeWithText("Keyboard control").performClick()
+        compose.onNodeWithTag("noma_body_input").performClick()
+        compose.waitUntil(10_000) { visible.value }
+        compose.onNodeWithTag("noma_editor_hide_keyboard").assertIsEnabled().performClick()
+        compose.waitUntil(10_000) { !visible.value }
+        compose.waitForIdle()
+        assertTrue("Hide must not be cancelled by an ongoing focus effect", !visible.value)
+    }
+
     @Test fun editorFailedDraftCanOpenPortableExportWithoutDiscardingText() {
         val repo = FakeRepository(listOf(Note("rescue", "Rescue draft", "Stored", false, 1L, 2L)))
         val model = NotesViewModel(repo, NotesService(repo))
