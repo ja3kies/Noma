@@ -2539,41 +2539,44 @@ private fun WidgetStyleDialog(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                        Box(
-                            modifier = Modifier.size(width = 136.dp, height = 36.dp)
-                                .background(previewBrush, RoundedCornerShape(15.dp))
-                                .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
-                                .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
-                                    Modifier.padding(1.dp).border(1.dp,
-                                        colorResource(R.color.noma_widget_glass_stroke), RoundedCornerShape(14.dp))
-                                    else Modifier)
-                                .testTag("noma_widget_preview_${style.name}"),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Row(
-                                Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Box(
+                                modifier = Modifier.size(width = 136.dp, height = 36.dp)
+                                    .background(previewBrush, RoundedCornerShape(15.dp))
+                                    .border(1.dp, previewOutline, RoundedCornerShape(15.dp))
+                                    .then(if (style == NomaWidgetStyle.LIQUID_GLASS)
+                                        Modifier.padding(1.dp).border(1.dp,
+                                            colorResource(R.color.noma_widget_glass_stroke), RoundedCornerShape(14.dp))
+                                        else Modifier)
+                                    .testTag("noma_widget_preview_${style.name}"),
+                                contentAlignment = Alignment.CenterStart
                             ) {
-                                Image(
-                                    painter = painterResource(R.drawable.noma_launcher_foreground),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(23.dp)
-                                )
-                                Text(
-                                    stringResource(R.string.shortcut_new_note),
-                                    color = previewText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Image(
+                                        painter = painterResource(R.drawable.noma_launcher_foreground),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(23.dp)
+                                    )
+                                    Text(
+                                        stringResource(R.string.shortcut_new_note),
+                                        color = previewText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
+                            Spacer(Modifier.weight(1f))
+                            RadioButton(selected = isSelected, onClick = null)
                         }
-                        Spacer(Modifier.weight(1f))
-                        RadioButton(selected = isSelected, onClick = null)
-                        }
-                        Column(Modifier.fillMaxWidth()) {
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(NomaSpacing.tiny)
+                        ) {
                             Text(
                                 stringResource(label),
                                 style = MaterialTheme.typography.bodyLarge,
