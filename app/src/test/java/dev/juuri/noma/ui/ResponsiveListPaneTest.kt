@@ -15,6 +15,21 @@ class ResponsiveListPaneTest {
         assertEquals(2, nomaThemeFamilyColumns(560.dp, 1.2f))
     }
 
+    @Test fun themeModeOptionsStayReadableAtCompactWidthsAndLargeText() {
+        assertEquals(1, nomaAppearanceColumns(320.dp, 1f))
+        assertEquals(1, nomaAppearanceColumns(393.dp, 1f))
+        assertEquals(1, nomaAppearanceColumns(560.dp, 2f))
+        assertEquals(2, nomaAppearanceColumns(480.dp, 1f))
+        assertEquals(3, nomaAppearanceColumns(560.dp, 1f))
+    }
+
+    @Test fun accentSwatchesWrapOnPhoneAndInLargeText() {
+        assertEquals(3, nomaAccentColumns(320.dp, 1f))
+        assertEquals(3, nomaAccentColumns(393.dp, 1f))
+        assertEquals(3, nomaAccentColumns(560.dp, 2f))
+        assertEquals(6, nomaAccentColumns(560.dp, 1f))
+    }
+
     @Test fun minimumListWidthAtCompactTabletBreakpoint() {
         assertEquals(320.dp, responsiveListPaneWidth(840.dp))
     }

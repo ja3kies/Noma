@@ -14,6 +14,12 @@ class NomaAccentTest {
         assertEquals(NomaAccent.FOREST, NomaAccent.fromStorage("UNRECOGNIZED"))
     }
 
+    @Test fun legacyLilacPreferenceMigratesWithoutPurpleAccent() {
+        assertEquals(NomaAccent.INK, NomaAccent.fromStorage("LILAC"))
+        assertTrue(NomaAccent.entries.none { it.name == "LILAC" })
+        assertEquals(NomaAccent.INK, NomaAccent.fromStorage("INK"))
+    }
+
     @Test fun everyAccentRoundTripsThroughStoredEnumName() {
         NomaAccent.entries.forEach { accent ->
             assertEquals(accent, NomaAccent.fromStorage(accent.name))
